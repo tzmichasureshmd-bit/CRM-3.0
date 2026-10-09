@@ -17,7 +17,7 @@ export function KPIWidget({ title, value, change, trend = 'neutral', icon, accen
     <div className="crm-kpi-card">
       <div className={`crm-kpi-icon ${accent}`}>{icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 22, fontWeight: 750, color: 'var(--crm-text)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{value}</div>
+        <div style={{ fontSize: 22, fontWeight: 750, color: 'var(--crm-text-strong)', letterSpacing: '-0.02em', lineHeight: 1.2 }}>{value}</div>
         <div style={{ fontSize: 12.5, color: 'var(--crm-text-secondary)', marginTop: 2, fontWeight: 500 }}>{title}</div>
         {change && (
           <div className={trend === 'up' ? 'crm-trend-up' : trend === 'down' ? 'crm-trend-down' : ''} style={{ marginTop: 8 }}>

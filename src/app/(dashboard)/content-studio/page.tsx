@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Sparkles, FileText, Calendar, Grid3X3,
   Plus, Loader2, Copy, Check, AtSign, Share2,
-  MessageSquare, Send, RefreshCw, Wand2,
+  MessageSquare, Send, RefreshCw, Wand2, TrendingUp,
 } from 'lucide-react';
 import type { ContentItem, ContentStatus, ContentPlatform } from '@/types/crm3';
+import Link from 'next/link';
 
 // ── Status badge ──────────────────────────────────────────────
 function StatusBadge({ status }: { status: ContentStatus }) {
@@ -39,7 +40,7 @@ function PlatformIcon({ platform }: { platform: ContentPlatform }) {
 }
 
 // ── AI Generator Panel ────────────────────────────────────────
-function AIGeneratorPanel({ onGenerated }: { onGenerated: (content: GeneratedContent) => void }) {
+function AIGeneratorPanel({ onGenerated }: { onGenerated: (content: GeneratedContent) => Promise<void> }) {
   const [prompt, setPrompt] = useState('');
   const [platform, setPlatform] = useState<ContentPlatform>('instagram');
   const [tone, setTone] = useState('professional');
@@ -189,10 +190,10 @@ function AIGeneratorPanel({ onGenerated }: { onGenerated: (content: GeneratedCon
           )}
 
           <button
-            onClick={() => onGenerated(result)}
+            onClick={() => void onGenerated(result)}
             className="w-full rounded-xl border border-primary bg-primary/10 py-2 text-sm font-semibold text-primary hover:bg-primary/20 transition-colors"
           >
-            Use This Content
+            Save to Drafts
           </button>
         </div>
       )}
@@ -201,7 +202,14 @@ function AIGeneratorPanel({ onGenerated }: { onGenerated: (content: GeneratedCon
 }
 
 // ── Content Card ──────────────────────────────────────────────
-function ContentCard({ item }: { item: Partial<ContentItem> }) {
+function ContentCard({ item, onPublish }: { item: Partial<ContentItem>; onPublish?: (id: string) => Promise<void> }) {
+  const [publishing, setPublishing] = useState(false);
+  const handlePublish = async () => {
+    if (!item.id || !onPublish) return;
+    setPublishing(true);
+    await onPublish(item.id);
+    setPublishing(false);
+  };
   return (
     <div className="rounded-2xl border border-border bg-card p-4 space-y-3 hover:shadow-md transition-all">
       <div className="flex items-start justify-between gap-2">
@@ -229,11 +237,16 @@ function ContentCard({ item }: { item: Partial<ContentItem> }) {
           </div>
           <div>
             <p className="text-sm font-bold text-foreground">
-              {item.revenue_attributed ? `${(item.revenue_attributed / 1000).toFixed(0)}K` : '—'}
+              {item.revenue_attributed ? `$${(item.revenue_attributed / 1000).toFixed(1)}K` : '—'}
             </p>
             <p className="text-[9px] text-muted-foreground">Revenue</p>
           </div>
         </div>
+      )}
+      {onPublish && item.status !== 'published' && (
+        <button onClick={() => void handlePublish()} disabled={publishing} className="w-full rounded-lg border border-green-200 bg-green-50 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50">
+          {publishing ? 'Publishing...' : 'Mark as Published'}
+        </button>
       )}
     </div>
   );
@@ -261,23 +274,99 @@ type Tab = (typeof TABS)[number]['id'];
 export default function ContentStudioPage() {
   const [activeTab, setActiveTab] = useState<Tab>('create');
   const [draftContent, setDraftContent] = useState<Partial<ContentItem>[]>([]);
+  const [publishedContent, setPublishedContent] = useState<Partial<ContentItem>[]>([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
+  const [loadingPublished, setLoadingPublished] = useState(false);
 
-  const handleGenerated = useCallback((content: GeneratedContent) => {
-    const newItem: Partial<ContentItem> = {
-      id: `draft-${Date.now()}`,
-      title: content.headline || 'AI Generated Content',
-      caption: content.caption,
-      cta: content.cta,
-      hashtags: content.hashtags,
-      platform: 'instagram',
-      status: 'ai_generated',
-      ai_generated: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setDraftContent((prev) => [newItem, ...prev]);
-    setActiveTab('drafts');
+  const loadDrafts = useCallback(async () => {
+    setLoadingDrafts(true);
+    try {
+      const res = await fetch('/api/v3/content?status=ai_generated');
+      if (res.ok) {
+        const d = await res.json() as { data: Partial<ContentItem>[] };
+        setDraftContent(d.data ?? []);
+      }
+    } finally {
+      setLoadingDrafts(false);
+    }
   }, []);
+
+  const loadPublished = useCallback(async () => {
+    setLoadingPublished(true);
+    try {
+      const res = await fetch('/api/v3/content?status=published');
+      if (res.ok) {
+        const d = await res.json() as { data: Partial<ContentItem>[] };
+        setPublishedContent(d.data ?? []);
+      }
+    } finally {
+      setLoadingPublished(false);
+    }
+  }, []);
+
+  const handlePublish = useCallback(async (id: string) => {
+    const res = await fetch(`/api/v3/content/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'published' }),
+    });
+    if (res.ok) {
+      await Promise.all([loadDrafts(), loadPublished()]);
+    }
+  }, [loadDrafts, loadPublished]);
+
+  useEffect(() => { void loadDrafts(); void loadPublished(); }, [loadDrafts, loadPublished]);
+
+  const handleGenerated = useCallback(async (content: GeneratedContent) => {
+    // Persist to DB
+    try {
+      const res = await fetch('/api/v3/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: content.headline || 'AI Generated Content',
+          caption: content.caption,
+          cta: content.cta,
+          hashtags: content.hashtags,
+          platform: 'instagram',
+          content_type: 'text',
+          status: 'ai_generated',
+          ai_generated: true,
+          media_urls: [],
+        }),
+      });
+      if (res.ok) {
+        await loadDrafts();
+      } else {
+        // Fallback: add in-memory
+        const newItem: Partial<ContentItem> = {
+          id: `draft-${Date.now()}`,
+          title: content.headline || 'AI Generated Content',
+          caption: content.caption,
+          cta: content.cta,
+          hashtags: content.hashtags,
+          platform: 'instagram',
+          status: 'ai_generated',
+          ai_generated: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setDraftContent((prev) => [newItem, ...prev]);
+      }
+    } catch {
+      const newItem: Partial<ContentItem> = {
+        id: `draft-${Date.now()}`,
+        title: content.headline || 'AI Generated Content',
+        caption: content.caption,
+        status: 'ai_generated',
+        ai_generated: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setDraftContent((prev) => [newItem, ...prev]);
+    }
+    setActiveTab('drafts');
+  }, [loadDrafts]);
 
   return (
     <div className="space-y-5">
@@ -319,7 +408,9 @@ export default function ContentStudioPage() {
 
       {activeTab === 'drafts' && (
         <div>
-          {draftContent.length === 0 ? (
+          {loadingDrafts ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#8790aa', fontSize: 13 }}>Loading drafts...</div>
+          ) : draftContent.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
               <FileText className="h-10 w-10 text-muted-foreground/50 mb-3" />
               <p className="text-sm font-medium text-muted-foreground">No drafts yet</p>
@@ -334,7 +425,7 @@ export default function ContentStudioPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {draftContent.map((item) => (
-                <ContentCard key={item.id} item={item} />
+                <ContentCard key={item.id} item={item} onPublish={handlePublish} />
               ))}
             </div>
           )}
@@ -350,10 +441,28 @@ export default function ContentStudioPage() {
       )}
 
       {activeTab === 'published' && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
-          <Grid3X3 className="h-10 w-10 text-muted-foreground/50 mb-3" />
-          <p className="text-sm font-medium text-muted-foreground">No published content yet</p>
-          <p className="text-xs text-muted-foreground mt-1">Published content with attribution data will appear here</p>
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-muted-foreground">Published content with attribution metrics</p>
+            <Link href="/revenue" className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors">
+              <TrendingUp className="h-3 w-3" /> Full Attribution Dashboard
+            </Link>
+          </div>
+          {loadingPublished ? (
+            <div style={{ textAlign: 'center', padding: '40px', color: '#8790aa', fontSize: 13 }}>Loading...</div>
+          ) : publishedContent.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
+              <Grid3X3 className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">No published content yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Mark drafts as published to track attribution</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {publishedContent.map((item) => (
+                <ContentCard key={item.id} item={item} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -16,10 +16,19 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { contactId, accountId } = await req.json();
-    if (!contactId || !accountId) {
-      return NextResponse.json({ error: 'contactId and accountId required' }, { status: 400 });
+    const { contactId } = await req.json();
+    if (!contactId) {
+      return NextResponse.json({ error: 'contactId required' }, { status: 400 });
     }
+
+    // ── Get account_id from session (NEVER from request body) ──
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('account_id')
+      .eq('user_id', user.id)
+      .single();
+    const accountId = profile?.account_id;
+    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
 
     // ── Fetch contact data ──────────────────────────────────
     const { data: contact } = await supabase

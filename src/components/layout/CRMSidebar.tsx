@@ -63,7 +63,7 @@ const NAV = [
   {
     id: 'intelligence', label: 'INTELLIGENCE',
     items: [
-      { href: '/revenue', icon: BarChart3, label: 'Revenue Intelligence' },
+      { href: '/revenue', icon: BarChart3, label: 'Revenue Attribution' },
       { href: '/analytics', icon: Activity, label: 'Analytics' },
       { href: '/reports', icon: FileBarChart, label: 'Reports' },
     ],
@@ -136,7 +136,7 @@ export function CRMSidebar({ theme: _theme, onToggleTheme: _onToggleTheme }: CRM
           <Brain size={18} color="white" strokeWidth={2} />
         </div>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--crm-text)', letterSpacing: '-0.01em' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--crm-text-strong)', letterSpacing: '-0.01em' }}>
             TZMICHA
           </div>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--crm-text-muted)', letterSpacing: '0.04em' }}>

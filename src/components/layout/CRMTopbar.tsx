@@ -22,7 +22,7 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
   return (
     <header className="crm-topbar">
       <div className="crm-search">
-        <Search size={14} color="var(--crm-text-muted)" strokeWidth={2} />
+        <Search size={14} color="#2563EB" strokeWidth={2} />
         <input type="text" placeholder="Search customers, leads, conversations... (Ctrl + K)" />
         <kbd style={{
           fontSize: 10, color: 'var(--crm-text-muted)',
@@ -32,21 +32,21 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
       </div>
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button className="crm-topbar-btn" aria-label="Messages">
+        <button className="crm-topbar-btn" aria-label="Messages" style={{ color: 'var(--crm-text-nav)' }}>
           <MessageSquare size={15} strokeWidth={1.8} />
         </button>
-        <button className="crm-topbar-btn" aria-label="Notifications" style={{ position: 'relative' }}>
+        <button className="crm-topbar-btn" aria-label="Notifications" style={{ position: 'relative', color: 'var(--crm-text-nav)' }}>
           <Bell size={15} strokeWidth={1.8} />
           <span style={{
             position: 'absolute', top: 7, right: 7,
             width: 7, height: 7, borderRadius: '50%',
-            background: '#f46b72', border: '1.5px solid white',
+            background: '#DC2626', border: '1.5px solid white',
           }} />
         </button>
-        <button className="crm-topbar-btn" aria-label="Settings">
+        <button className="crm-topbar-btn" aria-label="Settings" style={{ color: 'var(--crm-text-nav)' }}>
           <Settings size={15} strokeWidth={1.8} />
         </button>
-        <button className="crm-topbar-btn" aria-label="Apps">
+        <button className="crm-topbar-btn" aria-label="Apps" style={{ color: 'var(--crm-text-nav)' }}>
           <LayoutGrid size={15} strokeWidth={1.8} />
         </button>
 
@@ -59,7 +59,7 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
           {open && (
             <div style={{
               position: 'absolute', right: 0, top: 'calc(100% + 8px)', zIndex: 200,
-              background: 'var(--crm-surface, rgba(255,255,255,0.95))',
+              background: 'rgba(255,255,255,0.97)',
               backdropFilter: 'blur(20px)',
               border: '1px solid rgba(130,145,190,0.18)',
               borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.14)',
@@ -74,8 +74,8 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
                     color: 'white', fontSize: 13, fontWeight: 700, flexShrink: 0,
                   }}>J</div>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)' }}>John Doe</div>
-                    <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Team Lead</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#0B1F3A' }}>John Doe</div>
+                    <div style={{ fontSize: 11, color: '#627D98' }}>Team Lead</div>
                   </div>
                 </div>
                 <button
@@ -84,7 +84,7 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
                     display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                     padding: '6px 8px', borderRadius: 8,
                     background: 'rgba(130,145,190,0.10)', border: '1px solid rgba(130,145,190,0.16)',
-                    cursor: 'pointer', color: 'var(--crm-text-secondary)', fontSize: 12, fontWeight: 500,
+                    cursor: 'pointer', color: '#334E68', fontSize: 12, fontWeight: 500,
                   }}
                 >
                   {theme === 'light' ? <Moon size={13} /> : <Sun size={13} />}
@@ -95,7 +95,7 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
               <button style={{
                 display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                 padding: '8px 14px', background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--crm-text)', fontSize: 13,
+                color: '#0B1F3A', fontSize: 13,
               }}>
                 <User size={14} /> Profile
               </button>
@@ -105,7 +105,7 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
               <button style={{
                 display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                 padding: '8px 14px', background: 'none', border: 'none', cursor: 'pointer',
-                color: '#f46b72', fontSize: 13,
+                color: '#DC2626', fontSize: 13,
               }}>
                 <LogOut size={14} /> Sign Out
               </button>

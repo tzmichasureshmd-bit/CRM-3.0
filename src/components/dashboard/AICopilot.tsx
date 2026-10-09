@@ -20,7 +20,7 @@ export function AICopilot() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div className="crm-ai-orb" style={{ width: 36, height: 36 }} />
-          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text)' }}>AI Copilot</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text-strong)' }}>AI Copilot</span>
         </div>
         <button style={{ background: 'none', border: 'none', color: 'var(--crm-text-muted)', fontSize: 18, cursor: 'pointer' }}>···</button>
       </div>
@@ -47,8 +47,8 @@ export function AICopilot() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0 }}>J</div>
-          <div style={{ background: 'rgba(255,255,255,0.55)', borderRadius: '0 12px 12px 12px', padding: '10px 12px', border: '1px solid rgba(255,255,255,0.70)' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)', marginBottom: 2 }}>Hello John,</div>
+          <div style={{ background: 'rgba(255,255,255,0.65)', borderRadius: '0 12px 12px 12px', padding: '10px 12px', border: '1px solid rgba(255,255,255,0.80)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text-strong)', marginBottom: 2 }}>Hello John,</div>
             <div style={{ fontSize: 12.5, color: 'var(--crm-text-secondary)' }}>How can I help you today?</div>
           </div>
         </div>
@@ -59,7 +59,7 @@ export function AICopilot() {
             <button
               key={s}
               onClick={() => setInput(s)}
-              style={{ padding: '7px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.50)', border: '1px solid rgba(255,255,255,0.68)', fontSize: 11, color: 'var(--crm-text-secondary)', cursor: 'pointer', textAlign: 'left', transition: 'all 150ms', fontWeight: 500 }}
+              style={{ padding: '7px 9px', borderRadius: 10, background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(255,255,255,0.75)', fontSize: 11, color: 'var(--crm-text-secondary)', cursor: 'pointer', textAlign: 'left', transition: 'all 150ms', fontWeight: 500 }}
             >
               {s}
             </button>
@@ -68,12 +68,12 @@ export function AICopilot() {
       </div>
 
       {/* Input */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 14, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.72)', borderRadius: 14, padding: '8px 10px 8px 14px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 14, background: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.80)', borderRadius: 14, padding: '8px 10px 8px 14px', alignItems: 'center' }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           placeholder="Ask anything about your CRM..."
-          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--crm-text)' }}
+          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--crm-text-nav)' }}
         />
         <button
           className="crm-btn-primary"

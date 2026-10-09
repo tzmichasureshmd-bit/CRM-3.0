@@ -26,7 +26,7 @@ export function PipelineOverview() {
   return (
     <GlassPanel className="crm-table-card">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text)' }}>Pipeline Overview</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text-strong)' }}>Pipeline Overview</div>
         <Link href="/pipelines" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--crm-primary)' }}>
           View all <ArrowRight size={12} />
         </Link>
@@ -38,7 +38,7 @@ export function PipelineOverview() {
               <span style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.label}</span>
               <span style={{ fontSize: 10, background: s.color, color: 'white', borderRadius: 6, padding: '1px 6px', fontWeight: 600 }}>{s.count}</span>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 10 }}>{s.value}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text-strong)', marginBottom: 10 }}>{s.value}</div>
             {s.deals.map(d => (
               <div key={d.name} style={{ marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
