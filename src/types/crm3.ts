@@ -1,7 +1,5 @@
 /**
  * CRM 3.0 — Master Types
- * Extends CRM 2.0 types. Never duplicates existing types.
- * Import CRM 2.0 types from the original project.
  */
 
 // ============================================================

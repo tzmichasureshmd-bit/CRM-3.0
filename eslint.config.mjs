@@ -3,7 +3,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['CRM 2.0/**', 'backend/**', 'ai-service/**', 'frontend/**', 'node_modules/**', '.next/**'] },
+  { ignores: ['backend/**', 'ai-service/**', 'frontend/**', 'node_modules/**', '.next/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

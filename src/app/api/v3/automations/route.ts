@@ -4,7 +4,7 @@
  * POST /api/v3/automations  — create automation
  *
  * Security: account_id always from session, never from body.
- * Reuses existing CRM 2.0 automations table.
+ * Reuses existing automations table.
  */
 
 import { NextRequest, NextResponse } from 'next/server';

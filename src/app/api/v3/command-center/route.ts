@@ -2,7 +2,7 @@
  * CRM 3.0 — Command Center API
  * GET /api/v3/command-center
  *
- * Returns real intelligence from existing CRM 2.0 tables.
+ * Returns real intelligence from CRM 3.0 tables.
  * NO fake data. NO mock statistics.
  */
 

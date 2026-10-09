@@ -223,7 +223,7 @@ async function executeStep(
     }
 
     default:
-      return { detail: `Step type "${step.step_type}" — logged, execution via CRM 2.0 engine` };
+      return { detail: `Step type "${step.step_type}" — logged` };
   }
 }
 

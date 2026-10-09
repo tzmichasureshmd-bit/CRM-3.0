@@ -72,12 +72,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .order('started_at', { ascending: false })
       .limit(20);
 
-    // Fetch recent logs (CRM 2.0 logs)
+    // Fetch recent execution logs
     const { data: logs } = await supabase
-      .from('automation_logs')
-      .select('id,status,trigger_event,steps_executed,error_message,created_at,contact_id')
+      .from('crm3_automation_executions')
+      .select('id,status,trigger_type,started_at,completed_at,error_message,contact_id')
       .eq('automation_id', id)
-      .order('created_at', { ascending: false })
+      .eq('account_id', accountId)
+      .order('started_at', { ascending: false })
       .limit(20);
 
     return NextResponse.json({
