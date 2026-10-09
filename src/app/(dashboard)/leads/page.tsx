@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Flame, Search, Brain, TrendingUp, Zap, ChevronRight, RefreshCw, Filter } from 'lucide-react';
+import { Flame, Search, Brain, Zap, ChevronRight, RefreshCw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 

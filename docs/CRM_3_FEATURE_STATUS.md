@@ -345,11 +345,11 @@
 | Attention Section (6 cards) | `IMPLEMENTED` | Framer Motion AnimatePresence + shuffle animation |
 | Recent Conversations (5) | `IMPLEMENTED` | Static demo data, hover animations |
 | Pipeline Overview (4 stages) | `IMPLEMENTED` | Static deal data with progress bars |
-| AI Copilot widget | `IMPLEMENTED` | Chat UI with tabs (Chat/Actions/Insights), not connected to API |
-| Hot Leads (real data) | `NOT_STARTED` | Needs P3 |
-| Overdue Follow-ups (real data) | `NOT_STARTED` | Needs real DB query |
-| Deals at Risk (real data) | `NOT_STARTED` | Needs real DB query |
-| AI Recommendations (real) | `NOT_STARTED` | Needs NBA engine |
+| AI Copilot widget | `IMPLEMENTED` | FIXED Session 011 — wired to /api/v3/copilot, full message history |
+| Hot Leads (real data) | `IMPLEMENTED` | AttentionSection via /api/v3/command-center |
+| Overdue Follow-ups (real data) | `IMPLEMENTED` | AttentionSection via /api/v3/command-center |
+| Deals at Risk (real data) | `IMPLEMENTED` | AttentionSection via /api/v3/command-center |
+| AI Recommendations (real) | `IMPLEMENTED` | AIInsights via /api/v3/command-center |
 | Realtime updates | `NOT_STARTED` | |
 
 ---

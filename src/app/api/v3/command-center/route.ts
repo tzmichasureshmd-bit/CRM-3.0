@@ -18,7 +18,7 @@ import type {
   TeamWorkloadItem,
 } from '@/types/crm3';
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const supabase = await createClient();
 

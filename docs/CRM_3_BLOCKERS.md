@@ -111,8 +111,8 @@
 
 | # | Blocker | Impact | Required Action | Owner | Est. Resolution | Status |
 |---|---------|--------|-----------------|-------|-----------------|--------|
-| P10-B1 | All dashboard KPIs are static/demo data | Command center shows fake numbers | Connect to real Supabase queries — requires live DB | Owner + Developer | After P1-B1 + 2–4 hours dev | `OPEN` |
-| P10-B2 | AI Copilot widget not connected to `/api/v3/copilot` | Copilot on dashboard does nothing | Wire AICopilot.tsx to API | Developer | 1–2 hours | `OPEN` |
+| P10-B1 | ~~All dashboard KPIs are static/demo data~~ | ~~Command center shows fake numbers~~ | **FIXED Session 011** — PipelineOverview real data, AICopilot wired to API | Developer | RESOLVED | `RESOLVED` |
+| P10-B2 | ~~AI Copilot widget not connected to `/api/v3/copilot`~~ | ~~Copilot on dashboard does nothing~~ | **FIXED Session 011** — full message history, real CRM data | Developer | RESOLVED | `RESOLVED` |
 | P10-B3 | Realtime updates not implemented on dashboard | Hot leads / alerts don't update live | Implement Supabase realtime subscription on dashboard | Developer | 2–3 hours | `OPEN` |
 
 ---
@@ -132,7 +132,7 @@
 ## OWNER ACTION CHECKLIST
 > Complete these in order. Each unlocks the next.
 
-- [ ] **Step 1** — Provide real Supabase URL + anon key + service role key → update `.env.local`
+- [x] **Step 1** — Provide real Supabase URL + anon key + service role key → update `.env.local` (**DONE — credentials present**)
 - [ ] **Step 2** — Provide real OpenAI API key → update `.env.local`
 - [ ] **Step 3** — Apply `supabase/migrations/001_crm3_foundation.sql` via Supabase SQL editor
 - [ ] **Step 4** — Apply `supabase/migrations/002_conversation_ai_columns.sql` via Supabase SQL editor

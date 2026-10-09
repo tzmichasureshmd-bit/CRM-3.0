@@ -15,17 +15,17 @@ export async function POST(req: NextRequest) {
     const { prompt, options = {} } = await req.json();
     if (!prompt?.trim()) return NextResponse.json({ error: 'Prompt required' }, { status: 400 });
 
-    const { platform = 'instagram', tone = 'professional', brandVoice, targetAudience } = options;
+    const { platform = 'instagram', tone: _tone = 'professional', brandVoice, targetAudience } = options;
 
     const openaiKey = process.env.OPENAI_API_KEY;
     if (!openaiKey) {
       // Fallback: template-based generation without AI
-      return NextResponse.json(templateFallback(prompt, platform, tone));
+      return NextResponse.json(templateFallback(prompt, platform));
     }
 
     const systemPrompt = `You are a professional social media content creator for a business CRM.
 Create engaging content for ${platform}.
-Tone: ${tone}.
+Tone: ${_tone}.
 ${brandVoice ? `Brand voice: ${brandVoice}.` : ''}
 ${targetAudience ? `Target audience: ${targetAudience}.` : ''}
 
@@ -62,7 +62,7 @@ Respond ONLY with valid JSON in this exact format:
     if (!response.ok) {
       const err = await response.text();
       console.error('[generate-content] OpenAI error:', err);
-      return NextResponse.json(templateFallback(prompt, platform, tone));
+      return NextResponse.json(templateFallback(prompt, platform));
     }
 
     const data = await response.json();
@@ -76,7 +76,7 @@ Respond ONLY with valid JSON in this exact format:
 }
 
 // ── Template fallback (no AI key needed) ─────────────────────
-function templateFallback(prompt: string, platform: string, tone: string) {
+function templateFallback(prompt: string, platform: string) {
   const topic = prompt.slice(0, 50);
   return {
     headline: `Exciting Update: ${topic}`,

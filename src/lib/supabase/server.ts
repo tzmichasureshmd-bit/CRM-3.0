@@ -14,7 +14,7 @@ export async function createClient() {
             toSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch {}
+          } catch { /* cookie set not available in RSC context */ }
         },
       },
     }

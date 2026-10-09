@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Plus, DollarSign } from 'lucide-react';
+import { Plus, DollarSign } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 interface Deal {

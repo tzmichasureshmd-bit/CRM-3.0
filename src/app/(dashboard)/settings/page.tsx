@@ -1,6 +1,6 @@
 'use client';
 
-import { Settings, User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight } from 'lucide-react';
+import { User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight } from 'lucide-react';
 
 const SECTIONS = [
   {

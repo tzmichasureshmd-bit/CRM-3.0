@@ -5,13 +5,22 @@ import { ArrowRight } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
 import { createClient } from '@/lib/supabase/client';
 
+interface ConvRaw {
+  id: string;
+  platform: string | null;
+  last_message_text: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+  contact: { name: string | null }[] | null;
+}
+
 interface Conv {
   id: string;
   platform: string | null;
   last_message_text: string | null;
   last_message_at: string | null;
   unread_count: number;
-  contact: { name: string | null } | null;
+  contactName: string;
 }
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -43,7 +52,15 @@ export function RecentConversations() {
       .eq('status', 'open')
       .order('last_message_at', { ascending: false })
       .limit(5);
-    setConvos((data as Conv[]) ?? []);
+    const normalized: Conv[] = ((data as ConvRaw[]) ?? []).map(c => ({
+      id: c.id,
+      platform: c.platform,
+      last_message_text: c.last_message_text,
+      last_message_at: c.last_message_at,
+      unread_count: c.unread_count,
+      contactName: Array.isArray(c.contact) ? (c.contact[0]?.name ?? 'Unknown') : ((c.contact as { name?: string | null } | null)?.name ?? 'Unknown'),
+    }));
+    setConvos(normalized);
     setLoading(false);
   }, []);
 
@@ -68,7 +85,7 @@ export function RecentConversations() {
           {convos.map(c => {
             const platColor = PLATFORM_COLORS[c.platform ?? ''] ?? '#8790aa';
             const platLabel = PLATFORM_LABELS[c.platform ?? ''] ?? '??';
-            const name = c.contact?.name ?? 'Unknown';
+            const name = c.contactName;
             return (
               <Link key={c.id} href="/inbox" className="crm-conv-card">
                 <div className="crm-conv-avatar" style={{ background: `linear-gradient(135deg,${platColor}55,${platColor}22)`, color: platColor }}>
