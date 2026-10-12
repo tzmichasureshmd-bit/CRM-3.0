@@ -254,10 +254,10 @@
 | Load Drafts from DB | `IMPLEMENTED` | Loads on mount via /api/v3/content GET |
 | Content card display | `IMPLEMENTED` | |
 | Drafts tab | `IMPLEMENTED` | DB-backed |
-| Scheduled tab | `IN_PROGRESS` | Empty state only |
-| Published tab | `IN_PROGRESS` | Empty state only |
-| Content Calendar view | `NOT_STARTED` | |
-| Visual Grid view | `NOT_STARTED` | |
+| Scheduled tab | `IMPLEMENTED` | Replaced by Calendar tab (Session 014) |
+| Published tab | `IMPLEMENTED` | DB-backed |
+| Content Calendar view | `IMPLEMENTED` | Session 014 — month/week/day/agenda views, status+platform filters, real DB data |
+| Visual Grid view | `IMPLEMENTED` | Session 014 — responsive grid, search, filter, sort, pagination, real DB data |
 | DB persistence | `IMPLEMENTED` | FIXED Session 007 |
 | Multi-platform variants | `NOT_STARTED` | |
 | Attribution metrics display | `NOT_STARTED` | Needs P7 |
@@ -295,7 +295,7 @@
 | AI Changes | AI decision node reuses contacts.lead_score from P3 (no duplication) |
 | UI Changes | Full journey builder: node canvas, config panel, analytics, history, test runner |
 | Tests | TypeScript: PASS, Lint: PASS, Build: PASS (44 routes). Browser test: BLOCKED. |
-| Known Issues | Migration 006 must be applied. Wait node background execution needs server scheduler. |
+| Known Issues | Migration 006 + 007 must be applied. Wait node scheduler implemented (Session 014). |
 | Dependencies | P4 IMPLEMENTED ✅, P3 IMPLEMENTED ✅ |
 
 ---
@@ -324,8 +324,8 @@
 | Field | Value |
 |-------|-------|
 | Status | `IMPLEMENTED` |
-| Last Verified | Session 010 |
-| Files Changed | src/components/dashboard/RevenueIntelligence.tsx (real data), src/components/dashboard/LeadSources.tsx (real data), src/components/dashboard/AIInsights.tsx (real command-center data), src/app/(dashboard)/dashboard/page.tsx (removed fake % changes) |
+| Last Verified | Session 012 |
+| Files Changed | src/components/dashboard/RevenueIntelligence.tsx (real data), src/components/dashboard/LeadSources.tsx (real data), src/components/dashboard/AIInsights.tsx (real command-center data), src/app/(dashboard)/dashboard/page.tsx (removed fake % changes), src/components/dashboard/PipelineOverview.tsx (REBUILT real data Session 011), src/components/dashboard/RecentConversations.tsx (real data Session 011), src/components/dashboard/AICopilot.tsx (wired to API Session 011), src/components/dashboard/AttentionSection.tsx (real data Session 011) |
 | Database Changes | None — reads existing tables via APIs |
 | API Changes | Consumes /api/v3/revenue-intelligence + /api/v3/command-center |
 | AI Changes | AI Insights panel shows real recommendations from CRM data |
@@ -339,18 +339,18 @@
 |---------|--------|-------|
 | Greeting + live clock | `VERIFIED` | Dynamic, updates every 60s |
 | KPI cards (5 metrics) | `IMPLEMENTED` | Real data: revenue/pipeline/hot leads/overdue followups/win rate from Supabase |
-| Revenue Intelligence chart | `IMPLEMENTED` | Recharts AreaChart, 4 time ranges (7D/1M/3M/1Y), static data |
-| AI Insights panel | `IMPLEMENTED` | Glass-AI variant, orb animation, static insights |
-| Lead Sources donut chart | `IMPLEMENTED` | Recharts PieChart, 5 sources, static data |
-| Attention Section (6 cards) | `IMPLEMENTED` | Framer Motion AnimatePresence + shuffle animation |
-| Recent Conversations (5) | `IMPLEMENTED` | Static demo data, hover animations |
-| Pipeline Overview (4 stages) | `IMPLEMENTED` | Static deal data with progress bars |
-| AI Copilot widget | `IMPLEMENTED` | FIXED Session 011 — wired to /api/v3/copilot, full message history |
+| Revenue Intelligence chart | `IMPLEMENTED` | Recharts AreaChart, real /api/v3/revenue-intelligence data |
+| AI Insights panel | `IMPLEMENTED` | Real /api/v3/command-center recommendations |
+| Lead Sources donut chart | `IMPLEMENTED` | Real /api/v3/revenue-intelligence source_breakdown |
+| Attention Section (6 cards) | `IMPLEMENTED` | Real /api/v3/command-center data — hot leads/overdue/deals/convs |
+| Recent Conversations (5) | `IMPLEMENTED` | Real Supabase conversations JOIN contacts query |
+| Pipeline Overview (4 stages) | `IMPLEMENTED` | Real Supabase deals grouped by pipeline_stages |
+| AI Copilot widget | `IMPLEMENTED` | Wired to /api/v3/copilot, full message history |
 | Hot Leads (real data) | `IMPLEMENTED` | AttentionSection via /api/v3/command-center |
 | Overdue Follow-ups (real data) | `IMPLEMENTED` | AttentionSection via /api/v3/command-center |
 | Deals at Risk (real data) | `IMPLEMENTED` | AttentionSection via /api/v3/command-center |
 | AI Recommendations (real) | `IMPLEMENTED` | AIInsights via /api/v3/command-center |
-| Realtime updates | `NOT_STARTED` | |
+| Realtime updates | `IMPLEMENTED` | Dashboard KPIs auto-refresh via Supabase realtime (deals/contacts/follow_ups) |
 
 ---
 
@@ -359,15 +359,15 @@
 ### Module: AI Business Copilot
 | Field | Value |
 |-------|-------|
-| Status | `IN_PROGRESS` |
-| Last Verified | Session 001 |
-| Files Changed | src/app/(dashboard)/ai-center/page.tsx |
+| Status | `IMPLEMENTED` |
+| Last Verified | Session 013 |
+| Files Changed | src/app/(dashboard)/ai-center/page.tsx, src/app/api/v3/copilot/route.ts |
 | Database Changes | None |
-| API Changes | /api/v3/copilot (scaffolded, not implemented) |
-| AI Changes | Tool-based Q&A over CRM data (planned) |
-| UI Changes | Full chat interface — VERIFIED working UI |
-| Tests | — |
-| Known Issues | API route not implemented — UI calls /api/v3/copilot but gets error/placeholder |
+| API Changes | /api/v3/copilot — full POST handler, 5 intent categories, real CRM data |
+| AI Changes | Rule-based intent routing (hot_leads/overdue_followups/deals/conversations/pipeline/general) |
+| UI Changes | Full chat interface — message history, suggested queries, data source badges |
+| Tests | TypeScript: PASS, Lint: PASS, Build: PASS. Browser test: BLOCKED (migrations required). |
+| Known Issues | None — fully implemented. Browser test blocked on live Supabase. |
 | Dependencies | P0 VERIFIED ✅ |
 
 #### UI Details (VERIFIED)

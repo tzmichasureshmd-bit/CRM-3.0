@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import type { ContentItem, ContentStatus, ContentPlatform } from '@/types/crm3';
 import Link from 'next/link';
+import { ContentCalendar } from '@/components/content-studio/ContentCalendar';
+import { ContentGrid } from '@/components/content-studio/ContentGrid';
 
 // ── Status badge ──────────────────────────────────────────────
 function StatusBadge({ status }: { status: ContentStatus }) {
@@ -263,10 +265,11 @@ interface GeneratedContent {
 
 // ── Main Page ─────────────────────────────────────────────────
 const TABS = [
-  { id: 'create', label: 'Create', icon: Wand2 },
-  { id: 'drafts', label: 'Drafts', icon: FileText },
-  { id: 'scheduled', label: 'Scheduled', icon: Calendar },
-  { id: 'published', label: 'Published', icon: Grid3X3 },
+  { id: 'create',    label: 'Create',    icon: Wand2 },
+  { id: 'drafts',    label: 'Drafts',    icon: FileText },
+  { id: 'calendar',  label: 'Calendar',  icon: Calendar },
+  { id: 'grid',      label: 'Grid',      icon: Grid3X3 },
+  { id: 'published', label: 'Published', icon: TrendingUp },
 ] as const;
 
 type Tab = (typeof TABS)[number]['id'];
@@ -432,12 +435,12 @@ export default function ContentStudioPage() {
         </div>
       )}
 
-      {activeTab === 'scheduled' && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16 text-center">
-          <Calendar className="h-10 w-10 text-muted-foreground/50 mb-3" />
-          <p className="text-sm font-medium text-muted-foreground">No scheduled content</p>
-          <p className="text-xs text-muted-foreground mt-1">Schedule content from your drafts</p>
-        </div>
+      {activeTab === 'calendar' && (
+        <ContentCalendar onCreateForDate={() => setActiveTab('create')} />
+      )}
+
+      {activeTab === 'grid' && (
+        <ContentGrid />
       )}
 
       {activeTab === 'published' && (

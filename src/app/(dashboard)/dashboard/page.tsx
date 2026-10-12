@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { DollarSign, Target, Users, Clock, BarChart3, Brain } from 'lucide-react';
 import { KPIWidget } from '@/components/dashboard/KPIWidget';
 import { RevenueIntelligence } from '@/components/dashboard/RevenueIntelligence';
@@ -32,6 +32,7 @@ export default function CommandCenterPage() {
   const [now, setNow]   = useState<Date | null>(null);
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const supabase = createClient();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     setNow(new Date());
@@ -67,6 +68,18 @@ export default function CommandCenterPage() {
   }, []);
 
   useEffect(() => { void loadKPIs(); }, [loadKPIs]);
+
+  // Realtime: re-fetch KPIs when deals / contacts / follow_ups change
+  useEffect(() => {
+    const ch = supabase
+      .channel('dashboard-kpi-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' },        () => { void loadKPIs(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' },     () => { void loadKPIs(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' },   () => { void loadKPIs(); })
+      .subscribe();
+    channelRef.current = ch;
+    return () => { void supabase.removeChannel(ch); };
+  }, [loadKPIs]);
 
   const greeting = now
     ? (now.getHours() < 12 ? 'Good Morning' : now.getHours() < 17 ? 'Good Afternoon' : 'Good Evening')

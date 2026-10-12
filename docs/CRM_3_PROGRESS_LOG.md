@@ -4,6 +4,164 @@
 
 ---
 
+## SESSION 013 — Segments API + Create Modal + Dashboard Realtime + Doc Fixes
+**Status: IMPLEMENTED**
+
+### What Was Done
+
+#### ✅ NEW — GET/POST /api/v3/segments
+- Was: no API route — segments page queried Supabase directly from client
+- Now: GET /api/v3/segments — lists segments for account (server-side auth)
+- Now: POST /api/v3/segments — creates segment (name/description/type, account_id from session)
+- Auth: 401/403 enforced, account_id from session only
+
+#### ✅ FIXED — segments/page.tsx — "New Segment" button now works
+- Was: button rendered but did nothing
+- Now: opens create modal → POST /api/v3/segments → optimistic prepend to list
+- Modal: name (required), description (optional), type picker (manual/rule_based/ai_assisted)
+- Empty state also has "Create Segment" button
+- Page now fetches via /api/v3/segments instead of direct Supabase client query
+
+#### ✅ FIXED — P10-B3 RESOLVED — Dashboard realtime subscription
+- Was: KPIs only updated on page load
+- Now: Supabase realtime channel on deals + contacts + follow_ups tables
+- Any INSERT/UPDATE/DELETE triggers loadKPIs() automatically
+- Channel cleaned up on component unmount
+
+#### ✅ FIXED — AI Copilot feature status corrected
+- Was: CRM_3_FEATURE_STATUS.md showed AI Copilot as IN_PROGRESS (stale from Session 001)
+- Now: IMPLEMENTED — /api/v3/copilot fully built (Session 011), ai-center/page.tsx fully built
+- P10 realtime sub-feature updated from NOT_STARTED → IMPLEMENTED
+
+### Build Results
+- TypeScript: **PASS** (0 errors)
+- Lint: **PASS** (0 errors, 0 warnings)
+- Build: **PASS** (49 routes — 2 new: /api/v3/segments + segments page)
+
+### Files Changed
+| File | Change |
+|------|--------|
+| src/app/api/v3/segments/route.ts | NEW — GET/POST segments API |
+| src/app/(dashboard)/segments/page.tsx | REBUILT — create modal + API-backed fetch |
+| src/app/(dashboard)/dashboard/page.tsx | ADDED — Supabase realtime subscription |
+| docs/CRM_3_FEATURE_STATUS.md | AI Copilot IN_PROGRESS → IMPLEMENTED, P10 realtime updated |
+| docs/CRM_3_BLOCKERS.md | P10-B3 OPEN → RESOLVED |
+| docs/SESSION_SAVE_STATE.md | Updated to Session 013 |
+| docs/CRM_3_PROGRESS_LOG.md | This entry |
+
+### Remaining Open Developer Tasks
+- P8-B3: Journey wait-node background scheduler (infrastructure decision — needs Supabase Edge Function cron or external queue)
+- Content Studio: Calendar view and Visual Grid view (NOT_STARTED)
+
+---
+
+## SESSION 012 — Production Hardening, Security Fixes, Missing Routes, Docs
+**Status: IMPLEMENTED**
+
+### What Was Done
+
+#### ✅ STEP 1 — BASELINE VERIFICATION
+- Confirmed Session 011 changes present: PipelineOverview, RecentConversations, AICopilot, AttentionSection all use real data
+- TypeScript: PASS (0 errors), ESLint: PASS (0 warnings), Build: PASS (45 routes on Next.js 16.2.6)
+- Git status: clean working tree, branch main, up to date with origin/main
+- Confirmed .env.local has real Supabase credentials (project: ngvmzkavvkikisprtpgd)
+- Confirmed OpenAI key is still placeholder (sk-...) — AI falls back to rule-based
+
+#### ✅ STEP 2 — CRITICAL SECURITY FIX: Next.js upgraded 16.2.6 → 16.4.0
+- `npm audit` revealed 1 CRITICAL + 8 HIGH CVEs in Next.js 16.2.6:
+  - CRITICAL: Middleware/proxy bypass in App Router (GHSA-6gpp-xcg3-4w24)
+  - HIGH: DoS via Server Actions (GHSA-m99w-x7hq-7vfj)
+  - HIGH: SSRF in Server Actions on custom servers (GHSA-89xv-2m56-2m9x)
+  - HIGH: Cache confusion of response bodies (GHSA-68g3-v927-f742, GHSA-4633-3j49-mh5q)
+  - HIGH: Unbounded Server Action payload in Edge runtime (GHSA-4c39-4ccg-62r3)
+  - HIGH: SSRF in rewrites (GHSA-p9j2-gv94-2wf4)
+  - HIGH: DoS in Image Optimization API (GHSA-q8wf-6r8g-63ch)
+  - HIGH: Unauthenticated disclosure of internal Server Function endpoints (GHSA-955p-x3mx-jcvp)
+- Fixed: `npm install next@16.4.0 --save-exact`
+- Build confirmed passing on 16.4.0
+
+#### ✅ STEP 3 — ai PACKAGE RESTORED + react-is PEER DEP FIXED
+- ai@3.0.0 was accidentally removed in previous session
+- Reinstalled with `--legacy-peer-deps` (React 19 project, ai@3 requires React 18)
+- ai package install removed react-is, breaking recharts build
+- Fixed: `npm install react-is --legacy-peer-deps`
+- Build confirmed passing: 47 routes
+
+#### ✅ STEP 4 — segments/page.tsx — REMOVED ALL HARDCODED DEMO DATA
+- Was: 5 fake segments with hardcoded counts (52, 134, 89, 23, 67)
+- Now: real Supabase query from crm3_segments table
+- Loading skeleton, empty state with helpful message, error + retry state
+- Dynamic accent colors per segment
+
+#### ✅ STEP 5 — /api/v3/ai/next-best-action/route.ts CREATED
+- Was: empty directory — dead reference in orchestrator.ts
+- Now: full POST handler
+- For leads/contacts: derives NBA from existing lead_score (no duplicate AI)
+- For deals: derives NBA from days_stalled
+- Auth: 401/403/404 enforced, account_id from session only
+
+#### ✅ STEP 6 — /api/v3/ai/recommendations/route.ts CREATED
+- Was: empty directory — dead reference in orchestrator.ts
+- Now: full GET handler
+- 4 parallel DB queries: hot leads, overdue followups, stalled deals, unanswered convs
+- Returns real recommendations array
+- Auth: 401/403/404 enforced, account_id from session only
+
+#### ✅ STEP 7 — next.config.ts PRODUCTION DOMAIN ADDED
+- Was: serverActions.allowedOrigins = ["localhost:3000"] only
+- Now: ["localhost:3000", "crm.tzmicha.com"]
+- Without this, Server Actions would fail silently in production
+
+#### ✅ STEP 8 — ALL DOCUMENTATION UPDATED
+- SESSION_SAVE_STATE.md — updated to Session 012
+- CRM_3_BLOCKERS.md — added P9/P10 blockers, updated owner checklist to 16 steps (all 6 migrations), marked CC-B1 RESOLVED
+- CRM_3_FEATURE_STATUS.md — updated P10 sub-features to reflect real data
+- CRM_3_PROGRESS_LOG.md — this entry
+
+### Build Results
+- TypeScript: **PASS** (0 errors)
+- Lint: **PASS** (0 errors, 0 warnings)
+- Build: **PASS** (47 routes — 2 new AI routes)
+- Next.js: **16.4.0** (upgraded from 16.2.6)
+
+### Files Changed
+| File | Change |
+|------|--------|
+| package.json | next 16.2.6 → 16.4.0, ai@3.0.0 restored, react-is added |
+| package-lock.json | Updated |
+| next.config.ts | Added crm.tzmicha.com to serverActions.allowedOrigins |
+| src/app/(dashboard)/segments/page.tsx | REBUILT — real Supabase data, removed all hardcoded demo data |
+| src/app/api/v3/ai/next-best-action/route.ts | NEW — full NBA handler |
+| src/app/api/v3/ai/recommendations/route.ts | NEW — full recommendations handler |
+| docs/SESSION_SAVE_STATE.md | Updated to Session 012 |
+| docs/CRM_3_BLOCKERS.md | Full update — P9/P10 blockers, 16-step owner checklist |
+| docs/CRM_3_FEATURE_STATUS.md | P10 sub-features updated |
+| docs/CRM_3_PROGRESS_LOG.md | This entry |
+
+### Security Audit Results (Session 012)
+| Endpoint | Unauthenticated | account_id source | Ownership check |
+|----------|----------------|-------------------|-----------------|
+| GET /api/v3/command-center | 401 ✅ | session ✅ | N/A |
+| POST /api/v3/copilot | 401 ✅ | session ✅ | N/A |
+| GET /api/v3/automations | 401 ✅ | session ✅ | N/A |
+| GET /api/v3/agents | 401 ✅ | session ✅ | N/A |
+| GET /api/v3/journeys | 401 ✅ | session ✅ | N/A |
+| GET /api/v3/attribution | 401 ✅ | session ✅ | N/A |
+| GET /api/v3/revenue-intelligence | 401 ✅ | session ✅ | N/A |
+| GET /api/v3/content | 401 ✅ | session ✅ | N/A |
+| POST /api/v3/ai/lead-intelligence | 401 ✅ | session ✅ | contact.account_id ✅ |
+| POST /api/v3/ai/reply-assist | 401 ✅ | session ✅ | N/A |
+| POST /api/v3/ai/next-best-action | 401 ✅ | session ✅ | object.account_id ✅ |
+| GET /api/v3/ai/recommendations | 401 ✅ | session ✅ | N/A |
+
+### Remaining Blockers
+- All live browser tests blocked — OpenAI key is placeholder, migrations 001–006 not applied
+- P10-B3: Dashboard realtime subscription not implemented (OPEN)
+- P8-B3: Journey wait-node background scheduler not implemented (OPEN)
+- P4-B2: Full trigger-based automation execution needs CRM 2.0 webhook infrastructure (OPEN)
+
+---
+
 ## SESSION 011 — Dashboard Static Data Fix + Security Audit + Build Clean
 **Status: IMPLEMENTED**
 
