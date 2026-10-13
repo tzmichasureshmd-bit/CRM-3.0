@@ -96,7 +96,7 @@
 |---|---------|--------|-----------------|-------|-----------------|--------|
 | P8-B1 | Migration 006 not applied | crm3_journeys, crm3_journey_contact_state, crm3_journey_executions tables missing | Apply `supabase/migrations/006_journey_builder.sql` | Owner | After P0-B1 | `PENDING OWNER ACTION` |
 | P8-B2 | Browser E2E test not completed | P8 cannot be marked VERIFIED | After P8-B1: create journey, add nodes, publish, execute, verify events | Owner + Developer | After P8-B1 | `PENDING OWNER ACTION` |
-| P8-B3 | ~~Journey wait-node background scheduler~~ | ~~Wait nodes pause execution but don't auto-resume~~ | **FIXED Session 014** — POST /api/v3/journeys/scheduler with idempotency locks, 3-attempt retry, exponential backoff, dead-letter state, audit log. Vercel Cron configured in vercel.json. Migration 007 adds scheduler columns. | Developer | RESOLVED | `RESOLVED` |
+| P8-B3 | ~~Journey wait-node background scheduler~~ | ~~Wait nodes pause execution but don't auto-resume~~ | **FIXED Session 014** — POST /api/v3/journeys/scheduler with idempotency locks, 3-attempt retry, exponential backoff, dead-letter state, audit log. Vercel Cron configured in vercel.json (*/5 * * * *). Migration 007 adds scheduler columns. Full guide: docs/JOURNEY_SCHEDULER_GUIDE.md | Developer | RESOLVED | `RESOLVED` |
 
 ---
 

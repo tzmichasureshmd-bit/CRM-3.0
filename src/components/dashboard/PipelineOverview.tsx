@@ -90,7 +90,7 @@ export function PipelineOverview() {
               <RefreshCw size={11} /> Retry
             </button>
           )}
-          <Link href="/pipelines" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--crm-primary)' }}>
+          <Link href="/pipeline-crm" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--crm-primary)' }}>
             View all <ArrowRight size={12} />
           </Link>
         </div>

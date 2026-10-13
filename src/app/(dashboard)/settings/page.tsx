@@ -1,6 +1,7 @@
 'use client';
 
 import { User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 
 const SECTIONS = [
   {
@@ -12,6 +13,7 @@ const SECTIONS = [
   },
   {
     title: 'Integrations',
+    href: '/settings/integrations',
     items: [
       { icon: <Smartphone size={16} />, label: 'WhatsApp Business', desc: 'Connect WhatsApp API', color: '#25D366' },
       { icon: <AtSign size={16} />, label: 'Instagram', desc: 'Connect Instagram DMs', color: '#E1306C' },
@@ -47,22 +49,27 @@ export default function SettingsPage() {
         <div key={section.title}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{section.title}</div>
           <div className="crm-glass" style={{ overflow: 'hidden' }}>
-            {section.items.map((item, i) => (
-              <button key={item.label} style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
-                borderBottom: i < section.items.length - 1 ? '1px solid rgba(130,145,190,0.10)' : 'none',
-                transition: 'background 150ms',
-              }}>
-                <div style={{ width: 38, height: 38, borderRadius: 11, background: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
-                  {item.icon}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text)' }}>{item.label}</div>
-                  <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{item.desc}</div>
-                </div>
-                <ChevronRight size={16} color="var(--crm-text-muted)" />
-              </button>
-            ))}
+            {section.items.map((item, i) => {
+              const href = (section as { href?: string }).href;
+              const inner = (
+                <>
+                  <div style={{ width: 38, height: 38, borderRadius: 11, background: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
+                    {item.icon}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text)' }}>{item.label}</div>
+                    <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{item.desc}</div>
+                  </div>
+                  <ChevronRight size={16} color="var(--crm-text-muted)" />
+                </>
+              );
+              const style = { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const, borderBottom: i < section.items.length - 1 ? '1px solid rgba(130,145,190,0.10)' : 'none', textDecoration: 'none' };
+              return href ? (
+                <Link key={item.label} href={href} style={style}>{inner}</Link>
+              ) : (
+                <button key={item.label} style={style}>{inner}</button>
+              );
+            })}
           </div>
         </div>
       ))}

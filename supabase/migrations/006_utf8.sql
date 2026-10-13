@@ -1,1 +1,127 @@
-﻿ⴭ㴠㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽ഽⴊ‭剃⁍⸳‰楍牧瑡潩⁮〰‶胢ₔ畃瑳浯牥䨠畯湲祥䈠極摬牥਍ⴭ挠浲弳潪牵敮役癥湥獴愠牬慥祤攠楸瑳⁳牦浯洠杩慲楴湯〠㄰മⴊ‭桔獩愠摤㩳樠畯湲祥搠晥湩瑩潩獮‬硥捥瑵潩獮‬潣瑮捡⁴瑳瑡⹥਍ⴭ匠晡⁥潴爠湵洠汵楴汰⁥楴敭⁳䤨⁆低⁔塅卉協⸩਍ⴭ㴠㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽ഽഊⴊ‭铢肔䨠畯湲祥䐠晥湩瑩潩獮肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔਍ⴭ匠潴敲⁳桴⁥潪牵敮⁹整灭慬整›潮敤ⱳ攠杤獥‬牴杩敧Ⱳ挠湯楦⹧਍剃䅅䕔吠䉁䕌䤠⁆低⁔塅卉協挠浲弳潪牵敮獹⠠਍†摩†††††††啕䑉倠䥒䅍奒䬠奅䐠䙅啁呌朠湥牟湡潤彭畵摩⤨ബ 愠捣畯瑮楟⁤††唠䥕⁄低⁔啎䱌删䙅剅久䕃⁓捡潣湵獴椨⥤传⁎䕄䕌䕔䌠十䅃䕄ബ 挠敲瑡摥扟⁹††唠䥕⁄䕒䕆䕒䍎卅愠瑵⹨獵牥⡳摩Ⱙ਍†慮敭††††††䕔员丠呏丠䱕ⱌ਍†敤捳楲瑰潩⁮††䕔员ബ 猠慴畴⁳††††吠塅⁔低⁔啎䱌䐠䙅啁呌✠牤晡❴਍††䡃䍅⁋猨慴畴⁳义⠠搧慲瑦Ⱗ愧瑣癩❥✬慰獵摥Ⱗ愧捲楨敶❤⤩ബ 琠楲杧牥瑟灹⁥†吠塅⁔低⁔啎䱌䐠䙅啁呌✠慭畮污ധ †䌠䕈䭃⠠牴杩敧彲祴数䤠⁎ന ††✠慭畮污Ⱗ挧湯慴瑣损敲瑡摥Ⱗ氧慥彤牣慥整❤✬潣癮牥慳楴湯獟慴瑲摥Ⱗ਍†††洧獥慳敧牟捥楥敶❤✬敤污损敲瑡摥Ⱗ搧慥彬瑳条彥档湡敧❤ബ ††✠敤污睟湯Ⱗ愧灰楯瑮敭瑮损敲瑡摥Ⱗ挧獵潴敭彲湩捡楴敶Ⱗ਍†††愧彩捳牯彥桴敲桳汯❤✬湩整瑮摟瑥捥整❤✬潣瑮湥彴湩整慲瑣潩❮਍††⤩ബ 琠楲杧牥损湯楦⁧䨠体䉎丠呏丠䱕⁌䕄䅆䱕⁔笧❽ബ 渠摯獥†††††䨠体䉎丠呏丠䱕⁌䕄䅆䱕⁔嬧❝ബ ⴠ‭慅档渠摯㩥笠椠Ɽ琠灹ⱥ瀠獯瑩潩㩮硻礬ⱽ搠瑡㩡汻扡汥挬湯楦絧素਍†ⴭ渠摯⁥祴数㩳琠楲杧牥‬潣摮瑩潩Ɱ愠彩敤楣楳湯‬捡楴湯‬慷瑩‬瑳条ⱥ攠摮਍†摥敧⁳†††††半乏⁂低⁔啎䱌䐠䙅啁呌✠嵛Ⱗ਍†ⴭ䔠捡⁨摥敧›⁻摩‬潳牵散‬慴杲瑥‬慬敢㽬素਍†湥牴役潣湵⁴††义䕔䕇⁒低⁔啎䱌䐠䙅啁呌〠ബ 愠瑣癩彥潣湵⁴†䤠呎䝅剅丠呏丠䱕⁌䕄䅆䱕⁔ⰰ਍†潣灭敬整彤潣湵⁴义䕔䕇⁒低⁔啎䱌䐠䙅啁呌〠ബ 挠湯敶獲潩彮慲整丠䵕剅䍉㔨㈬Ⱙ਍†牣慥整彤瑡†††䥔䕍呓䵁呐⁚低⁔啎䱌䐠䙅啁呌渠睯⤨ബ 甠摰瑡摥慟⁴††吠䵉卅䅔偍婔丠呏丠䱕⁌䕄䅆䱕⁔潮⡷ഩ⤊഻ഊ䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭機畯湲祥彳捡潣湵彴摩⁸乏挠浲弳潪牵敮獹愨捣畯瑮楟⥤഻䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭機畯湲祥彳瑳瑡獵楟硤†乏挠浲弳潪牵敮獹愨捣畯瑮楟Ɽ猠慴畴⥳഻ഊ䄊呌剅吠䉁䕌挠浲弳潪牵敮獹䔠䅎䱂⁅佒⁗䕌䕖⁌䕓啃䥒奔഻䐊佒⁐佐䥌奃䤠⁆塅卉協挠浲弳潪牵敮獹牟獬传⁎牣㍭機畯湲祥㭳਍剃䅅䕔倠䱏䍉⁙牣㍭機畯湲祥彳汲⁳乏挠浲弳潪牵敮獹਍†单义⁇愨捣畯瑮楟⁤义⠠䕓䕌呃愠捣畯瑮楟⁤剆䵏瀠潲楦敬⁳䡗剅⁅獵牥楟⁤‽畡桴甮摩⤨⤩഻ഊⴊ‭铢肔䨠畯湲祥䌠湯慴瑣匠慴整肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔਍ⴭ吠慲正⁳桷牥⁥慥档挠湯慴瑣椠⁳湩愠樠畯湲祥മ䌊䕒呁⁅䅔䱂⁅䙉丠呏䔠䥘呓⁓牣㍭機畯湲祥损湯慴瑣獟慴整⠠਍†摩†††††††啕䑉倠䥒䅍奒䬠奅䐠䙅啁呌朠湥牟湡潤彭畵摩⤨ബ 愠捣畯瑮楟⁤††唠䥕⁄低⁔啎䱌删䙅剅久䕃⁓捡潣湵獴椨⥤传⁎䕄䕌䕔䌠十䅃䕄ബ 樠畯湲祥楟⁤††唠䥕⁄低⁔啎䱌删䙅剅久䕃⁓牣㍭機畯湲祥⡳摩 乏䐠䱅呅⁅䅃䍓䑁ⱅ਍†潣瑮捡彴摩†††啕䑉丠呏丠䱕⁌䕒䕆䕒䍎卅挠湯慴瑣⡳摩 乏䐠䱅呅⁅䅃䍓䑁ⱅ਍†畣牲湥彴潮敤楟⁤䕔员ബ 挠牵敲瑮獟慴敧†吠塅ⱔ਍†瑳瑡獵†††††䕔员丠呏丠䱕⁌䕄䅆䱕⁔愧瑣癩❥਍††䡃䍅⁋猨慴畴⁳义⠠愧瑣癩❥✬慷瑩湩❧✬潣灭敬整❤✬慦汩摥Ⱗ攧楸整❤⤩ബ 攠瑮牥摥慟⁴††吠䵉卅䅔偍婔丠呏丠䱕⁌䕄䅆䱕⁔潮⡷Ⱙ਍†潣灭敬整彤瑡††䥔䕍呓䵁呐ⱚ਍†慷瑩畟瑮汩†††䥔䕍呓䵁呐ⱚ਍†牥潲彲敭獳条⁥†䕔员ബ 洠瑥摡瑡⁡†††䨠体䉎丠呏丠䱕⁌䕄䅆䱕⁔笧❽ബ 唠䥎啑⡅潪牵敮役摩‬潣瑮捡彴摩ഩ⤊഻ഊ䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭機獣機畯湲祥楟硤†乏挠浲弳潪牵敮役潣瑮捡彴瑳瑡⡥潪牵敮役摩‬瑳瑡獵㬩਍剃䅅䕔䤠䑎塅䤠⁆低⁔塅卉協挠浲弳捪彳潣瑮捡彴摩⁸传⁎牣㍭機畯湲祥损湯慴瑣獟慴整挨湯慴瑣楟⥤഻䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭機獣慟捣畯瑮楟硤†乏挠浲弳潪牵敮役潣瑮捡彴瑳瑡⡥捡潣湵彴摩㬩਍剃䅅䕔䤠䑎塅䤠⁆低⁔塅卉協挠浲弳捪彳慷瑩湩彧摩⁸传⁎牣㍭機畯湲祥损湯慴瑣獟慴整眨楡彴湵楴⥬਍†䡗剅⁅瑳瑡獵㴠✠慷瑩湩❧഻ഊ䄊呌剅吠䉁䕌挠浲弳潪牵敮役潣瑮捡彴瑳瑡⁥久䉁䕌删坏䰠噅䱅匠䍅剕呉㭙਍剄偏倠䱏䍉⁙䙉䔠䥘呓⁓牣㍭機獣牟獬传⁎牣㍭機畯湲祥损湯慴瑣獟慴整഻䌊䕒呁⁅佐䥌奃挠浲弳捪彳汲⁳乏挠浲弳潪牵敮役潣瑮捡彴瑳瑡൥ 唠䥓䝎⠠捡潣湵彴摩䤠⁎匨䱅䍅⁔捡潣湵彴摩䘠佒⁍牰景汩獥圠䕈䕒甠敳彲摩㴠愠瑵⹨極⡤⤩㬩਍਍ⴭ肔铢₀潊牵敮⁹硅捥瑵潩獮肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢඀ⴊ‭畆汬攠數畣楴湯氠杯瀠牥挠湯慴瑣瀠牥樠畯湲祥爠湵മ䌊䕒呁⁅䅔䱂⁅䙉丠呏䔠䥘呓⁓牣㍭機畯湲祥敟數畣楴湯⁳ന 椠⁤††††††唠䥕⁄剐䵉剁⁙䕋⁙䕄䅆䱕⁔敧彮慲摮浯畟極⡤Ⱙ਍†捡潣湵彴摩†††啕䑉丠呏丠䱕⁌䕒䕆䕒䍎卅愠捣畯瑮⡳摩 乏䐠䱅呅⁅䅃䍓䑁ⱅ਍†潪牵敮役摩†††啕䑉丠呏丠䱕⁌䕒䕆䕒䍎卅挠浲弳潪牵敮獹椨⥤传⁎䕄䕌䕔䌠十䅃䕄ബ 挠湯慴瑣楟⁤††唠䥕⁄䕒䕆䕒䍎卅挠湯慴瑣⡳摩 乏䐠䱅呅⁅䕓⁔啎䱌ബ 琠楲杧牥摥扟⁹†吠塅⁔低⁔啎䱌䐠䙅啁呌✠慭畮污Ⱗ਍†瑳瑡獵†††††䕔员丠呏丠䱕⁌䕄䅆䱕⁔爧湵楮杮ധ †䌠䕈䭃⠠瑳瑡獵䤠⁎✨畲湮湩❧✬潣灭敬整❤✬慦汩摥Ⱗ眧楡楴杮Ⱗ挧湡散汬摥⤧Ⱙ਍†潮敤彳硥捥瑵摥†半乏⁂低⁔啎䱌䐠䙅啁呌✠嵛Ⱗ਍†ⴭ䔠捡⁨湥牴㩹笠渠摯彥摩‬潮敤瑟灹ⱥ猠慴畴ⱳ爠獥汵ⱴ搠牵瑡潩彮獭‬硥捥瑵摥慟⁴ൽ 挠牵敲瑮湟摯彥摩吠塅ⱔ਍†牥潲彲敭獳条⁥†䕔员ബ 猠慴瑲摥慟⁴††吠䵉卅䅔偍婔丠呏丠䱕⁌䕄䅆䱕⁔潮⡷Ⱙ਍†潣灭敬整彤瑡††䥔䕍呓䵁呐ⱚ਍†畤慲楴湯浟⁳††义䕔䕇൒⤊഻ഊ䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭機彥潪牵敮役摩⁸传⁎牣㍭機畯湲祥敟數畣楴湯⡳潪牵敮役摩‬瑳牡整彤瑡䐠卅⥃഻䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭機彥捡潣湵彴摩⁸传⁎牣㍭機畯湲祥敟數畣楴湯⡳捡潣湵彴摩‬瑳牡整彤瑡䐠卅⥃഻䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭機彥潣瑮捡彴摩⁸传⁎牣㍭機畯湲祥敟數畣楴湯⡳潣瑮捡彴摩ഩ 圠䕈䕒挠湯慴瑣楟⁤卉丠呏丠䱕㭌਍剃䅅䕔䤠䑎塅䤠⁆低⁔塅卉協挠浲弳敪獟慴畴彳摩⁸†乏挠浲弳潪牵敮役硥捥瑵潩獮愨捣畯瑮楟Ɽ猠慴畴⥳਍†䡗剅⁅瑳瑡獵䤠⁎✨畲湮湩❧✬慷瑩湩❧㬩਍਍䱁䕔⁒䅔䱂⁅牣㍭機畯湲祥敟數畣楴湯⁳久䉁䕌删坏䰠噅䱅匠䍅剕呉㭙਍剄偏倠䱏䍉⁙䙉䔠䥘呓⁓牣㍭機彥汲⁳乏挠浲弳潪牵敮役硥捥瑵潩獮഻䌊䕒呁⁅佐䥌奃挠浲弳敪牟獬传⁎牣㍭機畯湲祥敟數畣楴湯൳ 唠䥓䝎⠠捡潣湵彴摩䤠⁎匨䱅䍅⁔捡潣湵彴摩䘠佒⁍牰景汩獥圠䕈䕒甠敳彲摩㴠愠瑵⹨極⡤⤩㬩਍਍ⴭ肔铢₀硅整摮挠浲弳潪牵敮役癥湥獴眠瑩⁨潪牵敮役摩肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢඀䄊呌剅吠䉁䕌挠浲弳潪牵敮役癥湥獴਍†䑁⁄佃啌乍䤠⁆低⁔塅卉協樠畯湲祥楟⁤啕䑉删䙅剅久䕃⁓牣㍭機畯湲祥⡳摩 乏䐠䱅呅⁅䕓⁔啎䱌ബ 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓硥捥瑵潩彮摩唠䥕⁄䕒䕆䕒䍎卅挠浲弳潪牵敮役硥捥瑵潩獮椨⥤传⁎䕄䕌䕔匠呅丠䱕㭌਍਍剃䅅䕔䤠䑎塅䤠⁆低⁔塅卉協挠浲弳敪敟敶瑮彳潪牵敮役摩൸ 传⁎牣㍭機畯湲祥敟敶瑮⡳潪牵敮役摩ഩ 圠䕈䕒樠畯湲祥楟⁤卉丠呏丠䱕㭌਍਍ⴭ肔铢₀敒污楴敭肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢඀䐊⁏␤਍䕂䥇ൎ 䤠⁆低⁔塅卉協⠠਍††䕓䕌呃ㄠ䘠佒⁍杰灟扵楬慣楴湯瑟扡敬൳ †圠䕈䕒瀠扵慮敭㴠✠畳慰慢敳牟慥瑬浩❥䄠䑎琠扡敬慮敭㴠✠牣㍭機畯湲祥敟數畣楴湯❳਍† 䡔久਍††䱁䕔⁒啐䱂䍉呁佉⁎畳慰慢敳牟慥瑬浩⁥䑁⁄䅔䱂⁅牣㍭機畯湲祥敟數畣楴湯㭳਍†久⁄䙉഻䔊䑎␠㬤਍
+-- ============================================================
+-- CRM 3.0 Migration 006 — Customer Journey Builder
+-- crm3_journey_events already exists from migration 001.
+-- This adds: journey definitions, executions, contact state.
+-- Safe to run multiple times (IF NOT EXISTS).
+-- ============================================================
+
+-- ── Journey Definitions ───────────────────────────────────────
+-- Stores the journey template: nodes, edges, trigger, config.
+CREATE TABLE IF NOT EXISTS crm3_journeys (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  created_by      UUID REFERENCES auth.users(id),
+  name            TEXT NOT NULL,
+  description     TEXT,
+  status          TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft','active','paused','archived')),
+  trigger_type    TEXT NOT NULL DEFAULT 'manual'
+    CHECK (trigger_type IN (
+      'manual','contact_created','lead_created','conversation_started',
+      'message_received','deal_created','deal_stage_changed',
+      'deal_won','appointment_created','customer_inactive',
+      'ai_score_threshold','intent_detected','content_interaction'
+    )),
+  trigger_config  JSONB NOT NULL DEFAULT '{}',
+  nodes           JSONB NOT NULL DEFAULT '[]',
+  -- Each node: { id, type, position:{x,y}, data:{label,config} }
+  -- node types: trigger, condition, ai_decision, action, wait, stage, end
+  edges           JSONB NOT NULL DEFAULT '[]',
+  -- Each edge: { id, source, target, label? }
+  entry_count     INTEGER NOT NULL DEFAULT 0,
+  active_count    INTEGER NOT NULL DEFAULT 0,
+  completed_count INTEGER NOT NULL DEFAULT 0,
+  conversion_rate NUMERIC(5,2),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS crm3_journeys_account_idx ON crm3_journeys(account_id);
+CREATE INDEX IF NOT EXISTS crm3_journeys_status_idx  ON crm3_journeys(account_id, status);
+
+ALTER TABLE crm3_journeys ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_journeys_rls ON crm3_journeys;
+CREATE POLICY crm3_journeys_rls ON crm3_journeys
+  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+
+-- ── Journey Contact State ─────────────────────────────────────
+-- Tracks where each contact is in a journey.
+CREATE TABLE IF NOT EXISTS crm3_journey_contact_state (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  journey_id      UUID NOT NULL REFERENCES crm3_journeys(id) ON DELETE CASCADE,
+  contact_id      UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  current_node_id TEXT,
+  current_stage   TEXT,
+  status          TEXT NOT NULL DEFAULT 'active'
+    CHECK (status IN ('active','waiting','completed','failed','exited')),
+  entered_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at    TIMESTAMPTZ,
+  wait_until      TIMESTAMPTZ,
+  error_message   TEXT,
+  metadata        JSONB NOT NULL DEFAULT '{}',
+  UNIQUE(journey_id, contact_id)
+);
+
+CREATE INDEX IF NOT EXISTS crm3_jcs_journey_idx  ON crm3_journey_contact_state(journey_id, status);
+CREATE INDEX IF NOT EXISTS crm3_jcs_contact_idx  ON crm3_journey_contact_state(contact_id);
+CREATE INDEX IF NOT EXISTS crm3_jcs_account_idx  ON crm3_journey_contact_state(account_id);
+CREATE INDEX IF NOT EXISTS crm3_jcs_waiting_idx  ON crm3_journey_contact_state(wait_until)
+  WHERE status = 'waiting';
+
+ALTER TABLE crm3_journey_contact_state ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_jcs_rls ON crm3_journey_contact_state;
+CREATE POLICY crm3_jcs_rls ON crm3_journey_contact_state
+  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+
+-- ── Journey Executions ────────────────────────────────────────
+-- Full execution log per contact per journey run.
+CREATE TABLE IF NOT EXISTS crm3_journey_executions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  journey_id      UUID NOT NULL REFERENCES crm3_journeys(id) ON DELETE CASCADE,
+  contact_id      UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  triggered_by    TEXT NOT NULL DEFAULT 'manual',
+  status          TEXT NOT NULL DEFAULT 'running'
+    CHECK (status IN ('running','completed','failed','waiting','cancelled')),
+  nodes_executed  JSONB NOT NULL DEFAULT '[]',
+  -- Each entry: { node_id, node_type, status, result, duration_ms, executed_at }
+  current_node_id TEXT,
+  error_message   TEXT,
+  started_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at    TIMESTAMPTZ,
+  duration_ms     INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS crm3_je_journey_idx  ON crm3_journey_executions(journey_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS crm3_je_account_idx  ON crm3_journey_executions(account_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS crm3_je_contact_idx  ON crm3_journey_executions(contact_id)
+  WHERE contact_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS crm3_je_status_idx   ON crm3_journey_executions(account_id, status)
+  WHERE status IN ('running','waiting');
+
+ALTER TABLE crm3_journey_executions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_je_rls ON crm3_journey_executions;
+CREATE POLICY crm3_je_rls ON crm3_journey_executions
+  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+
+-- ── Extend crm3_journey_events with journey_id ────────────────
+ALTER TABLE crm3_journey_events
+  ADD COLUMN IF NOT EXISTS journey_id UUID REFERENCES crm3_journeys(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS execution_id UUID REFERENCES crm3_journey_executions(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS crm3_je_events_journey_idx
+  ON crm3_journey_events(journey_id)
+  WHERE journey_id IS NOT NULL;
+
+-- ── Realtime ──────────────────────────────────────────────────
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'crm3_journey_executions'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE crm3_journey_executions;
+  END IF;
+END $$;
+

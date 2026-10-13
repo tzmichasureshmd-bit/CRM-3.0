@@ -21,8 +21,6 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY accounts_rls ON accounts
-  USING (id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
 -- ── Profiles (links auth.users → accounts) ────────────────────
 CREATE TABLE IF NOT EXISTS profiles (
@@ -40,6 +38,9 @@ CREATE INDEX IF NOT EXISTS profiles_user_idx    ON profiles(user_id);
 CREATE INDEX IF NOT EXISTS profiles_account_idx ON profiles(account_id);
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY accounts_rls ON accounts
+  USING (id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+
 CREATE POLICY profiles_rls ON profiles
   USING (user_id = auth.uid() OR account_id IN (
     SELECT account_id FROM profiles p2 WHERE p2.user_id = auth.uid()

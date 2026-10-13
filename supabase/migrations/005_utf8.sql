@@ -1,1 +1,55 @@
-﻿ⴭ㴠㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽ഽⴊ‭剃⁍⸳‰楍牧瑡潩⁮〰‵胢ₔ㝐䄠瑴楲畢楴湯䔠桮湡散敭瑮൳ⴊ‭摁獤猠畯捲⽥档湡敮⁬牴捡楫杮‬慣灭楡湧氠湩慫敧‬湡⁤湩敤數⹳਍ⴭ挠浲弳瑡牴扩瑵潩⁮污敲摡⁹硥獩獴映潲⁭業牧瑡潩⁮〰⸱਍ⴭ匠晡⁥潴爠湵洠汵楴汰⁥楴敭⁳䤨⁆低⁔塅卉協⼠䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⥓മⴊ‭㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽਍਍ⴭ肔铢₀硅整摮挠浲弳瑡牴扩瑵潩⁮楷桴猠畯捲⽥档湡敮⁬牴捡楫杮肔铢肔铢肔਍䱁䕔⁒䅔䱂⁅牣㍭慟瑴楲畢楴湯਍†䑁⁄佃啌乍䤠⁆低⁔塅卉協猠畯捲⁥††††吠塅ⱔ਍†䑁⁄佃啌乍䤠⁆低⁔塅卉協挠慨湮汥††††吠塅ⱔ਍†䑁⁄佃啌乍䤠⁆低⁔塅卉協甠浴獟畯捲⁥††吠塅ⱔ਍†䑁⁄佃啌乍䤠⁆低⁔塅卉協甠浴浟摥畩⁭††吠塅ⱔ਍†䑁⁄佃啌乍䤠⁆低⁔塅卉協甠浴损浡慰杩⁮†吠塅ⱔ਍†䑁⁄佃啌乍䤠⁆低⁔塅卉協焠慵楬楦摥慟⁴†吠䵉卅䅔偍婔ബ 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓敤污损敲瑡摥慟⁴䥔䕍呓䵁呐ⱚ਍†䑁⁄佃啌乍䤠⁆低⁔塅卉協搠慥彬潷彮瑡††吠䵉卅䅔偍婔ബ 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓獩睟湯†††††佂䱏䅅⁎低⁔啎䱌䐠䙅啁呌映污敳഻ഊⴊ‭铢肔䄠摤瑩潩慮⁬湩敤數⁳潦⁲瑡牴扩瑵潩⁮畱牥敩⁳铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔਍剃䅅䕔䤠䑎塅䤠⁆低⁔塅卉協挠浲弳瑡牴扩瑵潩彮潣瑮湥彴摩൸ 传⁎牣㍭慟瑴楲畢楴湯挨湯整瑮楟⥤਍†䡗剅⁅潣瑮湥彴摩䤠⁓低⁔啎䱌഻ഊ䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭慟瑴楲畢楴湯损浡慰杩彮摩൸ 传⁎牣㍭慟瑴楲畢楴湯挨浡慰杩彮摩ഩ 圠䕈䕒挠浡慰杩彮摩䤠⁓低⁔啎䱌഻ഊ䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭慟瑴楲畢楴湯损敲瑡摥楟硤਍†乏挠浲弳瑡牴扩瑵潩⡮捡潣湵彴摩‬牣慥整彤瑡䐠卅⥃഻ഊ䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭慟瑴楲畢楴湯獟畯捲彥摩൸ 传⁎牣㍭慟瑴楲畢楴湯愨捣畯瑮楟Ɽ猠畯捲⥥਍†䡗剅⁅潳牵散䤠⁓低⁔啎䱌഻ഊ䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭慟瑴楲畢楴湯睟湯楟硤਍†乏挠浲弳瑡牴扩瑵潩⡮捡潣湵彴摩‬獩睟湯ഩ 圠䕈䕒椠彳潷⁮‽牴敵഻ഊⴊ‭铢肔䔠瑸湥⁤牣㍭损湯整瑮眠瑩⁨慣灭楡湧獟畯捲⁥牴捡楫杮肔铢肔铢肔铢肔铢඀䄊呌剅吠䉁䕌挠浲弳潣瑮湥൴ 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓潳牵散†††††䕔员ബ 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓档湡敮⁬††††䕔员ബ 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓楶睥⁳†††††义䕔䕇ⱒ਍†䑁⁄佃啌乍䤠⁆低⁔塅卉協猠慨敲⁳††††䤠呎䝅剅഻ഊⴊ‭铢肔䤠摮硥映牯挠湯整瑮瀠牥潦浲湡散焠敵楲獥肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢඀䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭损湯整瑮灟扵楬桳摥楟硤਍†乏挠浲弳潣瑮湥⡴捡潣湵彴摩‬異汢獩敨彤瑡䐠卅⥃਍†䡗剅⁅瑳瑡獵㴠✠異汢獩敨❤഻ഊ䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭损湯整瑮损浡慰杩彮摩൸ 传⁎牣㍭损湯整瑮挨浡慰杩彮摩ഩ 圠䕈䕒挠浡慰杩彮摩䤠⁓低⁔啎䱌഻
+-- ============================================================
+-- CRM 3.0 Migration 005 — P7 Attribution Enhancements
+-- Adds source/channel tracking, campaign linkage, and indexes.
+-- crm3_attribution already exists from migration 001.
+-- Safe to run multiple times (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
+-- ============================================================
+
+-- ── Extend crm3_attribution with source/channel tracking ─────
+ALTER TABLE crm3_attribution
+  ADD COLUMN IF NOT EXISTS source          TEXT,
+  ADD COLUMN IF NOT EXISTS channel         TEXT,
+  ADD COLUMN IF NOT EXISTS utm_source      TEXT,
+  ADD COLUMN IF NOT EXISTS utm_medium      TEXT,
+  ADD COLUMN IF NOT EXISTS utm_campaign    TEXT,
+  ADD COLUMN IF NOT EXISTS qualified_at    TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS deal_created_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS deal_won_at     TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS is_won          BOOLEAN NOT NULL DEFAULT false;
+
+-- ── Additional indexes for attribution queries ────────────────
+CREATE INDEX IF NOT EXISTS crm3_attribution_content_idx
+  ON crm3_attribution(content_id)
+  WHERE content_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS crm3_attribution_campaign_idx
+  ON crm3_attribution(campaign_id)
+  WHERE campaign_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS crm3_attribution_created_idx
+  ON crm3_attribution(account_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS crm3_attribution_source_idx
+  ON crm3_attribution(account_id, source)
+  WHERE source IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS crm3_attribution_won_idx
+  ON crm3_attribution(account_id, is_won)
+  WHERE is_won = true;
+
+-- ── Extend crm3_content with campaign_source tracking ────────
+ALTER TABLE crm3_content
+  ADD COLUMN IF NOT EXISTS source          TEXT,
+  ADD COLUMN IF NOT EXISTS channel         TEXT,
+  ADD COLUMN IF NOT EXISTS views           INTEGER,
+  ADD COLUMN IF NOT EXISTS shares          INTEGER;
+
+-- ── Index for content performance queries ────────────────────
+CREATE INDEX IF NOT EXISTS crm3_content_published_idx
+  ON crm3_content(account_id, published_at DESC)
+  WHERE status = 'published';
+
+CREATE INDEX IF NOT EXISTS crm3_content_campaign_idx
+  ON crm3_content(campaign_id)
+  WHERE campaign_id IS NOT NULL;
+

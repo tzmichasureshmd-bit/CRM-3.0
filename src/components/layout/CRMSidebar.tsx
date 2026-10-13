@@ -31,7 +31,7 @@ const NAV = [
     id: 'sales', label: 'SALES',
     items: [
       { href: '/leads', icon: Flame, label: 'Leads' },
-      { href: '/pipelines', icon: TrendingUp, label: 'Pipeline' },
+      { href: '/pipeline-crm', icon: TrendingUp, label: 'Pipeline & CRM' },
       { href: '/follow-ups', icon: CalendarDays, label: 'Follow-ups' },
     ],
   },

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CRMSidebar } from '@/components/layout/CRMSidebar';
 import { CRMTopbar } from '@/components/layout/CRMTopbar';
+import { FloatingCopilot } from '@/components/chat/FloatingCopilot';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -26,6 +27,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </div>
+      {/* Floating AI Copilot - appears on all pages */}
+      <FloatingCopilot />
     </div>
   );
 }

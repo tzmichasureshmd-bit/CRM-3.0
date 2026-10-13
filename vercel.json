@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/v3/journeys/scheduler",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

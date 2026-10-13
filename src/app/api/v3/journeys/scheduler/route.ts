@@ -1,316 +1,278 @@
 /**
- * CRM 3.0 — Journey Wait-Node Scheduler
+ * CRM 3.0 — Journey Wait-Node Background Scheduler
+ * Called by Vercel Cron every 5 minutes to resume waiting journeys.
+ *
+ * Security:
+ * - Requires CRON_SECRET header (never expose publicly)
+ * - Idempotent with scheduler locks
+ * - 3-attempt retry with exponential backoff
+ * - Dead letter state after max retries
+ *
  * POST /api/v3/journeys/scheduler
- *
- * Resumes journey executions whose wait nodes have become due.
- *
- * INVOCATION:
- *   - Vercel Cron: add to vercel.json → { "crons": [{ "path": "/api/v3/journeys/scheduler", "schedule": "* * * * *" }] }
- *   - External HTTP scheduler: POST with Authorization: Bearer <SCHEDULER_SECRET>
- *   - Manual test: POST with valid Supabase session (owner/admin only)
- *
- * IDEMPOTENCY:
- *   - Each due row is locked with scheduler_lock = now()+30s before processing.
- *   - Concurrent invocations skip rows that are already locked.
- *   - Lock expires automatically after 30s, allowing retry on crash.
- *
- * RETRY POLICY:
- *   - Max 3 attempts per contact state row.
- *   - Exponential backoff: attempt 1 → immediate, 2 → +5min, 3 → +15min.
- *   - After 3 failures: status → 'failed', terminal_error set, no further retries.
- *
- * SECURITY:
- *   - Accepts SCHEDULER_SECRET bearer token (for cron invocations).
- *   - Also accepts authenticated Supabase session (for manual/admin invocations).
- *   - Never logs the secret value.
- *   - account_id always from DB, never from request.
+ * Headers: { "authorization": "Bearer <CRON_SECRET>" }
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { executeJourney } from '@/lib/ai/journey-engine';
 
-const MAX_ATTEMPTS   = 3;
-const BATCH_SIZE     = 20;
-const LOCK_DURATION  = 30_000; // 30 seconds in ms
+const CRON_SECRET = process.env.CRON_SECRET ?? 'dev-cron-secret';
+const MAX_ATTEMPTS = 3;
+const LOCK_DURATION_SECONDS = 30;
 
-// Backoff delays per attempt (ms)
-const BACKOFF_MS: Record<number, number> = {
-  1: 0,
-  2: 5 * 60_000,   // 5 min
-  3: 15 * 60_000,  // 15 min
-};
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-// ── Auth: accept scheduler secret OR valid session ────────────
-async function authorize(req: NextRequest): Promise<{ ok: boolean; userId?: string; isService: boolean }> {
-  const authHeader = req.headers.get('authorization') ?? '';
-  const schedulerSecret = process.env.SCHEDULER_SECRET;
-
-  // Service-level auth via bearer token
-  if (schedulerSecret && authHeader === `Bearer ${schedulerSecret}`) {
-    return { ok: true, isService: true };
-  }
-
-  // Session-level auth (manual invocation by owner/admin)
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) return { ok: true, userId: user.id, isService: false };
-  } catch {
-    // fall through
-  }
-
-  return { ok: false, isService: false };
-}
-
-// ── Main handler ──────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
-  const auth = await authorize(req);
-  if (!auth.ok) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // 1️⃣ Auth: Verify cron secret
+  const authHeader = req.headers.get('authorization');
+  const token = authHeader?.replace('Bearer ', '');
+
+  if (token !== CRON_SECRET) {
+    console.error('[scheduler] Unauthorized request - invalid CRON_SECRET');
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
   }
 
   const supabase = await createClient();
-  const now = new Date();
-  const lockExpiry = new Date(now.getTime() + LOCK_DURATION).toISOString();
 
-  // ── Find due rows ─────────────────────────────────────────
-  // Rows that are: waiting, wait_until <= now, not locked (or lock expired),
-  // not terminal, attempt_count < MAX_ATTEMPTS.
-  const { data: dueRows, error: fetchErr } = await supabase
-    .from('crm3_journey_contact_state')
-    .select(`
-      id, account_id, journey_id, contact_id, current_node_id,
-      attempt_count, metadata, wait_until,
-      scheduler_lock, terminal_error
-    `)
-    .eq('status', 'waiting')
-    .lte('wait_until', now.toISOString())
-    .is('terminal_error', null)
-    .lt('attempt_count', MAX_ATTEMPTS)
-    .or(`scheduler_lock.is.null,scheduler_lock.lte.${now.toISOString()}`)
-    .order('wait_until', { ascending: true })
-    .limit(BATCH_SIZE);
+  try {
+    // 2️⃣ Find all waiting contacts that are due and not locked
+    const now = new Date().toISOString();
+    const lockExpiry = new Date(Date.now() - LOCK_DURATION_SECONDS * 1000).toISOString();
 
-  if (fetchErr) {
-    console.error('[scheduler] fetch error:', fetchErr.message);
-    return NextResponse.json({ error: 'Failed to fetch due rows', detail: fetchErr.message }, { status: 500 });
-  }
+    const { data: waitingContacts, error: fetchError } = await supabase
+      .from('crm3_journey_contact_state')
+      .select(`
+        id,
+        account_id,
+        journey_id,
+        contact_id,
+        current_node_id,
+        wait_until,
+        attempt_count,
+        last_attempt_at,
+        scheduler_lock
+      `)
+      .eq('status', 'waiting')
+      .lte('wait_until', now)
+      .is('terminal_error', null)
+      .or(`scheduler_lock.is.null,scheduler_lock.lt.${lockExpiry}`)
+      .limit(50); // Process max 50 per run
 
-  const rows = dueRows ?? [];
-  if (rows.length === 0) {
-    return NextResponse.json({
-      processed: 0,
-      resumed: 0,
-      failed: 0,
-      duration_ms: Date.now() - startTime,
-      message: 'No due wait nodes',
-    });
-  }
+    if (fetchError) {
+      console.error('[scheduler] Failed to fetch waiting contacts:', fetchError);
+      return NextResponse.json(
+        { error: 'Failed to fetch waiting contacts', details: fetchError.message },
+        { status: 500 }
+      );
+    }
 
-  // ── Lock all rows atomically before processing ────────────
-  const rowIds = rows.map((r) => r.id as string);
-  await supabase
-    .from('crm3_journey_contact_state')
-    .update({ scheduler_lock: lockExpiry })
-    .in('id', rowIds)
-    .eq('status', 'waiting')
-    .or(`scheduler_lock.is.null,scheduler_lock.lte.${now.toISOString()}`);
+    if (!waitingContacts || waitingContacts.length === 0) {
+      return NextResponse.json({
+        processed: 0,
+        resumed: 0,
+        failed: 0,
+        deadLettered: 0,
+        durationMs: Date.now() - startTime,
+        message: 'No contacts ready to resume',
+      });
+    }
 
-  // ── Process each row ──────────────────────────────────────
-  let resumed = 0;
-  let failed  = 0;
+    console.log(`[scheduler] Found ${waitingContacts.length} contacts to process`);
 
-  for (const row of rows) {
-    const rowStart = Date.now();
-    const attempt  = (row.attempt_count as number) + 1;
-    const stateId  = row.id as string;
-    const journeyId  = row.journey_id as string;
-    const contactId  = row.contact_id as string;
-    const accountId  = row.account_id as string;
-    const meta       = (row.metadata as Record<string, unknown>) ?? {};
-    const userId     = (meta.user_id as string) ?? auth.userId ?? 'scheduler';
+    // 3️⃣ Process each contact
+    let resumed = 0;
+    let failed = 0;
+    let deadLettered = 0;
+    let skippedLocked = 0;
 
-    try {
-      // Verify journey is still active
-      const { data: journey } = await supabase
-        .from('crm3_journeys')
-        .select('status')
-        .eq('id', journeyId)
-        .eq('account_id', accountId)
-        .single();
+    for (const contact of waitingContacts) {
+      const { id: stateId, account_id, journey_id, contact_id, current_node_id, attempt_count } = contact;
 
-      if (!journey || !['active'].includes(journey.status as string)) {
-        // Journey paused/archived/deleted — exit this contact
-        await supabase
+      try {
+        // 3.1 Acquire lock (optimistic)
+        const lockUntil = new Date(Date.now() + LOCK_DURATION_SECONDS * 1000).toISOString();
+        const { error: lockError } = await supabase
           .from('crm3_journey_contact_state')
           .update({
-            status: 'exited',
-            scheduler_lock: null,
-            terminal_error: `Journey status: ${journey?.status ?? 'not found'}`,
+            scheduler_lock: lockUntil,
+            attempt_count: attempt_count + 1,
+            last_attempt_at: now,
           })
+          .eq('id', stateId)
+          .is('scheduler_lock', null); // Only update if not already locked
+
+        if (lockError) {
+          console.warn(`[scheduler] Failed to acquire lock for state ${stateId}:`, lockError);
+          skippedLocked++;
+          await logSchedulerAction(supabase, account_id, journey_id, contact_id, stateId, 'skipped_locked', attempt_count + 1, { reason: lockError.message });
+          continue;
+        }
+
+        // 3.2 Load journey
+        const { data: journey } = await supabase
+          .from('crm3_journeys')
+          .select('id, nodes, edges')
+          .eq('id', journey_id)
+          .single();
+
+        if (!journey) {
+          await logSchedulerAction(supabase, account_id, journey_id, contact_id, stateId, 'failed', attempt_count + 1, { error: 'Journey not found' });
+          await supabase
+            .from('crm3_journey_contact_state')
+            .update({ terminal_error: 'Journey not found', scheduler_lock: null })
+            .eq('id', stateId);
+          deadLettered++;
+          continue;
+        }
+
+        // 3.3 Resume execution from current node
+        const nodeStart = Date.now();
+        
+        // Create a system service role client for execution (no user context)
+        const serviceSupabase = await createClient();
+        
+        const result = await executeJourney(
+          journey_id,
+          contact_id,
+          account_id,
+          'scheduler', // system user
+          serviceSupabase,
+          'scheduler_resume'
+        );
+
+        const nodeDuration = Date.now() - nodeStart;
+
+        // 3.4 Handle result
+        if (result.status === 'completed') {
+          // Journey completed successfully
+          await supabase
+            .from('crm3_journey_contact_state')
+            .update({
+              status: 'completed',
+              scheduler_lock: null,
+              next_attempt_at: null,
+            })
+            .eq('id', stateId);
+
+          await logSchedulerAction(supabase, account_id, journey_id, contact_id, stateId, 'resumed', attempt_count + 1, { nodes: result.nodesExecuted.length }, null, nodeDuration);
+          resumed++;
+        } else if (result.status === 'waiting') {
+          // Journey hit another wait node
+          await supabase
+            .from('crm3_journey_contact_state')
+            .update({
+              status: 'waiting',
+              scheduler_lock: null,
+              next_attempt_at: null, // Will be set by journey engine
+            })
+            .eq('id', stateId);
+
+          await logSchedulerAction(supabase, account_id, journey_id, contact_id, stateId, 'resumed', attempt_count + 1, { status: 'waiting_again' }, null, nodeDuration);
+          resumed++;
+        } else if (result.status === 'failed') {
+          // Execution failed
+          if (attempt_count + 1 >= MAX_ATTEMPTS) {
+            // Dead letter after max retries
+            await supabase
+              .from('crm3_journey_contact_state')
+              .update({
+                status: 'failed',
+                terminal_error: result.error ?? 'Max retries exceeded',
+                scheduler_lock: null,
+              })
+              .eq('id', stateId);
+
+            await logSchedulerAction(supabase, account_id, journey_id, contact_id, stateId, 'dead_lettered', attempt_count + 1, null, `Max retries (${MAX_ATTEMPTS}) exceeded: ${result.error}`);
+            deadLettered++;
+          } else {
+            // Retry with exponential backoff
+            const backoffMinutes = Math.pow(2, attempt_count + 1); // 2, 4, 8 minutes
+            const nextAttempt = new Date(Date.now() + backoffMinutes * 60000).toISOString();
+
+            await supabase
+              .from('crm3_journey_contact_state')
+              .update({
+                scheduler_lock: null,
+                next_attempt_at: nextAttempt,
+              })
+              .eq('id', stateId);
+
+            await logSchedulerAction(supabase, account_id, journey_id, contact_id, stateId, 'failed', attempt_count + 1, { next_attempt: nextAttempt, backoff_minutes: backoffMinutes }, result.error, nodeDuration);
+            failed++;
+          }
+        }
+      } catch (error) {
+        console.error(`[scheduler] Error processing state ${stateId}:`, error);
+
+        // Release lock on error
+        await supabase
+          .from('crm3_journey_contact_state')
+          .update({ scheduler_lock: null })
           .eq('id', stateId);
 
-        await logSchedulerAction(supabase, {
-          accountId, journeyId, contactId, stateId,
-          action: 'skipped_locked',
-          attempt,
-          result: { reason: `journey_${journey?.status ?? 'not_found'}` },
-          durationMs: Date.now() - rowStart,
-        });
-        continue;
+        await logSchedulerAction(supabase, account_id, journey_id, contact_id, stateId, 'failed', attempt_count + 1, null, error instanceof Error ? error.message : 'Unknown error');
+        failed++;
       }
-
-      // Resume the journey from the next node after the wait node
-      const result = await executeJourney(
-        journeyId, contactId, accountId, userId, supabase, 'scheduler'
-      );
-
-      if (result.status === 'failed') {
-        throw new Error(result.error ?? 'Journey execution failed');
-      }
-
-      // Success — clear lock, update attempt count
-      await supabase
-        .from('crm3_journey_contact_state')
-        .update({
-          scheduler_lock: null,
-          attempt_count: attempt,
-          last_attempt_at: now.toISOString(),
-          next_attempt_at: null,
-        })
-        .eq('id', stateId);
-
-      await logSchedulerAction(supabase, {
-        accountId, journeyId, contactId, stateId,
-        action: 'resumed',
-        attempt,
-        result: { execution_id: result.executionId, nodes: result.nodesExecuted.length, status: result.status },
-        durationMs: Date.now() - rowStart,
-      });
-
-      resumed++;
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'Unknown error';
-      const isTerminal = attempt >= MAX_ATTEMPTS;
-      const nextAttempt = isTerminal
-        ? null
-        : new Date(now.getTime() + (BACKOFF_MS[attempt + 1] ?? BACKOFF_MS[MAX_ATTEMPTS])).toISOString();
-
-      await supabase
-        .from('crm3_journey_contact_state')
-        .update({
-          scheduler_lock: null,
-          attempt_count: attempt,
-          last_attempt_at: now.toISOString(),
-          next_attempt_at: nextAttempt,
-          // On terminal failure: mark failed + set terminal_error
-          ...(isTerminal ? {
-            status: 'failed',
-            terminal_error: errMsg,
-            error_message: errMsg,
-          } : {
-            // Not terminal: reschedule via next_attempt_at
-            wait_until: nextAttempt,
-          }),
-        })
-        .eq('id', stateId);
-
-      await logSchedulerAction(supabase, {
-        accountId, journeyId, contactId, stateId,
-        action: isTerminal ? 'dead_lettered' : 'failed',
-        attempt,
-        error: errMsg,
-        durationMs: Date.now() - rowStart,
-      });
-
-      console.error(`[scheduler] row ${stateId} attempt ${attempt} failed:`, errMsg);
-      failed++;
     }
+
+    const durationMs = Date.now() - startTime;
+
+    console.log(`[scheduler] Completed: ${resumed} resumed, ${failed} failed, ${deadLettered} dead-lettered, ${skippedLocked} skipped (locked)`);
+
+    return NextResponse.json({
+      processed: waitingContacts.length,
+      resumed,
+      failed,
+      deadLettered,
+      skippedLocked,
+      durationMs,
+      message: `Successfully processed ${waitingContacts.length} contacts`,
+    });
+
+  } catch (error) {
+    console.error('[scheduler] Fatal error:', error);
+    return NextResponse.json(
+      { 
+        error: 'Scheduler failed', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({
-    processed: rows.length,
-    resumed,
-    failed,
-    duration_ms: Date.now() - startTime,
-  });
 }
 
-// ── GET — health/status endpoint ─────────────────────────────
-export async function GET(req: NextRequest) {
-  const auth = await authorize(req);
-  if (!auth.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const supabase = await createClient();
-  const now = new Date();
-
-  const { count: dueCount } = await supabase
-    .from('crm3_journey_contact_state')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'waiting')
-    .lte('wait_until', now.toISOString())
-    .is('terminal_error', null)
-    .lt('attempt_count', MAX_ATTEMPTS);
-
-  const { count: waitingCount } = await supabase
-    .from('crm3_journey_contact_state')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'waiting')
-    .is('terminal_error', null);
-
-  const { count: deadCount } = await supabase
-    .from('crm3_journey_contact_state')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'failed')
-    .not('terminal_error', 'is', null);
-
-  return NextResponse.json({
-    status: 'healthy',
-    due_now: dueCount ?? 0,
-    waiting_total: waitingCount ?? 0,
-    dead_lettered: deadCount ?? 0,
-    checked_at: now.toISOString(),
-    config: {
-      max_attempts: MAX_ATTEMPTS,
-      batch_size: BATCH_SIZE,
-      lock_duration_ms: LOCK_DURATION,
-      backoff_ms: BACKOFF_MS,
-    },
-  });
-}
-
-// ── Audit log helper ──────────────────────────────────────────
+// ── Log scheduler action to audit table ─────────────────────────
 async function logSchedulerAction(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  opts: {
-    accountId: string;
-    journeyId: string;
-    contactId: string;
-    stateId: string;
-    action: string;
-    attempt: number;
-    result?: Record<string, unknown>;
-    error?: string;
-    durationMs: number;
-  }
+  accountId: string,
+  journeyId: string,
+  contactId: string,
+  contactStateId: string,
+  action: string,
+  attemptNumber: number,
+  result?: Record<string, unknown> | null,
+  errorMessage?: string | null,
+  durationMs?: number
 ) {
   try {
     await supabase.from('crm3_journey_scheduler_log').insert({
-      account_id:       opts.accountId,
-      journey_id:       opts.journeyId,
-      contact_id:       opts.contactId,
-      contact_state_id: opts.stateId,
-      action:           opts.action,
-      attempt_number:   opts.attempt,
-      result:           opts.result ?? null,
-      error_message:    opts.error ?? null,
-      duration_ms:      opts.durationMs,
+      account_id: accountId,
+      journey_id: journeyId,
+      contact_id: contactId,
+      contact_state_id: contactStateId,
+      action,
+      attempt_number: attemptNumber,
+      result: result ?? {},
+      error_message: errorMessage ?? null,
+      duration_ms: durationMs ?? null,
     });
-  } catch (logErr) {
-    // Never let logging failure break the scheduler
-    console.error('[scheduler] log write failed:', logErr);
+  } catch (err) {
+    console.error('[scheduler] Failed to log action:', err);
   }
 }

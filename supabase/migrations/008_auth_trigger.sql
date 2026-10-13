@@ -1,7 +1,7 @@
 -- ============================================================
--- TZMICHA CRM 3.0 — Migration 000b: Auth Trigger
+-- TZMICHA CRM 3.0 — Migration 008: Auth Trigger
 -- Auto-creates account + profile + pipeline stages on signup.
--- Run AFTER 000_crm3_standalone_base.sql
+-- Runs after the base schema and feature migrations.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION handle_new_user()

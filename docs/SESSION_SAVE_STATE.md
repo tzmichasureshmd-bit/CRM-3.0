@@ -1,5 +1,5 @@
 # CRM 3.0 — SESSION SAVE STATE
-# Last updated: End of Session 013
+# Last updated: Pipeline Integration Session (after Session 013)
 # Read this FIRST at the start of the next session.
 
 ---
@@ -8,45 +8,68 @@
 
 - TypeScript: PASS (0 errors)
 - ESLint: PASS (0 errors, 0 warnings)
-- Next.js Build: PASS (Next.js 16.4.0)
-- Total routes: 49
+- Next.js Build: PASS
+- Total routes: 51 (49 from Session 013 + 2 new pipeline-crm routes)
 - All routes compile cleanly
 
 ---
 
-## WHAT WAS DONE IN SESSION 013
+## WHAT WAS DONE THIS SESSION
 
-### ✅ NEW — /api/v3/segments/route.ts
-- Was: no API route (segments page queried Supabase directly from client)
-- Now: GET /api/v3/segments — list segments for account (server-side auth)
-- Now: POST /api/v3/segments — create segment (name/description/type, account_id from session)
-- Auth: 401/403 enforced, account_id from session only
+### ✅ Sharvani's Pipeline & CRM work — fully integrated into CRM 3.0
 
-### ✅ FIXED — segments/page.tsx — "New Segment" button now works
-- Was: button rendered but did nothing
-- Now: opens create modal → POST /api/v3/segments → optimistic prepend to list
-- Modal: name (required), description (optional), type picker (manual/rule_based/ai_assisted)
-- Empty state also has "Create Segment" button
-- Page now fetches via /api/v3/segments instead of direct Supabase client query
+**4 new files created:**
+- `src/lib/crm-pipeline-store.ts` — shared Supabase error helpers, tenant account_id resolution, local storage fallback
+- `src/components/pipelines/PipelinesTab.tsx` — full Kanban deal board (create/move/search/contact association)
+- `src/components/crm/CrmTab.tsx` — CRM lead board (KPI cards, tier filters, add lead modal, slide-out drawer)
+- `src/app/(dashboard)/pipeline-crm/page.tsx` — unified Pipeline & CRM page with tab switcher (?tab=pipeline / ?tab=crm)
 
-### ✅ FIXED — P10-B3 — Dashboard realtime subscription implemented
-- Was: KPIs only updated on page load
-- Now: Supabase realtime channel on deals + contacts + follow_ups tables
-- Any INSERT/UPDATE/DELETE on those tables triggers loadKPIs() automatically
-- Channel cleaned up on component unmount
-- Resolves P10-B3 (OPEN → RESOLVED)
+**3 files modified:**
+- `src/app/(dashboard)/pipelines/page.tsx` — now redirects to /pipeline-crm (old standalone page replaced)
+- `src/components/layout/CRMSidebar.tsx` — "Pipeline" → "Pipeline & CRM" pointing to /pipeline-crm
+- `src/components/dashboard/PipelineOverview.tsx` — "View all" link updated to /pipeline-crm
 
-### ✅ FIXED — AI Copilot feature status corrected
-- Was: CRM_3_FEATURE_STATUS.md showed AI Copilot as IN_PROGRESS (stale from Session 001)
-- Now: IMPLEMENTED — /api/v3/copilot fully built (Session 011), ai-center/page.tsx fully built
-- P10 realtime sub-feature updated from NOT_STARTED → IMPLEMENTED
+### ✅ Backend deals.py — fully rewritten and completed
+**File:** `backend/app/api/v1/deals.py`
+
+Fixed bugs:
+- Removed broken `pipeline_id` field (no such column in DB schema)
+
+New endpoints added:
+- `GET /api/v1/pipeline-stages` — list stages for tenant
+- `POST /api/v1/pipeline-stages` — create stage
+- `PATCH /api/v1/pipeline-stages/{id}` — update stage
+- `DELETE /api/v1/pipeline-stages/{id}` — delete stage (safely nulls deals first)
+- `GET /api/v1/deals` — list deals with filters (status/stage_id/contact_id)
+- `GET /api/v1/deals/stats` — pipeline stats (total/open/won/lost/win_rate/by_stage)
+- `GET /api/v1/deals/{id}` — get single deal
+- `POST /api/v1/deals` — create deal (auto-sets status from stage name)
+- `PATCH /api/v1/deals/{id}` — update deal (auto-updates status on stage change)
+- `DELETE /api/v1/deals/{id}` — delete deal
+- `PATCH /api/v1/deals/{id}/move` — quick stage move endpoint
+
+### ✅ Migration 009 created
+**File:** `supabase/migrations/009_fix_profiles_rls.sql`
+- Fixes PostgreSQL error 42P17 (infinite recursion in profiles RLS policy)
+- Creates `get_my_account_id()` SECURITY DEFINER function
+- Replaces recursive profiles_rls policy with safe version
+- Must be applied to Supabase by owner
+
+### ✅ sharVaniii folder deleted
+- All work confirmed integrated before deletion
+- Folder permanently removed
+
+### ✅ WORK_DIVISION.md created
+- Full task breakdown for: You (owner), Sharvani, Amazon Q
+- Priority order for this week and next week
+- Deployment checklist
 
 ---
 
 ## COMPLETE PHASE STATUS
 
 | Phase | Status | Build | Live Test |
-|-------|--------|-------|-----------| 
+|-------|--------|-------|-----------|
 | P0 Foundation | VERIFIED | ✅ | ✅ |
 | P1 Conversations | IMPLEMENTED | ✅ | BLOCKED |
 | P2 Customer 360 | IMPLEMENTED | ✅ | BLOCKED |
@@ -58,87 +81,65 @@
 | P8 Journey Builder | IMPLEMENTED | ✅ | BLOCKED |
 | P9 Revenue Intelligence | IMPLEMENTED | ✅ | BLOCKED |
 | P10 Command Center | IMPLEMENTED | ✅ | BLOCKED |
+| Pipeline & CRM | IMPLEMENTED | ✅ | BLOCKED |
 
-All live tests blocked on: real OpenAI API key + migrations 001–006 applied to Supabase.
+All live tests blocked on: real OpenAI API key + migrations 001–009 applied to Supabase.
 
 ---
 
-## ALL API ROUTES (49 total)
+## ALL API ROUTES (51 total)
 
-### AI Routes
+### Frontend Next.js API Routes (v3)
 - POST /api/v3/ai/lead-intelligence
 - POST /api/v3/ai/reply-assist
 - POST /api/v3/ai/summarize-conversation
 - POST /api/v3/ai/generate-content
 - POST /api/v3/ai/next-best-action
 - GET  /api/v3/ai/recommendations
-
-### Agents (P5)
 - GET/POST /api/v3/agents
 - GET/PATCH/DELETE /api/v3/agents/[id]
 - POST /api/v3/agents/[id]/execute
 - GET /api/v3/agents/[id]/executions
 - POST /api/v3/agents/[id]/approve
 - GET /api/v3/agents/tools
-
-### Automations (P4)
 - GET/POST /api/v3/automations
 - GET/PATCH/DELETE /api/v3/automations/[id]
 - POST /api/v3/automations/[id]/execute
 - GET /api/v3/automations/templates
-
-### Attribution (P7)
 - GET/POST /api/v3/attribution
-
-### Content (P6)
 - GET/POST /api/v3/content
 - GET/PATCH/DELETE /api/v3/content/[id]
-
-### Journeys (P8)
 - GET/POST /api/v3/journeys
 - GET/PATCH/DELETE /api/v3/journeys/[id]
 - POST /api/v3/journeys/[id]/publish
 - POST /api/v3/journeys/[id]/execute
 - GET /api/v3/journeys/[id]/executions
 - GET /api/v3/journeys/[id]/events
-
-### Revenue Intelligence (P9)
-- GET /api/v3/revenue-intelligence (views: overview/forecast/win_loss/cohort)
-
-### Command Center (P10)
+- POST /api/v3/journeys/scheduler
+- GET /api/v3/revenue-intelligence
 - GET /api/v3/command-center
-
-### Copilot
 - POST /api/v3/copilot
-
-### Segments  ← NEW Session 013
 - GET/POST /api/v3/segments
 
----
-
-## REMAINING WORK (owner-blocked)
-
-All remaining work requires owner to:
-1. Provide real OpenAI API key → update OPENAI_API_KEY in .env.local
-2. Apply migrations 001–006 in order via Supabase SQL editor
-3. Run npm run dev and perform browser E2E tests
-
-### Developer tasks remaining (independent of credentials)
-- P8-B3: Journey wait-node background scheduler (needs Supabase Edge Function cron or external queue — infrastructure decision, not code-only)
-- Content Studio: Calendar view and Visual Grid view (NOT_STARTED)
-
----
-
-## SECURITY STATUS (Session 013 audit)
-
-All API routes: account_id ALWAYS from session (never from body/query) ✅
-- /api/v3/segments: 401 unauthenticated, account_id from session ✅
-- Ownership verified before any DB write ✅
-- No raw SQL from AI ✅
-- No secrets in browser ✅
-- RLS enabled on all crm3_* tables ✅
-- Next.js 16.4.0 — critical CVEs resolved ✅
-- serverActions.allowedOrigins includes production domain ✅
+### Python Backend API Routes (v1)
+- GET/POST /api/v1/contacts
+- GET/PATCH/DELETE /api/v1/contacts/{id}
+- GET/POST /api/v1/conversations
+- GET/POST /api/v1/deals ← FIXED this session
+- GET /api/v1/deals/stats ← NEW this session
+- GET/PATCH/DELETE /api/v1/deals/{id} ← FIXED this session
+- PATCH /api/v1/deals/{id}/move ← NEW this session
+- GET/POST /api/v1/pipeline-stages ← NEW this session
+- PATCH/DELETE /api/v1/pipeline-stages/{id} ← NEW this session
+- GET/POST /api/v1/leads
+- GET/POST /api/v1/campaigns
+- GET/POST /api/v1/automations
+- GET/POST /api/v1/content
+- GET/POST /api/v1/agents
+- GET/POST /api/v1/reports
+- GET /api/v1/command-center
+- POST /api/v1/webhooks
+- GET /api/v1/health
 
 ---
 
@@ -152,8 +153,39 @@ Apply in this exact order via Supabase SQL editor:
 4. supabase/migrations/004_ai_agents_full.sql
 5. supabase/migrations/005_attribution_enhancements.sql
 6. supabase/migrations/006_journey_builder.sql
+7. supabase/migrations/007_journey_scheduler.sql
+8. supabase/migrations/008_auth_trigger.sql
+9. supabase/migrations/009_fix_profiles_rls.sql  ← NEW this session
 
 ---
 
-*Saved: End of Session 013*
+## REMAINING WORK
+
+See WORK_DIVISION.md for full breakdown. Summary:
+
+### Owner must do:
+- Apply migrations 001–009 to Supabase (CRITICAL)
+- Add real OpenAI API key to .env.local
+- Browser E2E testing after migrations applied
+- Add WhatsApp/Meta credentials
+
+### Sharvani must do:
+- S-1: Contacts page full CRUD UI
+- S-2: Follow-ups page create/complete UI
+- S-3: Broadcasts page send/stats UI
+- S-4: Settings page profile/account section
+- S-5: Appointments page calendar UI
+
+### Amazon Q will do (just ask):
+- Q-1: Fix bugs found during browser testing
+- Q-2: Mark phases VERIFIED after testing
+- Q-3: Analytics dashboard page
+- Q-4: Platform Health page
+- Q-5: Global Search (⌘K)
+- Q-6: Campaigns page full UI
+- Q-7: Backend follow-ups/broadcasts/appointments routes
+
+---
+
+*Saved: Pipeline Integration Session*
 *Next session: Apply migrations → browser E2E testing → mark phases VERIFIED*

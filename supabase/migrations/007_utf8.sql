@@ -1,1 +1,48 @@
-﻿ⴭ㴠㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽਽ⴭ䌠䵒㌠〮䴠杩慲楴湯〠㜰钀䨠畯湲祥圠楡⵴潎敤匠档摥汵牥匠灵潰瑲ⴊ‭摁獤爠瑥祲椯敤灭瑯湥祣挠汯浵獮琠⁯牣㍭機畯湲祥损湯慴瑣獟慴整ਮⴭ匠晡⁥潴爠湵洠汵楴汰⁥楴敭⁳䤨⁆低⁔塅卉協⼠䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⥓ਮⴭ㴠㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽㴽਽ⴊ‭铢肔匠档摥汵牥挠汯浵獮漠⁮潣瑮捡⁴瑳瑡⁥铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢઀䱁䕔⁒䅔䱂⁅牣㍭機畯湲祥损湯慴瑣獟慴整 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓瑡整灭彴潣湵⁴†䤠呎䝅剅丠呏丠䱕⁌䕄䅆䱕⁔ⰰ 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓慬瑳慟瑴浥瑰慟⁴吠䵉卅䅔偍婔ਬ†䑁⁄佃啌乍䤠⁆低⁔塅卉協渠硥彴瑡整灭彴瑡†䥔䕍呓䵁呐ⱚ 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓整浲湩污敟牲牯†吠塅ⱔ 䄠䑄䌠䱏䵕⁎䙉丠呏䔠䥘呓⁓捳敨畤敬彲潬正†吠䵉卅䅔偍婔਻†ⴭ猠档摥汵牥江捯㩫猠瑥琠⁯潮⡷⬩〳⁳桷湥愠猠档摥汵牥瀠捩獫甠⁰桴獩爠睯ਮ†ⴭ倠敲敶瑮⁳潣据牵敲瑮猠档摥汵牥⁳牦浯瀠潲散獳湩⁧桴⁥慳敭爠睯ਮ†ⴭ䌠敬牡摥漠⁮潣灭敬楴湯漠⁲慦汩牵⹥䔠灸物獥愠瑵浯瑡捩污祬愠瑦牥㌠猰ਮⴊ‭铢肔䤠摮硥映牯猠档摥汵牥焠敵祲肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔ⴊ‭楆摮⁳潲獷琠慨⁴牡㩥眠楡楴杮‬畤ⱥ渠瑯氠捯敫⁤漨⁲潬正攠灸物摥Ⱙ渠瑯琠牥業慮⹬䌊䕒呁⁅义䕄⁘䙉丠呏䔠䥘呓⁓牣㍭機獣獟档摥汵牥楟硤 传⁎牣㍭機畯湲祥损湯慴瑣獟慴整⠠慷瑩畟瑮汩‬捡潣湵彴摩਩†䡗剅⁅瑳瑡獵㴠✠慷瑩湩❧䄠䑎琠牥業慮彬牥潲⁲卉丠䱕㭌ਊⴭ肔铢₀牣㍭機畯湲祥獟档摥汵牥江杯钀愠摵瑩琠慲汩肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔铢肔䌊䕒呁⁅䅔䱂⁅䙉丠呏䔠䥘呓⁓牣㍭機畯湲祥獟档摥汵牥江杯⠠ 椠⁤††††††唠䥕⁄剐䵉剁⁙䕋⁙䕄䅆䱕⁔敧彮慲摮浯畟極⡤Ⱙ 愠捣畯瑮楟⁤††唠䥕⁄低⁔啎䱌删䙅剅久䕃⁓捡潣湵獴椨⥤传⁎䕄䕌䕔䌠十䅃䕄ਬ†潪牵敮役摩†††啕䑉丠呏丠䱕⁌䕒䕆䕒䍎卅挠浲弳潪牵敮獹椨⥤传⁎䕄䕌䕔䌠十䅃䕄ਬ†潣瑮捡彴摩†††啕䑉删䙅剅久䕃⁓潣瑮捡獴椨⥤传⁎䕄䕌䕔匠呅丠䱕ⱌ 挠湯慴瑣獟慴整楟⁤啕䑉删䙅剅久䕃⁓牣㍭機畯湲祥损湯慴瑣獟慴整椨⥤传⁎䕄䕌䕔匠呅丠䱕ⱌ 愠瑣潩⁮††††吠塅⁔低⁔啎䱌ਬ†ⴭ✠敲畳敭❤‬昧楡敬❤‬搧慥彤敬瑴牥摥Ⱗ✠歳灩数彤潬正摥Ⱗ✠歳灩数彤潮彴畤❥ 愠瑴浥瑰湟浵敢⁲䤠呎䝅剅丠呏丠䱕⁌䕄䅆䱕⁔ⰱ 爠獥汵⁴††††䨠体䉎ਬ†牥潲彲敭獳条⁥†䕔员ਬ†畤慲楴湯浟⁳††义䕔䕇ⱒ 攠數畣整彤瑡††吠䵉卅䅔偍婔丠呏丠䱕⁌䕄䅆䱕⁔潮⡷਩㬩ਊ剃䅅䕔䤠䑎塅䤠⁆低⁔塅卉協挠浲弳獪彬捡潣湵彴摩⁸传⁎牣㍭機畯湲祥獟档摥汵牥江杯愨捣畯瑮楟Ɽ攠數畣整彤瑡䐠卅⥃਻剃䅅䕔䤠䑎塅䤠⁆低⁔塅卉協挠浲弳獪彬潪牵敮役摩⁸传⁎牣㍭機畯湲祥獟档摥汵牥江杯樨畯湲祥楟Ɽ攠數畣整彤瑡䐠卅⥃਻剃䅅䕔䤠䑎塅䤠⁆低⁔塅卉協挠浲弳獪彬潣瑮捡彴摩⁸传⁎牣㍭機畯湲祥獟档摥汵牥江杯挨湯慴瑣楟⥤ 圠䕈䕒挠湯慴瑣楟⁤卉丠呏丠䱕㭌ਊ䱁䕔⁒䅔䱂⁅牣㍭機畯湲祥獟档摥汵牥江杯䔠䅎䱂⁅佒⁗䕌䕖⁌䕓啃䥒奔਻剄偏倠䱏䍉⁙䙉䔠䥘呓⁓牣㍭機汳牟獬传⁎牣㍭機畯湲祥獟档摥汵牥江杯਻剃䅅䕔倠䱏䍉⁙牣㍭機汳牟獬传⁎牣㍭機畯湲祥獟档摥汵牥江杯 唠䥓䝎⠠捡潣湵彴摩䤠⁎匨䱅䍅⁔捡潣湵彴摩䘠佒⁍牰景汩獥圠䕈䕒甠敳彲摩㴠愠瑵⹨極⡤⤩㬩
+-- ============================================================
+-- CRM 3.0 Migration 007 — Journey Wait-Node Scheduler Support
+-- Adds retry/idempotency columns to crm3_journey_contact_state.
+-- Safe to run multiple times (IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
+-- ============================================================
+
+-- ── Scheduler columns on contact state ───────────────────────
+ALTER TABLE crm3_journey_contact_state
+  ADD COLUMN IF NOT EXISTS attempt_count    INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_attempt_at  TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS next_attempt_at  TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS terminal_error   TEXT,
+  ADD COLUMN IF NOT EXISTS scheduler_lock   TIMESTAMPTZ;
+  -- scheduler_lock: set to now()+30s when a scheduler picks up this row.
+  -- Prevents concurrent schedulers from processing the same row.
+  -- Cleared on completion or failure. Expires automatically after 30s.
+
+-- ── Index for scheduler query ─────────────────────────────────
+-- Finds rows that are: waiting, due, not locked (or lock expired), not terminal.
+CREATE INDEX IF NOT EXISTS crm3_jcs_scheduler_idx
+  ON crm3_journey_contact_state (wait_until, account_id)
+  WHERE status = 'waiting' AND terminal_error IS NULL;
+
+-- ── crm3_journey_scheduler_log — audit trail ─────────────────
+CREATE TABLE IF NOT EXISTS crm3_journey_scheduler_log (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id      UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  journey_id      UUID NOT NULL REFERENCES crm3_journeys(id) ON DELETE CASCADE,
+  contact_id      UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  contact_state_id UUID REFERENCES crm3_journey_contact_state(id) ON DELETE SET NULL,
+  action          TEXT NOT NULL,
+  -- 'resumed', 'failed', 'dead_lettered', 'skipped_locked', 'skipped_not_due'
+  attempt_number  INTEGER NOT NULL DEFAULT 1,
+  result          JSONB,
+  error_message   TEXT,
+  duration_ms     INTEGER,
+  executed_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS crm3_jsl_account_idx  ON crm3_journey_scheduler_log(account_id, executed_at DESC);
+CREATE INDEX IF NOT EXISTS crm3_jsl_journey_idx  ON crm3_journey_scheduler_log(journey_id, executed_at DESC);
+CREATE INDEX IF NOT EXISTS crm3_jsl_contact_idx  ON crm3_journey_scheduler_log(contact_id)
+  WHERE contact_id IS NOT NULL;
+
+ALTER TABLE crm3_journey_scheduler_log ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_jsl_rls ON crm3_journey_scheduler_log;
+CREATE POLICY crm3_jsl_rls ON crm3_journey_scheduler_log
+  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
