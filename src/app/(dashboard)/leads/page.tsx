@@ -2,22 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Flame, Search, Brain, Zap, ChevronRight, RefreshCw } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { getLeads, analyzeLead, type Contact } from '@/lib/api-client';
 import Link from 'next/link';
-
-interface Contact {
-  id: string;
-  name: string | null;
-  phone: string | null;
-  email: string | null;
-  lead_status: string | null;
-  lead_score: number | null;
-  lead_score_tier: string | null;
-  lead_score_reason: string | null;
-  source: string | null;
-  last_customer_reply_at: string | null;
-  created_at: string;
-}
 
 const TIER_META: Record<string, { color: string; bg: string; label: string }> = {
   hot:  { color: '#f46b72', bg: 'rgba(244,107,114,0.10)', label: '🔥 Hot' },
@@ -44,45 +30,45 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('');
   const [tier, setTier] = useState<'all' | 'hot' | 'warm' | 'cold'>('all');
   const [analyzing, setAnalyzing] = useState<string | null>(null);
-  const supabase = createClient();
 
   const load = useCallback(async () => {
     setLoading(true);
-    let q = supabase.from('contacts').select('*').not('lead_status', 'is', null).order('lead_score', { ascending: false }).limit(100);
-    if (tier !== 'all') q = q.eq('lead_score_tier', tier);
-    const { data } = await q;
-    setLeads((data as Contact[]) ?? []);
-    setLoading(false);
-  }, [tier]);
+    try {
+      const res = await getLeads();
+      setLeads(res.data);
+    } catch { /* api-client handles 401 → redirect to /login */ }
+    finally { setLoading(false); }
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 
   const filtered = leads.filter(l => {
     const s = search.toLowerCase();
-    return (l.name ?? '').toLowerCase().includes(s) || (l.phone ?? '').includes(s) || (l.email ?? '').toLowerCase().includes(s);
+    const matchSearch = (l.name ?? '').toLowerCase().includes(s) || (l.phone ?? '').includes(s) || (l.email ?? '').toLowerCase().includes(s);
+    const matchTier = tier === 'all' || l.lead_score_tier === tier;
+    return matchSearch && matchTier;
   });
 
   async function analyzeOne(id: string) {
     setAnalyzing(id);
     try {
-      await fetch('/api/v3/ai/lead-intelligence', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contactId: id }),
-      });
-      await load();
-    } finally {
-      setAnalyzing(null);
-    }
+      const result = await analyzeLead(id);
+      setLeads(prev => prev.map(l => l.id === id ? {
+        ...l,
+        lead_score: result.score,
+        lead_score_tier: result.tier,
+        lead_score_reason: result.ai_summary,
+      } : l));
+    } catch { /* ignore */ }
+    finally { setAnalyzing(null); }
   }
 
-  const hot = leads.filter(l => l.lead_score_tier === 'hot').length;
+  const hot  = leads.filter(l => l.lead_score_tier === 'hot').length;
   const warm = leads.filter(l => l.lead_score_tier === 'warm').length;
   const cold = leads.filter(l => l.lead_score_tier === 'cold').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header */}
       <div className="crm-page-header">
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 750, color: 'var(--crm-text)', margin: 0, letterSpacing: '-0.02em' }}>AI Lead Intelligence</h1>
@@ -93,7 +79,6 @@ export default function LeadsPage() {
         </button>
       </div>
 
-      {/* KPI row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
         {[
           { label: 'Hot Leads', count: hot, color: '#f46b72', icon: '🔥' },
@@ -110,7 +95,6 @@ export default function LeadsPage() {
         ))}
       </div>
 
-      {/* Filters */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(255,255,255,0.80)', borderRadius: 12, padding: '8px 12px', flex: 1, maxWidth: 360 }}>
           <Search size={13} color="var(--crm-text-muted)" />
@@ -118,18 +102,13 @@ export default function LeadsPage() {
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['all', 'hot', 'warm', 'cold'] as const).map(t => (
-            <button key={t} onClick={() => setTier(t)} style={{
-              padding: '7px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
-              background: tier === t ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(255,255,255,0.55)',
-              color: tier === t ? 'white' : 'var(--crm-text-secondary)',
-            }}>
+            <button key={t} onClick={() => setTier(t)} style={{ padding: '7px 14px', borderRadius: 10, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', background: tier === t ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(255,255,255,0.55)', color: tier === t ? 'white' : 'var(--crm-text-secondary)' }}>
               {t === 'all' ? 'All' : TIER_META[t].label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Leads table */}
       <div className="crm-glass" style={{ overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--crm-text-muted)' }}>Loading leads...</div>
@@ -168,10 +147,8 @@ export default function LeadsPage() {
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: `conic-gradient(${tierMeta.color} ${score * 3.6}deg, rgba(130,145,190,0.15) 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--crm-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: tierMeta.color }}>{score}</div>
-                          </div>
+                        <div style={{ width: 36, height: 36, borderRadius: '50%', background: `conic-gradient(${tierMeta.color} ${score * 3.6}deg, rgba(130,145,190,0.15) 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--crm-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: tierMeta.color }}>{score}</div>
                         </div>
                       </td>
                       <td style={{ padding: '12px 16px' }}>
@@ -188,14 +165,14 @@ export default function LeadsPage() {
                           <span style={{ fontSize: 12, fontWeight: 600, color: intentColor }}>{intent}</span>
                         </div>
                       </td>
-                      <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--crm-text-muted)' }}>{timeAgo(lead.last_customer_reply_at)}</td>
+                      <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--crm-text-muted)' }}>{timeAgo(lead.lead_score_reason ?? null)}</td>
                       <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--crm-text-secondary)' }}>{lead.source ?? '—'}</td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <button onClick={() => void analyzeOne(lead.id)} disabled={analyzing === lead.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.20)', color: '#8b5cf6', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                             <Brain size={10} />{analyzing === lead.id ? '...' : 'Analyze'}
                           </button>
-                          <Link href={`/inbox`} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, background: 'rgba(79,109,245,0.10)', border: '1px solid rgba(79,109,245,0.20)', color: '#4f6df5', fontSize: 11, fontWeight: 600 }}>
+                          <Link href="/inbox" style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, background: 'rgba(79,109,245,0.10)', border: '1px solid rgba(79,109,245,0.20)', color: '#4f6df5', fontSize: 11, fontWeight: 600 }}>
                             <ChevronRight size={10} />Contact
                           </Link>
                         </div>

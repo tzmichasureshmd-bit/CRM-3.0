@@ -33,13 +33,16 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "out/types/**/*.ts",
+    "out/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "frontend",
     "Tzmicha_CRM-main",
     "backend",
-    "ai-service"
+    "ai-service",
+    "android"
   ]
 }

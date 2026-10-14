@@ -1,0 +1,15 @@
+
+> crm-3.0@3.0.0 dev
+> next dev
+
+▲ Next.js 16.4.0 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.15:3000
+- Environments: .env.local
+✓ Ready in 1174ms
+✓ Running next.config.ts took 87ms
+Creating turbopack project { dir: 'C:\\Users\\danie\\Desktop\\CRM_3.0', testMode: true }
+- Experiments (use with caution):
+  · serverActions
+
+[?25h

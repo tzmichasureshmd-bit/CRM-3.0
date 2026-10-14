@@ -293,7 +293,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-4 — Settings: Security Page (MISSING)
+## Q-4 — Settings: Security Page ✅ DONE
 **File to create:** `src/app/(dashboard)/settings/security/page.tsx`
 **Priority:** MEDIUM — sidebar links to it, currently 404
 **What to build:**
@@ -305,7 +305,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-5 — Settings: Billing Page (MISSING)
+## Q-5 — Settings: Billing Page ✅ DONE
 **File to create:** `src/app/(dashboard)/settings/billing/page.tsx`
 **Priority:** LOW — sidebar links to it, currently 404
 **What to build:**
@@ -317,7 +317,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-6 — Settings: Platform Health Page (MISSING)
+## Q-6 — Settings: Platform Health Page ✅ DONE
 **File to create:** `src/app/(dashboard)/settings/health/page.tsx`
 **Priority:** MEDIUM — sidebar links to it, currently 404
 **What to build:**
@@ -330,7 +330,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-7 — Backend: follow_ups.py (MISSING ENTIRELY)
+## Q-7 — Backend: follow_ups.py ✅ DONE
 **File to create:** `backend/app/api/v1/follow_ups.py`
 **Priority:** HIGH — frontend follow-ups page needs this
 **What to build:**
@@ -343,7 +343,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-8 — Backend: broadcasts.py (MISSING ENTIRELY)
+## Q-8 — Backend: broadcasts.py ✅ DONE
 **File to create:** `backend/app/api/v1/broadcasts.py`
 **Priority:** MEDIUM
 **What to build:**
@@ -356,7 +356,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-9 — Backend: appointments.py (MISSING ENTIRELY)
+## Q-9 — Backend: appointments.py ✅ DONE
 **File to create:** `backend/app/api/v1/appointments.py`
 **Priority:** MEDIUM
 **What to build:**
@@ -369,7 +369,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-10 — Backend: segments.py (MISSING ENTIRELY)
+## Q-10 — Backend: segments.py ✅ DONE
 **File to create:** `backend/app/api/v1/segments.py`
 **Priority:** MEDIUM
 **What to build:**
@@ -383,7 +383,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-11 — Backend: journeys.py (MISSING ENTIRELY)
+## Q-11 — Backend: journeys.py ✅ DONE
 **File to create:** `backend/app/api/v1/journeys.py`
 **Priority:** MEDIUM
 **What to build:**
@@ -397,7 +397,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-12 — Backend: Complete partial files
+## Q-12 — Backend: Complete partial files ✅ DONE
 **Priority:** MEDIUM
 **campaigns.py** — add: `POST /create`, `PATCH /{id}`, `DELETE /{id}`
 **automations.py** — add: `POST /create`, `DELETE /{id}`
@@ -406,7 +406,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-13 — AI Service: Complete empty folders
+## Q-13 — AI Service: Complete empty folders ✅ DONE
 **Priority:** LOW (AI service works without these, but incomplete)
 **`ai-service/app/agents/`** — agent tool implementations (get_contact, search_leads, etc.)
 **`ai-service/app/models/`** — Pydantic request/response models
@@ -415,7 +415,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-14 — DB: Verify broadcasts + appointments tables exist
+## Q-14 — DB: Verify broadcasts + appointments tables ✅ DONE exist
 **Priority:** HIGH — frontend pages query these tables
 **What to check:** Do `broadcasts` and `appointments` tables exist in Supabase?
 **Action:** Create migration `010_broadcasts_appointments.sql` if missing:
@@ -424,7 +424,7 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-15 — Global Search (⌘K)
+## Q-15 — Global Search (Ctrl+K) ✅ DONE
 **File:** `src/components/layout/CRMTopbar.tsx`
 **Priority:** LOW
 **What to build:**
@@ -437,15 +437,17 @@ Test every feature and report bugs to Amazon Q:
 
 ---
 
-## Q-16 — Bug fixes from browser testing (O-4)
+## Q-16 — Bug fixes from browser testing
 **Priority:** CRITICAL (after owner does O-4)
+**File ready:** `docs/BUG_TRACKER.md` — fill this during testing, then share with Amazon Q.
 When you test and find bugs, tell me exactly what's broken and I'll fix immediately.
 
 ---
 
 ## Q-17 — Mark all phases VERIFIED after testing
 **Priority:** After O-4 complete
-Update all docs: `CRM_3_FEATURE_STATUS.md`, `CRM_3_BLOCKERS.md`, `SESSION_SAVE_STATE.md`
+**Files to update:** `CRM_3_FEATURE_STATUS.md`, `CRM_3_BLOCKERS.md`, `SESSION_SAVE_STATE.md`
+**Framework ready** — will be done immediately after you confirm browser tests pass.
 
 ---
 ---

@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home, Brain, Users, UserCircle, Navigation, Target,
   Flame, TrendingUp, CalendarDays, MessageSquare, Smartphone,
-  AtSign, Mail, Sparkles, Megaphone, Rss, Zap, GitBranch,
+  AtSign, Mail, Sparkles, Megaphone, Rss, Zap,
   Bot, BarChart3, Activity, FileBarChart, Settings, Key,
   Shield, CreditCard, Server, ChevronDown, ChevronRight,
 } from 'lucide-react';
@@ -41,6 +41,7 @@ const NAV = [
       { href: '/inbox', icon: MessageSquare, label: 'Unified Inbox' },
       { href: '/inbox/whatsapp', icon: Smartphone, label: 'WhatsApp' },
       { href: '/inbox/instagram', icon: AtSign, label: 'Instagram' },
+      { href: '/inbox/facebook', icon: MessageSquare, label: 'Facebook' },
       { href: '/inbox/email', icon: Mail, label: 'Email' },
     ],
   },
@@ -56,7 +57,6 @@ const NAV = [
     id: 'automation', label: 'AUTOMATION',
     items: [
       { href: '/automations', icon: Zap, label: 'Automations' },
-      { href: '/journeys', icon: GitBranch, label: 'Journey Builder' },
       { href: '/agents', icon: Bot, label: 'AI Agents' },
     ],
   },
