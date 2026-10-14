@@ -27,9 +27,22 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     ai_service_url: str = "http://localhost:8001"
 
-    # WhatsApp
+    # WhatsApp (Meta)
     whatsapp_verify_token: str = ""
     whatsapp_app_secret: str = ""
+    whatsapp_access_token: str = ""
+    whatsapp_phone_number_id: str = ""
+
+    # Instagram (Meta)
+    instagram_verify_token: str = ""
+    instagram_app_secret: str = ""
+    instagram_page_id: str = ""
+
+    # Facebook Messenger (Meta)
+    facebook_verify_token: str = ""
+    facebook_app_secret: str = ""
+    facebook_page_id: str = ""
+    facebook_page_access_token: str = ""
 
     # Email (SMTP/IMAP)
     email_smtp_host: str = "smtp.gmail.com"

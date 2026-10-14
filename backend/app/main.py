@@ -8,7 +8,7 @@ from app.api.v1 import (
     command_center, leads, campaigns, automations,
     content, agents, reports, health, webhooks,
     follow_ups, broadcasts, appointments, segments, journeys,
-    revenue_intelligence, attribution, copilot, ai_routes, email_routes,
+    revenue_intelligence, attribution, copilot, ai_routes, email_routes, meta,
 )
 
 settings = get_settings()
@@ -63,6 +63,7 @@ app.include_router(attribution.router,           prefix=PREFIX, tags=["Attributi
 app.include_router(copilot.router,               prefix=PREFIX, tags=["Copilot"])
 app.include_router(ai_routes.router,             prefix=PREFIX, tags=["AI"])
 app.include_router(email_routes.router,          prefix=PREFIX, tags=["Email"])
+app.include_router(meta.router,                  prefix=PREFIX, tags=["Meta"])
 
 
 @app.get("/")
