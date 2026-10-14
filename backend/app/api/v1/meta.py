@@ -115,11 +115,45 @@ async def instagram_webhook(request: Request):
         raise HTTPException(status_code=403, detail="Invalid signature")
 
     payload = json.loads(body)
+    supabase = get_supabase_client()
+
     for entry in payload.get("entry", []):
+        # ── DMs ──────────────────────────────────────────────
         for msg_event in entry.get("messaging", []):
             sender_id = msg_event.get("sender", {}).get("id", "")
-            text = msg_event.get("message", {}).get("text", "")
+            msg       = msg_event.get("message", {})
+            text      = msg.get("text", "")
+
+            # Story reply — tag it
+            story_ref = msg.get("reply_to", {}).get("story", {})
+            if story_ref:
+                text = f"[Story Reply] {text}"
+
             _save_message("instagram", sender_id, "", text, msg_event)
+
+        # ── Comments / Mentions ───────────────────────────────
+        for change in entry.get("changes", []):
+            field = change.get("field", "")
+            val   = change.get("value", {})
+
+            if field == "comments":
+                supabase.table("instagram_comments").upsert({
+                    "comment_id":  val.get("id"),
+                    "media_id":    val.get("media", {}).get("id"),
+                    "from_id":     val.get("from", {}).get("id"),
+                    "from_name":   val.get("from", {}).get("name", ""),
+                    "text":        val.get("text", ""),
+                    "timestamp":   val.get("timestamp"),
+                    "raw":         json.dumps(val),
+                }, on_conflict="comment_id").execute()
+
+            elif field == "mentions":
+                supabase.table("instagram_mentions").upsert({
+                    "mention_id":  val.get("comment_id") or val.get("media_id"),
+                    "media_id":    val.get("media_id"),
+                    "comment_id":  val.get("comment_id"),
+                    "raw":         json.dumps(val),
+                }, on_conflict="mention_id").execute()
 
     return {"status": "ok"}
 
