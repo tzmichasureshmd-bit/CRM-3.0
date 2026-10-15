@@ -249,8 +249,8 @@ function ReadingPane({ conv, onBack, onReply, onDelete, onArchive }: {
                   {atts.length > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: G.gray }}><Paperclip size={12} />{atts.length}</div>}
                   <span style={{ fontSize: 12, color: G.gray }}>{fmt(msg.created_at)}</span>
                   {isOpen && <>
-                    <IconBtn icon={<Reply size={15} />} title="Reply" onClick={e => { (e as unknown as React.MouseEvent).stopPropagation(); onReply(); }} />
-                    <IconBtn icon={<Forward size={15} />} title="Forward" onClick={e => { (e as unknown as React.MouseEvent).stopPropagation(); setForwardingId(isForwarding ? null : msg.id); setForwardTo(''); }} />
+                    <IconBtn icon={<Reply size={15} />} title="Reply" onClick={() => { onReply(); }} />
+                    <IconBtn icon={<Forward size={15} />} title="Forward" onClick={() => { setForwardingId(isForwarding ? null : msg.id); setForwardTo(''); }} />
                   </>}
                 </div>
               </div>
