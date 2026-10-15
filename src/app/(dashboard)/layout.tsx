@@ -7,9 +7,11 @@ import { FloatingCopilot } from '@/components/chat/FloatingCopilot';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [ready, setReady] = useState<boolean | null>(null);
+  const [ready, setReady] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const token = localStorage.getItem('crm_token');
     if (!token) {
       window.location.replace('/login');
@@ -22,7 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  if (ready !== true) return (
+  if (!mounted || !ready) return (
     <div style={{ minHeight: '100vh', overflow: 'hidden', position: 'relative', background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;600&display=swap');

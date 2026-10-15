@@ -1,0 +1,16 @@
+﻿.login-card {
+  width: 100%;
+  max-width: 1080px;
+  height: 765px;
+  background: #ffffff;
+  border-radius: 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 18px;
+  overflow: hidden;
+}
+
+.login-left {
+  background: #ffffff;
+  display: flex;
+  align-items: center;

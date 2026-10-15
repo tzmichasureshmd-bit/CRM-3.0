@@ -1,0 +1,71 @@
+version: "3.8"
+
+services:
+  tzmicha-crm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        # Public (baked into the client bundle at build time). Set these on
+        # the host too so the running container is consistent with the build.
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+        NEXT_PUBLIC_META_APP_ID: ${META_APP_ID:-}
+        NEXT_PUBLIC_META_EMBEDDED_SIGNUP_CONFIG_ID: ${META_EMBEDDED_SIGNUP_CONFIG_ID:-}
+        NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI: ${NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI:-}
+        NEXT_PUBLIC_GIT_COMMIT: ${NEXT_PUBLIC_GIT_COMMIT:-unknown}
+        NEXT_PUBLIC_APP_VERSION: ${NEXT_PUBLIC_APP_VERSION:-dev}
+    container_name: tzmicha-crm
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      # ---- Meta / WhatsApp (REQUIRED for Settings → WhatsApp →
+      # Connect to Meta / Embedded Signup + inbound webhook) ----
+      # META_APP_ID + META_APP_SECRET gate whether the FB/IG Lead Ads
+      # OAuth flow and the WhatsApp inbound webhook work.  If either is
+      # missing the container silently receives an empty value and Meta
+      # shows "not configured".  The :? syntax makes compose FAIL
+      # loudly during `docker compose up` if either variable is not
+      # set in the host environment or .env, preventing silent misconfig.
+      - META_APP_ID=${META_APP_ID:?Required: add META_APP_ID to host .env or environment before deploying}
+      - META_APP_SECRET=${META_APP_SECRET:?Required: add META_APP_SECRET to host .env or environment before deploying}
+      # Required for WhatsApp Embedded Signup; optional for FB/IG Leads.
+      # The code treats absence as "Embedded Signup unavailable".
+      - META_EMBEDDED_SIGNUP_CONFIG_ID=${META_EMBEDDED_SIGNUP_CONFIG_ID}
+      - META_VERIFY_TOKEN=${META_VERIFY_TOKEN:-}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-}
+      # Optional public override for the exact OAuth redirect URI the
+      # Embedded Signup popup uses (must be registered verbatim in Meta).
+      - NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI=${NEXT_PUBLIC_META_EMBEDDED_SIGNUP_REDIRECT_URI:-}
+      # Public non-secret build tag so /api/health reports which git commit
+      # is running in production (set automatically by the CI deploy step).
+      - NEXT_PUBLIC_GIT_COMMIT=${NEXT_PUBLIC_GIT_COMMIT:-unknown}
+      - NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION:-dev}
+      - AI_PROVIDER=${AI_PROVIDER:-}
+      - AI_MODEL=${AI_MODEL:-}
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AUTOMATION_CRON_SECRET=${AUTOMATION_CRON_SECRET:-}
+      # Admin / super-admin access + locale. NEXT_PUBLIC_APP_LOCALE defaults
+      # to 'en' in code; SUPER_ADMIN_EMAILS gates /admin login.
+      - SUPER_ADMIN_EMAILS=${SUPER_ADMIN_EMAILS:-}
+      - NEXT_PUBLIC_APP_LOCALE=${NEXT_PUBLIC_APP_LOCALE:-en}
+      # Defense-in-depth hostname allow-list for invite links (optional).
+      - ALLOWED_INVITE_HOSTS=${ALLOWED_INVITE_HOSTS:-}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tzmicha-crm.rule=Host(`crm.tzmicha.com`)"
+      - "traefik.http.routers.tzmicha-crm.entrypoints=websecure"
+      - "traefik.http.routers.tzmicha-crm.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tzmicha-crm.loadbalancer.server.port=3000"
+    networks:
+      - traefik-net
+
+networks:
+  traefik-net:
+    external: true
