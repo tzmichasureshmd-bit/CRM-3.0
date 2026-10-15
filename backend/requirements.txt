@@ -21,3 +21,4 @@ celery==5.4.0
 alembic==1.13.3
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.9
+email-validator==2.3.0
