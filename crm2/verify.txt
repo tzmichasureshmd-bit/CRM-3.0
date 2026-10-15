@@ -1,4 +1,0 @@
-light_bg: True
-primary: True
-ring: True
-root_fixed: True
