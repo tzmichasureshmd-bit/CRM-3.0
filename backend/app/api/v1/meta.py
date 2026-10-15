@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, Query
 from app.core.config import get_settings
-from app.db.supabase import get_supabase_client
+from app.db.supabase import get_supabase as get_supabase_client
 import hmac, hashlib, json
 
 router = APIRouter()
