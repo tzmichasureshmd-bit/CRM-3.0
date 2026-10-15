@@ -48,3 +48,21 @@ dev.log
 
 # assets (large images)
 assets/
+<<<<<<< Updated upstream
+=======
+
+# docs (local only)
+*.md
+
+# python
+backend/venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+
+# python
+backend/venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+>>>>>>> Stashed changes

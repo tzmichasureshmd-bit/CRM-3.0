@@ -1,6 +1,14 @@
 'use client';
+<<<<<<< Updated upstream
 import { Search, Bell, Settings, LayoutGrid, MessageSquare, Sun, Moon, User, LogOut } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+=======
+import { Search, Bell, Settings, LayoutGrid, MessageSquare, Sun, Moon, User, LogOut, X, Users, TrendingUp, MessageCircle } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { getStoredUser, getContacts, getDeals, getConversations } from '@/lib/api-client';
+import { clearSession } from '@/lib/auth-client';
+>>>>>>> Stashed changes
 
 interface CRMTopbarProps {
   theme: 'light' | 'dark';
@@ -19,6 +27,104 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+<<<<<<< Updated upstream
+=======
+  // Ctrl+K / Cmd+K shortcut
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+        setTimeout(() => inputRef.current?.focus(), 50);
+      }
+      if (e.key === 'Escape') {
+        setSearchOpen(false);
+        setQuery('');
+        setResults([]);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Load user from localStorage JWT — no Supabase call needed
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (stored) {
+      const raw = localStorage.getItem('crm_user');
+      const parsed = raw ? JSON.parse(raw) as { user_id?: string; account_id?: string; role?: string; email?: string; full_name?: string } : null;
+      const name = parsed?.full_name ?? parsed?.email?.split('@')[0] ?? stored.role ?? 'User';
+      const email = parsed?.email ?? '';
+      setUserName(name);
+      setUserEmail(email);
+      setUserInitial(name[0]?.toUpperCase() ?? 'U');
+    }
+  }, []);
+
+  const handleSignOut = () => {
+    void clearSession().finally(() => window.location.replace('/login'));
+  };
+
+  const runSearch = useCallback(async (q: string) => {
+    if (!q.trim() || q.length < 2) { setResults([]); return; }
+    setSearching(true);
+    try {
+      const [contactsRes, dealsRes, convsRes] = await Promise.all([
+        getContacts({ search: q, limit: '4' }),
+        getDeals({ search: q, limit: '3' }),
+        getConversations({ search: q, limit: '3' }),
+      ]);
+      const out: SearchResult[] = [];
+      for (const c of contactsRes.data ?? []) {
+        out.push({ id: c.id, type: 'contact', title: c.name ?? c.phone ?? c.email ?? 'Unknown', subtitle: [c.phone, c.email, c.lead_status].filter(Boolean).join(' · '), href: '/contacts' });
+      }
+      for (const d of dealsRes.data ?? []) {
+        const sym = d.currency === 'INR' ? '₹' : '$';
+        out.push({ id: d.id, type: 'deal', title: d.title, subtitle: `${sym}${(d.value ?? 0).toLocaleString()} · ${d.status}`, href: '/pipeline-crm?tab=pipeline' });
+      }
+      for (const c of convsRes.data ?? []) {
+        out.push({ id: c.id, type: 'conversation', title: (c.contacts as { name?: string } | null)?.name ?? 'Conversation', subtitle: `${c.platform ?? 'inbox'} · ${(c.last_message_text ?? '').slice(0, 40)}`, href: '/inbox' });
+      }
+      setResults(out);
+      setSelectedIdx(0);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  const handleQueryChange = (val: string) => {
+    setQuery(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => void runSearch(val), 300);
+  };
+
+  const handleKeyNav = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIdx(i => Math.min(i + 1, results.length - 1)); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIdx(i => Math.max(i - 1, 0)); }
+    if (e.key === 'Enter' && results[selectedIdx]) {
+      router.push(results[selectedIdx].href);
+      setSearchOpen(false); setQuery(''); setResults([]);
+    }
+  };
+
+  const handleResultClick = (href: string) => {
+    router.push(href);
+    setSearchOpen(false); setQuery(''); setResults([]);
+  };
+
+  const TYPE_ICON: Record<string, React.ReactNode> = {
+    contact:      <Users size={13} color="#4f6df5" />,
+    deal:         <TrendingUp size={13} color="#28c99a" />,
+    conversation: <MessageCircle size={13} color="#8b5cf6" />,
+  };
+
+  const TYPE_LABEL: Record<string, string> = {
+    contact: 'Contact', deal: 'Deal', conversation: 'Conversation',
+  };
+
+>>>>>>> Stashed changes
   return (
     <header className="crm-topbar">
       <div className="crm-search">
