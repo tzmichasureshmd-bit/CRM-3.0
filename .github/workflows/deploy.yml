@@ -19,11 +19,11 @@ jobs:
           echo "${{ secrets.FRONTEND_ENV }}" > frontend/.env.local
           echo "${{ secrets.AI_SERVICE_ENV }}" > ai-service/.env
 
-      - name: Kill everything on our ports
+      - name: Stop only CRM 3.0 containers
         run: |
-          docker ps -q | xargs -r docker stop || true
-          docker ps -aq | xargs -r docker rm -f || true
-          docker network prune -f || true
+          docker compose down --remove-orphans || true
+          docker rm -f crm-30-frontend-1 crm-30-backend-1 crm-30-ai-service-1 crm-30-redis-1 2>/dev/null || true
+          fuser -k 3006/tcp 5003/tcp 8003/tcp 2>/dev/null || true
 
       - name: Build images
         run: docker compose build --no-cache
