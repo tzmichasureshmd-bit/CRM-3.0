@@ -9,13 +9,9 @@ out/
 build/
 dist/
 
-# frontend subfolder
-frontend/
-
 # other project folders
 Tzmicha_CRM-main/
 ai-service/
-backend/
 docker/
 
 # env files
@@ -48,8 +44,6 @@ dev.log
 
 # assets (large images)
 assets/
-<<<<<<< Updated upstream
-=======
 
 # docs (local only)
 *.md
@@ -65,4 +59,3 @@ backend/venv/
 backend/__pycache__/
 **/__pycache__/
 *.pyc
->>>>>>> Stashed changes
