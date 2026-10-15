@@ -13,8 +13,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Create .env files from secrets
+        run: |
+          echo "${{ secrets.BACKEND_ENV }}" > backend/.env
+          echo "${{ secrets.FRONTEND_ENV }}" > frontend/.env.local
+          echo "${{ secrets.AI_SERVICE_ENV }}" > ai-service/.env
+
       - name: Build and deploy
         run: |
-          docker compose down
+          docker compose down --remove-orphans
           docker compose build --no-cache
           docker compose up -d
+
+      - name: Verify deployment
+        run: |
+          sleep 15
+          docker compose ps
+          docker compose ps | grep -E "Up|running" || (docker compose logs --tail=50 && exit 1)
+
+      - name: Cleanup old images
+        if: success()
+        run: docker image prune -f

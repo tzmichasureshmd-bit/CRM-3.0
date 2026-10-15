@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   experimental: { serverActions: { allowedOrigins: ["localhost:3000", "crm3.tzmicha.com"] } },
   devIndicators: false,
   images: {
