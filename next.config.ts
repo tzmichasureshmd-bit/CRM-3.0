@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: { serverActions: { allowedOrigins: ["localhost:3000", "crm.tzmicha.com"] } },
+  experimental: { serverActions: { allowedOrigins: ["localhost:3000", "crm3.tzmicha.com"] } },
   devIndicators: false,
   images: {
     remotePatterns: [
