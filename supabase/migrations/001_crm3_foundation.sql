@@ -41,8 +41,9 @@ CREATE INDEX IF NOT EXISTS crm3_content_status_idx   ON crm3_content(account_id,
 CREATE INDEX IF NOT EXISTS crm3_content_platform_idx ON crm3_content(account_id, platform);
 
 ALTER TABLE crm3_content ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_content_rls ON crm3_content;
 CREATE POLICY crm3_content_rls ON crm3_content
-  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+  USING (account_id = get_my_account_id());
 
 -- ── Attribution Chain ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS crm3_attribution (
@@ -67,8 +68,9 @@ CREATE INDEX IF NOT EXISTS crm3_attribution_contact_idx ON crm3_attribution(cont
 CREATE INDEX IF NOT EXISTS crm3_attribution_deal_idx    ON crm3_attribution(deal_id);
 
 ALTER TABLE crm3_attribution ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_attribution_rls ON crm3_attribution;
 CREATE POLICY crm3_attribution_rls ON crm3_attribution
-  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+  USING (account_id = get_my_account_id());
 
 -- ── Customer Journey Events ───────────────────────────────────
 CREATE TABLE IF NOT EXISTS crm3_journey_events (
@@ -88,8 +90,9 @@ CREATE INDEX IF NOT EXISTS crm3_journey_contact_idx ON crm3_journey_events(conta
 CREATE INDEX IF NOT EXISTS crm3_journey_account_idx ON crm3_journey_events(account_id);
 
 ALTER TABLE crm3_journey_events ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_journey_rls ON crm3_journey_events;
 CREATE POLICY crm3_journey_rls ON crm3_journey_events
-  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+  USING (account_id = get_my_account_id());
 
 -- ── AI Agents ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS crm3_ai_agents (
@@ -112,8 +115,9 @@ CREATE TABLE IF NOT EXISTS crm3_ai_agents (
 CREATE INDEX IF NOT EXISTS crm3_agents_account_idx ON crm3_ai_agents(account_id);
 
 ALTER TABLE crm3_ai_agents ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_agents_rls ON crm3_ai_agents;
 CREATE POLICY crm3_agents_rls ON crm3_ai_agents
-  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+  USING (account_id = get_my_account_id());
 
 -- ── AI Agent Runs ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS crm3_ai_agent_runs (
@@ -134,8 +138,9 @@ CREATE INDEX IF NOT EXISTS crm3_agent_runs_agent_idx   ON crm3_ai_agent_runs(age
 CREATE INDEX IF NOT EXISTS crm3_agent_runs_account_idx ON crm3_ai_agent_runs(account_id);
 
 ALTER TABLE crm3_ai_agent_runs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_agent_runs_rls ON crm3_ai_agent_runs;
 CREATE POLICY crm3_agent_runs_rls ON crm3_ai_agent_runs
-  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+  USING (account_id = get_my_account_id());
 
 -- ── Next Best Actions ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS crm3_next_best_actions (
@@ -156,8 +161,9 @@ CREATE INDEX IF NOT EXISTS crm3_nba_account_idx ON crm3_next_best_actions(accoun
 CREATE INDEX IF NOT EXISTS crm3_nba_object_idx  ON crm3_next_best_actions(object_type, object_id);
 
 ALTER TABLE crm3_next_best_actions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_nba_rls ON crm3_next_best_actions;
 CREATE POLICY crm3_nba_rls ON crm3_next_best_actions
-  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+  USING (account_id = get_my_account_id());
 
 -- ── AI Operations Log ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS crm3_ai_operations (
@@ -179,8 +185,9 @@ CREATE INDEX IF NOT EXISTS crm3_ai_ops_account_idx ON crm3_ai_operations(account
 CREATE INDEX IF NOT EXISTS crm3_ai_ops_created_idx ON crm3_ai_operations(created_at DESC);
 
 ALTER TABLE crm3_ai_operations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_ai_ops_rls ON crm3_ai_operations;
 CREATE POLICY crm3_ai_ops_rls ON crm3_ai_operations
-  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+  USING (account_id = get_my_account_id());
 
 -- ── Segments ──────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS crm3_segments (
@@ -198,11 +205,38 @@ CREATE TABLE IF NOT EXISTS crm3_segments (
 );
 
 ALTER TABLE crm3_segments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS crm3_segments_rls ON crm3_segments;
 CREATE POLICY crm3_segments_rls ON crm3_segments
-  USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
+  USING (account_id = get_my_account_id());
 
 -- ── Enable Realtime ───────────────────────────────────────────
-ALTER PUBLICATION supabase_realtime ADD TABLE crm3_content;
-ALTER PUBLICATION supabase_realtime ADD TABLE crm3_journey_events;
-ALTER PUBLICATION supabase_realtime ADD TABLE crm3_next_best_actions;
-ALTER PUBLICATION supabase_realtime ADD TABLE crm3_ai_agent_runs;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'crm3_content'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE crm3_content;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'crm3_journey_events'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE crm3_journey_events;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'crm3_next_best_actions'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE crm3_next_best_actions;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'crm3_ai_agent_runs'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE crm3_ai_agent_runs;
+  END IF;
+END $$;

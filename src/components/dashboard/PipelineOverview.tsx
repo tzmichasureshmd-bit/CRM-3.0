@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowRight, RefreshCw } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
-import { createClient } from '@/lib/supabase/client';
+
 
 interface StageGroup {
   label: string;
@@ -28,25 +28,21 @@ export function PipelineOverview() {
   const [stages, setStages] = useState<StageGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const supabase = createClient();
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      const { data, error: err } = await supabase
-        .from('deals')
-        .select('id, title, value, currency, status, pipeline_stages(name)')
-        .eq('status', 'open')
-        .order('value', { ascending: false })
-        .limit(100);
+      const [dealsRes, stagesRes] = await Promise.all([
+        fetch('/api/v3/deals?status=open&limit=100').then(r => r.json()) as Promise<{ data?: { id: string; title: string; value: number; currency: string; stage_id: string }[] }>,
+        fetch('/api/v3/pipeline-stages').then(r => r.json()) as Promise<{ data?: { id: string; name: string }[] }>,
+      ]);
+      const data = dealsRes.data ?? [];
+      const stageMap = Object.fromEntries((stagesRes.data ?? []).map(s => [s.id, s.name]));
 
-      if (err) throw err;
-
-      // Group by stage name
       const map = new Map<string, { count: number; value: number; currency: string; deals: { name: string; value: number }[] }>();
-      for (const deal of data ?? []) {
-        const stageName = (deal.pipeline_stages as { name?: string } | null)?.name ?? 'Unknown';
+      for (const deal of data) {
+        const stageName = (deal.stage_id ? stageMap[deal.stage_id] : null) ?? 'Unknown';
         const existing = map.get(stageName) ?? { count: 0, value: 0, currency: deal.currency ?? 'USD', deals: [] as { name: string; value: number }[] };
         existing.count += 1;
         existing.value += deal.value ?? 0;
@@ -55,21 +51,12 @@ export function PipelineOverview() {
       }
 
       const maxVal = Math.max(...Array.from(map.values()).map(s => s.value), 1);
-
       const result: StageGroup[] = Array.from(map.entries()).slice(0, 4).map(([label, s], i) => ({
-        label,
-        count: s.count,
-        value: s.value,
-        currency: s.currency,
+        label, count: s.count, value: s.value, currency: s.currency,
         color: STAGE_COLORS[i % STAGE_COLORS.length],
         bg: `rgba(${hexToRgb(STAGE_COLORS[i % STAGE_COLORS.length])},0.08)`,
-        deals: s.deals.map(d => ({
-          name: d.name,
-          val: fmt(d.value, s.currency),
-          pct: Math.round((d.value / maxVal) * 100),
-        })),
+        deals: s.deals.map(d => ({ name: d.name, val: fmt(d.value, s.currency), pct: Math.round((d.value / maxVal) * 100) })),
       }));
-
       setStages(result);
     } catch {
       setError(true);

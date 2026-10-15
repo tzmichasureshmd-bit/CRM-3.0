@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 
 ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS accounts_rls ON accounts;
 
 -- ── Profiles (links auth.users → accounts) ────────────────────
 CREATE TABLE IF NOT EXISTS profiles (
@@ -38,9 +39,11 @@ CREATE INDEX IF NOT EXISTS profiles_user_idx    ON profiles(user_id);
 CREATE INDEX IF NOT EXISTS profiles_account_idx ON profiles(account_id);
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS accounts_rls ON accounts;
 CREATE POLICY accounts_rls ON accounts
   USING (id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS profiles_rls ON profiles;
 CREATE POLICY profiles_rls ON profiles
   USING (user_id = auth.uid() OR account_id IN (
     SELECT account_id FROM profiles p2 WHERE p2.user_id = auth.uid()
@@ -77,6 +80,7 @@ CREATE INDEX IF NOT EXISTS contacts_tier_idx      ON contacts(account_id, lead_s
 CREATE INDEX IF NOT EXISTS contacts_status_idx    ON contacts(account_id, lead_status);
 
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS contacts_rls ON contacts;
 CREATE POLICY contacts_rls ON contacts
   USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
@@ -110,6 +114,7 @@ CREATE INDEX IF NOT EXISTS conversations_platform_idx ON conversations(account_i
 CREATE INDEX IF NOT EXISTS conversations_last_msg_idx ON conversations(account_id, last_message_at DESC);
 
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS conversations_rls ON conversations;
 CREATE POLICY conversations_rls ON conversations
   USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
@@ -133,6 +138,7 @@ CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages(conversation_id
 CREATE INDEX IF NOT EXISTS messages_account_idx      ON messages(account_id);
 
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS messages_rls ON messages;
 CREATE POLICY messages_rls ON messages
   USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
@@ -149,6 +155,7 @@ CREATE TABLE IF NOT EXISTS pipeline_stages (
 CREATE INDEX IF NOT EXISTS pipeline_stages_account_idx ON pipeline_stages(account_id, position);
 
 ALTER TABLE pipeline_stages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS pipeline_stages_rls ON pipeline_stages;
 CREATE POLICY pipeline_stages_rls ON pipeline_stages
   USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
@@ -174,6 +181,7 @@ CREATE INDEX IF NOT EXISTS deals_status_idx   ON deals(account_id, status);
 CREATE INDEX IF NOT EXISTS deals_stage_idx    ON deals(stage_id);
 
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS deals_rls ON deals;
 CREATE POLICY deals_rls ON deals
   USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
@@ -197,6 +205,7 @@ CREATE INDEX IF NOT EXISTS follow_ups_status_idx  ON follow_ups(account_id, stat
 CREATE INDEX IF NOT EXISTS follow_ups_user_idx    ON follow_ups(user_id);
 
 ALTER TABLE follow_ups ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS follow_ups_rls ON follow_ups;
 CREATE POLICY follow_ups_rls ON follow_ups
   USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
@@ -213,6 +222,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
 CREATE INDEX IF NOT EXISTS campaigns_account_idx ON campaigns(account_id);
 
 ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS campaigns_rls ON campaigns;
 CREATE POLICY campaigns_rls ON campaigns
   USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
@@ -239,6 +249,7 @@ CREATE TABLE IF NOT EXISTS automations (
 CREATE INDEX IF NOT EXISTS automations_account_idx ON automations(account_id);
 
 ALTER TABLE automations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS automations_rls ON automations;
 CREATE POLICY automations_rls ON automations
   USING (account_id IN (SELECT account_id FROM profiles WHERE user_id = auth.uid()));
 
@@ -255,6 +266,7 @@ CREATE TABLE IF NOT EXISTS automation_steps (
 CREATE INDEX IF NOT EXISTS automation_steps_automation_idx ON automation_steps(automation_id);
 
 ALTER TABLE automation_steps ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS automation_steps_rls ON automation_steps;
 CREATE POLICY automation_steps_rls ON automation_steps
   USING (automation_id IN (
     SELECT id FROM automations WHERE account_id IN (

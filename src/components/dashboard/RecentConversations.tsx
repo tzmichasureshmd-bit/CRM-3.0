@@ -3,17 +3,16 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
-import { createClient } from '@/lib/supabase/client';
 
-interface ConvRaw {
+
+interface RawConv {
   id: string;
   platform: string | null;
   last_message_text: string | null;
   last_message_at: string | null;
   unread_count: number;
-  contact: { name: string | null }[] | null;
+  contacts: { name?: string | null } | null;
 }
-
 interface Conv {
   id: string;
   platform: string | null;
@@ -43,25 +42,24 @@ function timeAgo(iso: string | null) {
 export function RecentConversations() {
   const [convos, setConvos] = useState<Conv[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from('conversations')
-      .select('id, platform, last_message_text, last_message_at, unread_count, contact:contacts(name)')
-      .eq('status', 'open')
-      .order('last_message_at', { ascending: false })
-      .limit(5);
-    const normalized: Conv[] = ((data as ConvRaw[]) ?? []).map(c => ({
-      id: c.id,
-      platform: c.platform,
-      last_message_text: c.last_message_text,
-      last_message_at: c.last_message_at,
-      unread_count: c.unread_count,
-      contactName: Array.isArray(c.contact) ? (c.contact[0]?.name ?? 'Unknown') : ((c.contact as { name?: string | null } | null)?.name ?? 'Unknown'),
-    }));
-    setConvos(normalized);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/v3/conversations?status=open&limit=5');
+      if (res.ok) {
+        const d = await res.json() as { data?: RawConv[] };
+        setConvos((d.data ?? []).map(c => ({
+          id: c.id,
+          platform: c.platform,
+          last_message_text: c.last_message_text,
+          last_message_at: c.last_message_at,
+          unread_count: c.unread_count,
+          contactName: c.contacts?.name ?? 'Unknown',
+        })));
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { void load(); }, [load]);

@@ -7,7 +7,7 @@ import {
   Mail, Phone,
   CheckCheck, Circle, AlertCircle, Sparkles, Copy, Edit3,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { getConversations, getMessages } from '@/lib/api-client';
 import { useInboxRealtime } from '@/hooks/use-inbox-realtime';
 import { ConvAIIntelligencePanel } from '@/components/inbox/ConvAIIntelligencePanel';
 
@@ -46,8 +46,9 @@ interface Conversation {
 interface Message {
   id: string;
   conversation_id: string;
-  content_text: string | null;
-  sender_type: 'customer' | 'agent' | 'bot';
+  content: string | null;
+  content_text?: string | null;
+  sender_type: 'customer' | 'agent' | 'bot' | 'contact';
   status: string | null;
   created_at: string;
 }
@@ -341,7 +342,7 @@ function MessageThread({
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                   border: isAgent ? 'none' : '1px solid rgba(255,255,255,0.80)',
                 }}>
-                  <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.content_text ?? ''}</div>
+                  <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{msg.content ?? msg.content_text ?? ''}</div>
                   <div style={{ fontSize: 10, marginTop: 4, opacity: 0.65, textAlign: isAgent ? 'right' : 'left', display: 'flex', alignItems: 'center', justifyContent: isAgent ? 'flex-end' : 'flex-start', gap: 3 }}>
                     {timeAgo(msg.created_at)}
                     {isAgent && msg.status === 'read' && <CheckCheck size={10} />}
@@ -428,7 +429,9 @@ function MessageThread({
 
 // ── Main Page ────────────────────────────────────────────────
 export default function InboxPage() {
-  const supabase = createClient();
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : '';
+  const BASE = 'http://localhost:8000/api/v1';
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token ?? ''}` };
 
   // ── State ──────────────────────────────────────────────────
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -451,24 +454,27 @@ export default function InboxPage() {
 
   const [showAIPanel, setShowAIPanel] = useState(false);
 
+  // ── URL Parameters ─────────────────────────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ch = params.get('channel');
+    if (ch && ['whatsapp', 'instagram', 'facebook', 'email'].includes(ch)) {
+      setPlatform(ch);
+    } else {
+      setPlatform('all');
+    }
+  }, [typeof window !== 'undefined' ? window.location.pathname : '']);
+
   // ── Load conversations ─────────────────────────────────────
   const loadConversations = useCallback(async () => {
     setLoadingConvs(true);
-    const { data, error } = await supabase
-      .from('conversations')
-      .select(`
-        id, contact_id, platform, status, priority, unread_count,
-        last_message_at, last_message_text, assigned_agent_id,
-        ai_intent, ai_sentiment, ai_summary, ai_lead_score,
-        ai_next_action, ai_analyzed_at, created_at,
-        contact:contacts(id, name, phone, email, lead_score, lead_score_tier, lead_status, source)
-      `)
-      .order('last_message_at', { ascending: false })
-      .limit(100);
-
-    if (!error && data) {
-      setConversations(data as unknown as Conversation[]);
-    }
+    try {
+      const res = await getConversations({ limit: '100' });
+      setConversations((res.data ?? []).map(c => ({
+        ...c,
+        contact: c.contacts as Contact | null ?? null,
+      })) as unknown as Conversation[]);
+    } catch { /* silent */ }
     setLoadingConvs(false);
   }, []);
 
@@ -477,24 +483,16 @@ export default function InboxPage() {
   // ── Load messages ──────────────────────────────────────────
   const loadMessages = useCallback(async (convId: string) => {
     setLoadingMsgs(true);
-    const { data } = await supabase
-      .from('messages')
-      .select('id, conversation_id, content_text, sender_type, status, created_at')
-      .eq('conversation_id', convId)
-      .order('created_at', { ascending: true })
-      .limit(50);
-    setMessages((data as Message[]) ?? []);
+    try {
+      const res = await getMessages(convId, { limit: '50' });
+      setMessages((res.data ?? []) as unknown as Message[]);
+    } catch { /* silent */ }
     setLoadingMsgs(false);
-
-    // Mark as read
-    await supabase
-      .from('conversations')
-      .update({ unread_count: 0 })
-      .eq('id', convId);
-
-    setConversations(prev =>
-      prev.map(c => c.id === convId ? { ...c, unread_count: 0 } : c)
-    );
+    // Mark as read via API
+    try {
+      await fetch(`${BASE}/conversations/${convId}/status`, { method: 'PATCH', headers, body: JSON.stringify({ unread_count: 0 }) });
+    } catch { /* silent */ }
+    setConversations(prev => prev.map(c => c.id === convId ? { ...c, unread_count: 0 } : c));
   }, []);
 
   // ── Select conversation ────────────────────────────────────
@@ -515,37 +513,19 @@ export default function InboxPage() {
     setSendError(null);
     const text = replyText.trim();
     setReplyText('');
-
     const tempId = `temp-${Date.now()}`;
-    const tempMsg: Message = {
-      id: tempId, conversation_id: activeConv.id,
-      content_text: text, sender_type: 'agent',
-      status: 'sending', created_at: new Date().toISOString(),
-    };
+    const tempMsg: Message = { id: tempId, conversation_id: activeConv.id, content: text, content_text: text, sender_type: 'agent', status: 'sending', created_at: new Date().toISOString() };
     setMessages(prev => [...prev, tempMsg]);
-
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({ conversation_id: activeConv.id, content_text: text, sender_type: 'agent', status: 'sent' })
-      .select()
-      .single();
-
-    if (error) {
+    try {
+      const res = await fetch(`${BASE}/conversations/${activeConv.id}/messages`, { method: 'POST', headers, body: JSON.stringify({ content: text, sender_type: 'agent' }) });
+      if (!res.ok) throw new Error('Send failed');
+      const data = await res.json() as Message;
+      setMessages(prev => prev.map(m => m.id === tempId ? data : m));
+      setConversations(prev => prev.map(c => c.id === activeConv.id ? { ...c, last_message_text: text, last_message_at: new Date().toISOString() } : c));
+    } catch {
       setSendError('Failed to send message. Please try again.');
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setReplyText(text);
-    } else {
-      setMessages(prev => prev.map(m => m.id === tempId ? (data as Message) : m));
-      await supabase
-        .from('conversations')
-        .update({ last_message_text: text, last_message_at: new Date().toISOString() })
-        .eq('id', activeConv.id);
-      setConversations(prev =>
-        prev.map(c => c.id === activeConv.id
-          ? { ...c, last_message_text: text, last_message_at: new Date().toISOString() }
-          : c
-        )
-      );
     }
     setSending(false);
   }, [activeConv, replyText]);
@@ -637,14 +617,6 @@ export default function InboxPage() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 80px)', gap: 8, overflow: 'hidden' }}>
 
-      {/* Realtime indicator */}
-      <div style={{ position: 'absolute', top: 12, right: 16, display: 'flex', alignItems: 'center', gap: 5, zIndex: 10 }}>
-        {isConnected
-          ? <><Wifi size={11} color="#28c99a" /><span style={{ fontSize: 10, color: '#28c99a' }}>Live</span></>
-          : <><WifiOff size={11} color="#f4c95d" /><span style={{ fontSize: 10, color: '#f4c95d' }}>Reconnecting...</span></>
-        }
-      </div>
-
       {/* ── Panel 1: Conversation List ── */}
       <div
         className="crm-glass"
@@ -657,7 +629,16 @@ export default function InboxPage() {
         {/* Header */}
         <div style={{ padding: '14px 14px 8px', borderBottom: '1px solid rgba(130,145,190,0.10)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 750, color: 'var(--crm-text)' }}>Inbox</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 750, color: 'var(--crm-text)' }}>Inbox</h2>
+              {/* Realtime indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 6px', borderRadius: 6, background: isConnected ? 'rgba(40,201,154,0.08)' : 'rgba(244,201,93,0.08)', border: `1px solid ${isConnected ? 'rgba(40,201,154,0.20)' : 'rgba(244,201,93,0.20)'}` }}>
+                {isConnected
+                  ? <><Wifi size={10} color="#28c99a" /><span style={{ fontSize: 9, color: '#28c99a', fontWeight: 600 }}>Live</span></>
+                  : <><WifiOff size={10} color="#f4c95d" /><span style={{ fontSize: 9, color: '#f4c95d', fontWeight: 600 }}>...</span></>
+                }
+              </div>
+            </div>
             <button onClick={() => void loadConversations()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4 }}>
               <RefreshCw size={13} />
             </button>

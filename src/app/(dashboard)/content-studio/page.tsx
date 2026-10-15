@@ -381,7 +381,10 @@ export default function ContentStudioPage() {
             Create, schedule and track content across all channels
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
+        <button
+          onClick={() => setActiveTab('create')}
+          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
           <Plus className="h-4 w-4" /> New Content
         </button>
       </div>

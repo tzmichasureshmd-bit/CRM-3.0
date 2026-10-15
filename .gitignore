@@ -9,13 +9,9 @@ out/
 build/
 dist/
 
-# frontend subfolder
-frontend/
-
 # other project folders
 Tzmicha_CRM-main/
 ai-service/
-backend/
 docker/
 
 # env files
@@ -48,3 +44,6 @@ dev.log
 
 # assets (large images)
 assets/
+
+# docs (local only)
+*.md

@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    console.log(`[scheduler] Found ${waitingContacts.length} contacts to process`);
+    console.warn(`[scheduler] Found ${waitingContacts.length} contacts to process`);
 
     // 3️⃣ Process each contact
     let resumed = 0;
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     let skippedLocked = 0;
 
     for (const contact of waitingContacts) {
-      const { id: stateId, account_id, journey_id, contact_id, current_node_id, attempt_count } = contact;
+      const { id: stateId, account_id, journey_id, contact_id, attempt_count } = contact;
 
       try {
         // 3.1 Acquire lock (optimistic)
@@ -223,7 +223,7 @@ export async function POST(req: NextRequest) {
 
     const durationMs = Date.now() - startTime;
 
-    console.log(`[scheduler] Completed: ${resumed} resumed, ${failed} failed, ${deadLettered} dead-lettered, ${skippedLocked} skipped (locked)`);
+    console.warn(`[scheduler] Completed: ${resumed} resumed, ${failed} failed, ${deadLettered} dead-lettered, ${skippedLocked} skipped (locked)`);
 
     return NextResponse.json({
       processed: waitingContacts.length,
