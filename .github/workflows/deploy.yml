@@ -20,10 +20,7 @@ jobs:
           echo "${{ secrets.AI_SERVICE_ENV }}" > ai-service/.env
 
       - name: Stop only CRM 3.0 containers
-        run: |
-          docker compose down --remove-orphans || true
-          docker rm -f crm-30-frontend-1 crm-30-backend-1 crm-30-ai-service-1 crm-30-redis-1 2>/dev/null || true
-          fuser -k 3006/tcp 5003/tcp 8003/tcp 2>/dev/null || true
+        run: docker compose down --remove-orphans || true
 
       - name: Build images
         run: docker compose build --no-cache
