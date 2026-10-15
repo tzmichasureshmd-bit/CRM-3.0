@@ -46,17 +46,5 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes
 
-  celery-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: celery -A app.worker worker --loglevel=info
-    env_file:
-      - ./backend/.env
-    depends_on:
-      - redis
-      - backend
-    restart: unless-stopped
-
 volumes:
   redis_data:
