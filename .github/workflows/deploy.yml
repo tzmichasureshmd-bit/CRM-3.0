@@ -16,7 +16,7 @@ jobs:
       - name: Create .env files from secrets
         run: |
           echo "${{ secrets.BACKEND_ENV }}" > backend/.env
-          echo "${{ secrets.FRONTEND_ENV }}" > frontend/.env.local
+          echo "${{ secrets.FRONTEND_ENV }}" > .env.local
           echo "${{ secrets.AI_SERVICE_ENV }}" > ai-service/.env
 
       - name: Stop only CRM 3.0 containers
