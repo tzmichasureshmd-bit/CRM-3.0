@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     facebook_page_id: str = ""
     facebook_page_access_token: str = ""
 
+    # Meta Marketing API (Ads)
+    meta_app_id: str = "1354004176287129"
+    meta_ad_account_id: str = "act_2505907436503788"
+    meta_access_token: str = ""
+    meta_api_version: str = "v26.0"
+
     # Email (SMTP/IMAP)
     email_smtp_host: str = "smtp.gmail.com"
     email_smtp_port: int = 587

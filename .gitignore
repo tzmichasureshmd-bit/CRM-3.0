@@ -47,3 +47,17 @@ assets/
 
 # docs (local only)
 *.md
+__pycache__/  
+
+*.pyc
+__pycache__/
+*.pyc
+
+# scratch / sensitive tokens
+*token*.txt
+tmp_*
+search_token.py
+dev_output.txt
+t.json
+backend/.env
+backend/venv/
