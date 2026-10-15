@@ -1,27 +1,36 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Loader2, CheckCircle2, ArrowRight, Zap, Brain, MessageSquare, TrendingUp, Users, Bot } from 'lucide-react';
+import { Zap, Loader2, Brain, MessageSquare, TrendingUp, Users, Bot, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
+import { signInWithGoogle } from '@/lib/firebase';
 
 const FEATURES = [
-  { icon: <Brain size={18} />,        title: 'AI Lead Scoring',       desc: 'Explainable 0–100 scores with intent detection' },
-  { icon: <MessageSquare size={18} />, title: 'Unified Inbox',         desc: 'WhatsApp, Instagram, Facebook, Email in one place' },
-  { icon: <TrendingUp size={18} />,   title: 'Revenue Intelligence',  desc: 'Content → Lead → Deal attribution tracking' },
-  { icon: <Bot size={18} />,          title: 'AI Agents',             desc: 'Autonomous agents with human approval gates' },
-  { icon: <Users size={18} />,        title: 'Customer 360',          desc: 'Full timeline, deals, and AI insights per contact' },
+  { icon: <Brain size={18} />,         title: 'AI Lead Scoring',      desc: 'Explainable 0–100 scores with intent detection' },
+  { icon: <MessageSquare size={18} />, title: 'Unified Inbox',        desc: 'WhatsApp, Instagram, Facebook, Email in one place' },
+  { icon: <TrendingUp size={18} />,    title: 'Revenue Intelligence', desc: 'Content → Lead → Deal attribution tracking' },
+  { icon: <Bot size={18} />,           title: 'AI Agents',            desc: 'Autonomous agents with human approval gates' },
+  { icon: <Users size={18} />,         title: 'Customer 360',         desc: 'Full timeline, deals, and AI insights per contact' },
 ];
 
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18">
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+      <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/>
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z"/>
+    </svg>
+  );
+}
+
 export default function RegisterPage() {
-  const [step, setStep]                   = useState<1 | 2>(1);
   const [fullName, setFullName]           = useState('');
-  const [accountName, setAccountName]     = useState('');
   const [email, setEmail]                 = useState('');
   const [password, setPassword]           = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword]   = useState(false);
-  const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState('');
+  const [loading, setLoading]             = useState(false);
   const [activeFeature, setActiveFeature] = useState(0);
 
   useEffect(() => {
@@ -29,67 +38,58 @@ export default function RegisterPage() {
     return () => clearInterval(id);
   }, []);
 
-  const pwStrength = password.length === 0 ? 0 : password.length < 6 ? 1 : password.length < 10 ? 2 : 3;
-  const pwColor    = ['transparent', '#f46b72', '#f4c95d', '#28c99a'][pwStrength];
-  const pwLabel    = ['', 'Weak', 'Fair', 'Strong'][pwStrength];
-  const step1Valid = fullName.trim().length > 0 && accountName.trim().length > 0;
-  const step2Valid = email.trim().length > 0 && pwStrength >= 2 && password === confirmPassword;
+  const saveAndRedirect = (data: Record<string, string>) => {
+    localStorage.setItem('crm_token', data.access_token);
+    localStorage.setItem('crm_user', JSON.stringify({
+      user_id: data.user_id ?? '', account_id: data.account_id ?? '',
+      role: data.role ?? 'owner', email: data.email ?? email.trim(),
+      full_name: data.full_name ?? fullName.trim(), avatar_url: data.avatar_url ?? '',
+    }));
+    window.location.replace('/dashboard');
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEmailRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!step2Valid) return;
-    setError('');
     setLoading(true);
+    setError('');
     try {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-
-      // 1. Sign up with Supabase Auth
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { data: { full_name: fullName.trim(), account_name: accountName.trim() } },
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password, full_name: fullName.trim(), account_name: fullName.trim() }),
       });
-
-      if (signUpError || !data.user) {
-        setError(signUpError?.message ?? 'Registration failed. Please try again.');
-        setLoading(false);
-        return;
-      }
-
-      // 2. If email confirmation is disabled, session is available immediately
-      if (data.session) {
-        // Auth trigger (migration 008) auto-creates account + profile + pipeline stages
-        // Wait briefly for trigger to complete
-        await new Promise(r => setTimeout(r, 800));
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('account_id, role')
-          .eq('user_id', data.user.id)
-          .single();
-
-        // Store Supabase JWT as crm_token so FastAPI backend can verify it
-        localStorage.setItem('crm_token', data.session.access_token);
-        localStorage.setItem('crm_user', JSON.stringify({
-          user_id: data.user.id,
-          account_id: profile?.account_id ?? '',
-          role: profile?.role ?? 'owner',
-          email: email.trim(),
-          full_name: fullName.trim(),
-        }));
-
-        window.location.replace('/dashboard');
-      } else {
-        // Email confirmation required
-        setError('Check your email to confirm your account, then sign in.');
-        setLoading(false);
-      }
+      const data = await res.json() as Record<string, string>;
+      if (!res.ok || !data.access_token) { setError(data.detail ?? 'Registration failed'); setLoading(false); return; }
+      saveAndRedirect(data);
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError('Cannot connect to server.');
       setLoading(false);
     }
   };
+
+  const handleGoogle = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const idToken = await signInWithGoogle();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+      const data = await res.json() as Record<string, string>;
+      if (!res.ok || !data.access_token) { setError(data.detail ?? 'Google sign-in failed'); setLoading(false); return; }
+      saveAndRedirect(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('popup-closed')) { setLoading(false); return; }
+      setError('Cannot connect to server.');
+      setLoading(false);
+    }
+  };
+
+  const pwStrength = password.length === 0 ? 0 : password.length < 6 ? 1 : password.length < 10 ? 2 : 3;
+  const pwColor    = ['transparent', '#f46b72', '#f4c95d', '#28c99a'][pwStrength];
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: '#0f1117' }}>
@@ -108,7 +108,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <div style={{ position: 'relative', marginBottom: 48 }}>
+        <div style={{ marginBottom: 48 }}>
           <h2 style={{ fontSize: 32, fontWeight: 800, color: 'white', margin: '0 0 12px', lineHeight: 1.2, letterSpacing: '-0.03em' }}>
             Turn every customer<br />
             <span style={{ background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>into growth.</span>
@@ -116,7 +116,7 @@ export default function RegisterPage() {
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.50)', margin: 0, lineHeight: 1.6 }}>The AI-powered CRM built for modern sales teams.</p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, position: 'relative' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {FEATURES.map((f, i) => (
             <div key={i} onClick={() => setActiveFeature(i)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 14, cursor: 'pointer', transition: 'all 300ms ease', background: activeFeature === i ? 'rgba(79,109,245,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${activeFeature === i ? 'rgba(79,109,245,0.40)' : 'rgba(255,255,255,0.06)'}`, transform: activeFeature === i ? 'translateX(4px)' : 'none' }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: activeFeature === i ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeFeature === i ? 'white' : 'rgba(255,255,255,0.40)', flexShrink: 0, transition: 'all 300ms' }}>
@@ -142,102 +142,71 @@ export default function RegisterPage() {
 
       {/* Right Panel */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 48px', background: '#f8f9ff', overflowY: 'auto' }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 32 }}>
-            {[1, 2].map(s => (
-              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: step > s ? '#28c99a' : step === s ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(130,145,190,0.15)', color: step >= s ? 'white' : '#8790aa' }}>
-                  {step > s ? <CheckCircle2 size={14} /> : s}
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: step === s ? '#4f6df5' : step > s ? '#28c99a' : '#8790aa' }}>{s === 1 ? 'Your Info' : 'Account Setup'}</span>
-                {s < 2 && <div style={{ width: 32, height: 2, borderRadius: 1, background: step > 1 ? '#28c99a' : 'rgba(130,145,190,0.20)' }} />}
-              </div>
-            ))}
-          </div>
-
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f1117', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
-            {step === 1 ? 'Create your account' : 'Set up your workspace'}
-          </h1>
-          <p style={{ fontSize: 14, color: '#8790aa', margin: '0 0 28px' }}>
-            {step === 1 ? 'Start your free CRM in 30 seconds' : 'Almost there — just your login details'}
-          </p>
+        <div style={{ width: '100%', maxWidth: 400 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f1117', margin: '0 0 6px', letterSpacing: '-0.02em' }}>Create your account</h1>
+          <p style={{ fontSize: 14, color: '#8790aa', margin: '0 0 24px' }}>Start your free CRM in seconds</p>
 
           {error && (
-            <div style={{ padding: '12px 16px', borderRadius: 12, background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.25)', color: '#f46b72', fontSize: 13, marginBottom: 20 }}>
+            <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.25)', color: '#f46b72', fontSize: 13, marginBottom: 16 }}>
               ⚠️ {error}
             </div>
           )}
 
-          <form onSubmit={e => void handleSubmit(e)}>
-            {step === 1 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 6 }}>Your Full Name</label>
-                  <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="e.g. Rahul Sharma" autoFocus
-                    style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 6 }}>Company / Workspace Name</label>
-                  <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="e.g. Acme Corp"
-                    style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }} />
-                </div>
-                <button type="button" disabled={!step1Valid} onClick={() => setStep(2)}
-                  style={{ width: '100%', padding: '13px', borderRadius: 12, border: 'none', background: step1Valid ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(130,145,190,0.20)', color: step1Valid ? 'white' : '#8790aa', fontSize: 14, fontWeight: 700, cursor: step1Valid ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 }}>
-                  Continue <ArrowRight size={16} />
+          {/* Email/Password Form */}
+          <form onSubmit={e => void handleEmailRegister(e)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 5 }}>Full Name</label>
+              <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your name" required autoFocus
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 5 }}>Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 5 }}>Password</label>
+              <div style={{ position: 'relative' }}>
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 characters" required minLength={6}
+                  style={{ width: '100%', padding: '11px 42px 11px 14px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }} />
+                <button type="button" onClick={() => setShowPassword(p => !p)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8790aa', display: 'flex' }}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 6 }}>Email Address</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" autoFocus
-                    style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }} />
+              {pwStrength > 0 && (
+                <div style={{ marginTop: 6, display: 'flex', gap: 4 }}>
+                  {[1,2,3].map(i => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: pwStrength >= i ? pwColor : 'rgba(130,145,190,0.15)' }} />)}
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 6 }}>Password</label>
-                  <div style={{ position: 'relative' }}>
-                    <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 6 characters"
-                      style={{ width: '100%', padding: '12px 44px 12px 16px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }} />
-                    <button type="button" onClick={() => setShowPassword(p => !p)}
-                      style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8790aa', display: 'flex' }}>
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  {pwStrength > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        {[1,2,3].map(i => <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: pwStrength >= i ? pwColor : 'rgba(130,145,190,0.15)' }} />)}
-                      </div>
-                      <div style={{ fontSize: 11, color: pwColor, marginTop: 4, fontWeight: 600 }}>{pwLabel} password</div>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 6 }}>Confirm Password</label>
-                  <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat your password"
-                    style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: `1.5px solid ${confirmPassword && confirmPassword !== password ? '#f46b72' : confirmPassword && confirmPassword === password ? '#28c99a' : 'rgba(130,145,190,0.25)'}`, background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }} />
-                  {confirmPassword && confirmPassword === password && (
-                    <div style={{ fontSize: 11, color: '#28c99a', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <CheckCircle2 size={11} /> Passwords match
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                  <button type="button" onClick={() => { setStep(1); setError(''); }}
-                    style={{ flex: 1, padding: '13px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', color: '#627d98', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-                    Back
-                  </button>
-                  <button type="submit" disabled={loading || !step2Valid}
-                    style={{ flex: 2, padding: '13px', borderRadius: 12, border: 'none', background: step2Valid && !loading ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(130,145,190,0.20)', color: step2Valid && !loading ? 'white' : '#8790aa', fontSize: 14, fontWeight: 700, cursor: step2Valid && !loading ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                    {loading ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Creating…</> : <>Create Account <ArrowRight size={15} /></>}
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
+            <button type="submit" disabled={loading || !fullName.trim() || !email.trim() || password.length < 6}
+              style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? 0.75 : 1, marginTop: 4 }}>
+              {loading ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Creating…</> : 'Create Account'}
+            </button>
           </form>
 
-          <p style={{ textAlign: 'center', fontSize: 13, color: '#8790aa', marginTop: 24 }}>
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '18px 0' }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(130,145,190,0.20)' }} />
+            <span style={{ fontSize: 12, color: '#8790aa' }}>or continue with</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(130,145,190,0.20)' }} />
+          </div>
+
+          {/* Email OTP + Google */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button onClick={() => window.location.href = '/login?otp=1'} disabled={loading}
+              style={{ width: '100%', padding: '11px 20px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.30)', background: 'white', fontSize: 14, fontWeight: 600, color: '#0f1117', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4f6df5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+              Sign up with Email OTP
+            </button>
+            <button onClick={() => void handleGoogle()} disabled={loading}
+              style={{ width: '100%', padding: '11px 20px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.30)', background: 'white', fontSize: 14, fontWeight: 600, color: '#1a1a2e', cursor: loading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: loading ? 0.75 : 1 }}>
+              <GoogleIcon /> Continue with Google
+            </button>
+          </div>
+
+          <p style={{ textAlign: 'center', fontSize: 13, color: '#8790aa', marginTop: 20 }}>
             Already have an account?{' '}
             <Link href="/login" style={{ color: '#4f6df5', fontWeight: 700, textDecoration: 'none' }}>Sign in</Link>
           </p>

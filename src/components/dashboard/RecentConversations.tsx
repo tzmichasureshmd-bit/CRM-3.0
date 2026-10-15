@@ -45,7 +45,7 @@ export function RecentConversations() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v3/conversations?status=open&limit=5');
+      const res = await fetch('/api/v1/conversations?status=open&limit=5');
       if (res.ok) {
         const d = await res.json() as { data?: RawConv[] };
         setConvos((d.data ?? []).map(c => ({

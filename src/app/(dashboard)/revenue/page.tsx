@@ -268,7 +268,7 @@ export default function RevenuePage() {
   }, [dateRange]);
 
   const loadOverview = useCallback(async () => {
-    const res = await fetch(`/api/v3/attribution?view=overview${buildDateParams()}`);
+    const res = await fetch(`/api/v1/attribution?view=overview${buildDateParams()}`);
     if (res.ok) {
       const d = await res.json() as { overview: Overview };
       setOverview(d.overview);
@@ -276,7 +276,7 @@ export default function RevenuePage() {
   }, [buildDateParams]);
 
   const loadContent = useCallback(async () => {
-    const res = await fetch(`/api/v3/attribution?view=content${buildDateParams()}`);
+    const res = await fetch(`/api/v1/attribution?view=content${buildDateParams()}`);
     if (res.ok) {
       const d = await res.json() as { content: ContentRow[]; overview: Overview };
       setContentRows(d.content ?? []);
@@ -285,7 +285,7 @@ export default function RevenuePage() {
   }, [buildDateParams]);
 
   const loadSource = useCallback(async () => {
-    const res = await fetch(`/api/v3/attribution?view=source${buildDateParams()}`);
+    const res = await fetch(`/api/v1/attribution?view=source${buildDateParams()}`);
     if (res.ok) {
       const d = await res.json() as { sources: SourceRow[]; overview: Overview };
       setSourceRows(d.sources ?? []);
@@ -294,7 +294,7 @@ export default function RevenuePage() {
   }, [buildDateParams]);
 
   const loadTimeline = useCallback(async () => {
-    const res = await fetch(`/api/v3/attribution?view=timeline${buildDateParams()}`);
+    const res = await fetch(`/api/v1/attribution?view=timeline${buildDateParams()}`);
     if (res.ok) {
       const d = await res.json() as { timeline: TimelineRow[]; overview: Overview };
       setTimelineRows(d.timeline ?? []);

@@ -22,3 +22,6 @@ alembic==1.13.3
 sqlalchemy==2.0.35
 psycopg2-binary==2.9.9
 email-validator==2.3.0
+pyotp==2.9.0
+qrcode[pil]==7.4.2
+google-auth==2.29.0

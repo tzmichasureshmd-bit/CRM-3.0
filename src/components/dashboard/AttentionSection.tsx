@@ -27,7 +27,7 @@ export function AttentionSection() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v3/command-center');
+      const res = await fetch('/api/v1/command-center');
       if (res.ok) setData(await res.json() as CommandState);
     } finally {
       setLoading(false);

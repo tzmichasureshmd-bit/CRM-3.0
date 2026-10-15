@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(name)s %(levelname)s %(message)s')
 
 from app.core.config import get_settings
 from app.api.v1 import (
@@ -26,13 +29,13 @@ app = FastAPI(
     version="3.0.0",
     description="Tzmicha CRM 3.0 — Intelligent Customer Growth OS",
     lifespan=lifespan,
-    docs_url="/docs" if settings.debug else None,
-    redoc_url="/redoc" if settings.debug else None,
+    docs_url="/docs" if settings.debug_mode else None,
+    redoc_url="/redoc" if settings.debug_mode else None,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.debug else settings.origins_list,
+    allow_origins=["*"] if settings.debug_mode else settings.origins_list,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -18,7 +18,7 @@ export function RevenueIntelligence() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v3/revenue-intelligence?view=overview&months=6');
+      const res = await fetch('/api/v1/revenue-intelligence?view=overview&months=6');
       if (res.ok) {
         const d = await res.json() as { monthly_revenue?: MonthRow[] };
         setData(d.monthly_revenue ?? []);

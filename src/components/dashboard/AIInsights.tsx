@@ -30,7 +30,7 @@ export function AIInsights() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v3/command-center');
+      const res = await fetch('/api/v1/command-center');
       if (res.ok) {
         const d = await res.json() as { ai_recommendations?: Insight[] };
         setInsights(d.ai_recommendations ?? []);

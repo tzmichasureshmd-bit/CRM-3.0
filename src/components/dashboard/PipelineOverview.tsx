@@ -34,8 +34,8 @@ export function PipelineOverview() {
     setError(false);
     try {
       const [dealsRes, stagesRes] = await Promise.all([
-        fetch('/api/v3/deals?status=open&limit=100').then(r => r.json()) as Promise<{ data?: { id: string; title: string; value: number; currency: string; stage_id: string }[] }>,
-        fetch('/api/v3/pipeline-stages').then(r => r.json()) as Promise<{ data?: { id: string; name: string }[] }>,
+        fetch('/api/v1/deals?status=open&limit=100').then(r => r.json()) as Promise<{ data?: { id: string; title: string; value: number; currency: string; stage_id: string }[] }>,
+        fetch('/api/v1/pipeline-stages').then(r => r.json()) as Promise<{ data?: { id: string; name: string }[] }>,
       ]);
       const data = dealsRes.data ?? [];
       const stageMap = Object.fromEntries((stagesRes.data ?? []).map(s => [s.id, s.name]));

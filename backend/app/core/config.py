@@ -5,7 +5,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     app_name: str = "Tzmicha CRM 3.0"
     app_env: str = "development"
-    debug: bool = True
+    debug_mode: bool = True
     port: int = 8000
 
     # Database
@@ -16,6 +16,10 @@ class Settings(BaseSettings):
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
+
+    # Firebase / Google Auth
+    firebase_project_id: str = "tzmicha-crm-3"
+    firebase_messaging_sender_id: str = "869766401718"
 
     # JWT
     jwt_secret: str
