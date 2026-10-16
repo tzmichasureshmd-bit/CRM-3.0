@@ -14,7 +14,8 @@ export type ReportId =
   | 'conversations'
   | 'automations'
   | 'conversion'
-  | 'agents';
+  | 'agents'
+  | 'analytics';
 
 export const REPORT_IDS: ReportId[] = [
   'overview', 'contacts', 'sales', 'campaigns', 'broadcasts', 'conversations', 'automations', 'conversion', 'agents',
@@ -80,7 +81,7 @@ export interface ReportRange {
   to: string | null;
   preset: string | null;
   days: number;
-  granularity: 'day' | 'month';
+  granularity: 'day' | 'week' | 'month';
 }
 
 export interface ReportFilterOption { value: string; label: string }
@@ -133,7 +134,7 @@ export interface ExportableReport {
 }
 
 // ── Date-range presets ────────────────────────────────────────
-export type RangePreset = 'today' | '7d' | '30d' | '90d' | 'custom';
+export type RangePreset = 'today' | '7d' | '30d' | '90d' | 'year' | 'custom';
 
 export const RANGE_PRESETS: { id: RangePreset; label: string }[] = [
   { id: 'today', label: 'Today' },
@@ -141,4 +142,14 @@ export const RANGE_PRESETS: { id: RangePreset; label: string }[] = [
   { id: '30d', label: 'Last 30 Days' },
   { id: '90d', label: 'Last 90 Days' },
   { id: 'custom', label: 'Custom Range' },
+];
+
+/** Presets offered by the Analytics dashboard (adds This Year on top of the shared set). */
+export const ANALYTICS_RANGE_PRESETS: { id: RangePreset; label: string }[] = [
+  { id: 'today', label: 'Today' },
+  { id: '7d', label: 'Last 7 Days' },
+  { id: '30d', label: 'Last 30 Days' },
+  { id: '90d', label: 'Last 90 Days' },
+  { id: 'year', label: 'This Year' },
+  { id: 'custom', label: 'Custom' },
 ];

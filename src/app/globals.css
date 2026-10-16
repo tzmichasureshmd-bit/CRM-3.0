@@ -1156,3 +1156,166 @@ html[data-theme="dark"] .crm-ri-insights {
   .crm-ri-insights { animation: none !important; }
 }
 
+/* ── Billing & Support ──────────────────────────────────── */
+.crm-bill-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  padding: 28px 18px 40px;
+  min-height: 100%;
+  overflow: hidden;
+}
+.crm-bill-page::before,
+.crm-bill-page::after {
+  content: ""; position: absolute; border-radius: 50%;
+  pointer-events: none; filter: blur(70px); z-index: 0;
+}
+.crm-bill-page::before {
+  width: 360px; height: 360px; top: -110px; right: -70px;
+  background: radial-gradient(circle, rgba(37,211,102,0.28), transparent 68%);
+}
+.crm-bill-page::after {
+  width: 320px; height: 320px; bottom: -120px; left: -80px;
+  background: radial-gradient(circle, rgba(79,109,245,0.22), transparent 68%);
+}
+html[data-theme="dark"] .crm-bill-page::before {
+  background: radial-gradient(circle, rgba(37,211,102,0.20), transparent 68%);
+}
+html[data-theme="dark"] .crm-bill-page::after {
+  background: radial-gradient(circle, rgba(79,109,245,0.20), transparent 68%);
+}
+.crm-bill-inner {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 620px;
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  animation: crm-auto-rise 320ms ease both;
+}
+.crm-bill-breadcrumb {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; font-weight: 500; color: var(--crm-text-muted);
+}
+.crm-bill-breadcrumb:hover { color: var(--crm-text); }
+.crm-bill-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; }
+.crm-bill-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 14px; border-radius: 900px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  color: #128c4a;
+  background: rgba(37,211,102,0.12);
+  border: 1px solid rgba(37,211,102,0.30);
+}
+html[data-theme="dark"] .crm-bill-badge { color: #4ade80; }
+.crm-bill-badge i {
+  width: 7px; height: 7px; border-radius: 50%; background: #25d366;
+  box-shadow: 0 0 0 0 rgba(37,211,102,0.55);
+  animation: crm-auto-ping 1.8s ease-out infinite;
+}
+.crm-bill-title {
+  margin: 0; font-size: 30px; font-weight: 780; letter-spacing: -0.02em;
+  color: var(--crm-text-strong); line-height: 1.15;
+}
+.crm-bill-subtitle {
+  margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--crm-text-secondary);
+  max-width: 460px;
+}
+.crm-bill-card {
+  width: 100%;
+  padding: 30px 28px 28px;
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+  text-align: center;
+  border-radius: var(--crm-radius-lg);
+  transition: transform 280ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 280ms ease, border-color 280ms ease;
+}
+.crm-bill-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 28px 70px rgba(37,211,102,0.20), inset 0 1px 0 rgba(255,255,255,0.65);
+  border-color: rgba(37,211,102,0.45);
+}
+html[data-theme="dark"] .crm-bill-card:hover {
+  box-shadow: 0 30px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(37,211,102,0.28);
+}
+.crm-bill-avatar {
+  position: relative;
+  width: 82px; height: 82px; border-radius: 26px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  background: linear-gradient(145deg, #34e07a, #128c4a);
+  box-shadow: 0 16px 36px rgba(37,211,102,0.38);
+}
+.crm-bill-avatar::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 32px;
+  border: 2px solid rgba(37,211,102,0.28);
+  animation: crm-bill-ring 2.6s ease-in-out infinite;
+}
+@keyframes crm-bill-ring {
+  0%,100% { transform: scale(1); opacity: 0.75; }
+  50%     { transform: scale(1.06); opacity: 0.30; }
+}
+.crm-bill-online {
+  position: absolute; right: -3px; bottom: -3px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #25d366; border: 3px solid var(--crm-surface, #fff);
+  box-shadow: 0 2px 8px rgba(37,211,102,0.5);
+}
+html[data-theme="dark"] .crm-bill-online { border-color: #0e1424; }
+.crm-bill-label {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--crm-text-muted);
+}
+.crm-bill-number {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 30px; font-weight: 800; letter-spacing: 0.01em;
+  color: var(--crm-text-strong); line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.crm-bill-number button {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 9px;
+  color: var(--crm-text-muted);
+  background: rgba(130,145,190,0.12);
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+.crm-bill-number button:hover { background: rgba(37,211,102,0.16); color: #128c4a; transform: translateY(-1px); }
+.crm-bill-note {
+  margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--crm-text-secondary);
+  max-width: 400px;
+}
+.crm-bill-cta {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  width: 100%; max-width: 340px;
+  padding: 14px 22px; border-radius: 14px;
+  font-size: 14.5px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, #25d366, #128c4a);
+  box-shadow: 0 14px 32px rgba(37,211,102,0.34);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+.crm-bill-cta:hover { transform: translateY(-2px); box-shadow: 0 20px 42px rgba(37,211,102,0.46); filter: brightness(1.04); }
+.crm-bill-cta:active { transform: scale(0.98); }
+.crm-bill-meta {
+  display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 2px;
+}
+.crm-bill-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 900px;
+  font-size: 11px; font-weight: 600; color: var(--crm-text-secondary);
+  background: rgba(130,145,190,0.10);
+  border: 1px solid rgba(130,145,190,0.18);
+}
+html[data-theme="dark"] .crm-bill-chip { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
+.crm-bill-foot { font-size: 11px; color: var(--crm-text-muted); text-align: center; }
+@media (max-width: 480px) {
+  .crm-bill-page { padding: 18px 12px 32px; }
+  .crm-bill-title { font-size: 24px; }
+  .crm-bill-card { padding: 24px 18px 22px; }
+  .crm-bill-number { font-size: 25px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .crm-bill-inner, .crm-bill-avatar::after, .crm-bill-badge i { animation: none !important; }
+  .crm-bill-card, .crm-bill-cta, .crm-bill-number button { transition: none !important; }
+  .crm-bill-card:hover, .crm-bill-cta:hover { transform: none !important; }
+}
+

@@ -7,9 +7,7 @@ import { FloatingCopilot } from '@/components/chat/FloatingCopilot';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-<<<<<<< Updated upstream
-=======
-  const [ready, setReady] = useState<boolean | null>(null);
+  const [ready, setReady] = useState<boolean>(false);
 
   useEffect(() => {
     let active = true;
@@ -35,13 +33,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     })();
     return () => { active = false; };
   }, []);
->>>>>>> Stashed changes
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light');
+
+  if (!ready) return null;
 
   return (
     <div className="crm-app">

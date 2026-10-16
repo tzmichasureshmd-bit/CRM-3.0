@@ -1,714 +1,384 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Zap, Plus, Play, Pause, CheckCircle, XCircle, Clock,
-  Brain, Search, RefreshCw, Trash2, ChevronRight,
-  AlertCircle, X,
-  ArrowRight,
+  Zap, Plus, Play, Pause, Brain, Search, RefreshCw, Trash2, ChevronRight,
+  AlertCircle, X, History, BarChart3, Loader2, Inbox, LayoutTemplate,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { TRIGGER_MAP } from '@/lib/ai/automation-catalog';
+import {
+  WORKFLOW_TEMPLATES, evaluateCompatibility, buildTemplateSteps, DEFAULT_CAPABILITIES,
+  type WorkflowTemplate, type TemplateCompatibility, type TemplateCapabilities,
+} from '@/lib/ai/automation-templates';
+import { AutomationBuilder } from '@/components/automations/Builder';
+import { AutomationDetail } from '@/components/automations/Detail';
+import { ActivityFeed } from '@/components/automations/ActivityFeed';
+import { WorkflowPipeline } from '@/components/automations/WorkflowPipeline';
+import { AgentShowcase } from '@/components/automations/AgentShowcase';
+import { PermissionsPanel } from '@/components/automations/PermissionsPanel';
+import { TemplateGallery } from '@/components/automations/TemplateGallery';
+import { TemplatePreview } from '@/components/automations/TemplatePreview';
+import type { Automation, AutomationSummary, AgentLite } from '@/components/automations/types';
+import { STATUS_META, timeAgo } from '@/components/automations/types';
 
-// ── Types ────────────────────────────────────────────────────
-interface Automation {
-  id: string;
-  name: string;
-  description: string | null;
-  trigger_type: string;
-  trigger_config: Record<string, unknown>;
-  is_active: boolean;
-  status: string;
-  ai_enabled: boolean;
-  execution_count: number;
-  success_count: number;
-  failure_count: number;
-  last_run_at: string | null;
-  last_error: string | null;
-  created_at: string;
-}
+const EMPTY_SUMMARY: AutomationSummary = { total: 0, active: 0, draft: 0, paused: 0, archived: 0, executions: 0, successes: 0, failures: 0 };
 
-interface AutomationTemplate {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  trigger_type: string;
-  steps: unknown[];
-  ai_nodes: unknown[];
-  tags: string[];
-}
+export default function AutomationsPage() {
+  const [automations, setAutomations] = useState<Automation[]>([]);
+  const [summary, setSummary] = useState<AutomationSummary>(EMPTY_SUMMARY);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [agents, setAgents] = useState<AgentLite[]>([]);
+  const [toolsCount, setToolsCount] = useState(0);
+  const [tools, setTools] = useState<string[]>([]);
+  const [capabilities, setCapabilities] = useState<TemplateCapabilities>(DEFAULT_CAPABILITIES);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<string>('all');
+  const [showBuilder, setShowBuilder] = useState(false);
+  const [editing, setEditing] = useState<{ automation: Automation } | null>(null);
+  const [preview, setPreview] = useState<WorkflowTemplate | null>(null);
+  const [installing, setInstalling] = useState<string | null>(null);
+  const [detail, setDetail] = useState<Automation | null>(null);
+  const [showActivity, setShowActivity] = useState(false);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const templatesRef = useRef<HTMLDivElement | null>(null);
 
-interface ExecutionLog {
-  id: string;
-  status: string;
-  trigger_type: string;
-  started_at: string;
-  completed_at: string | null;
-  error_message: string | null;
-  contact_id: string | null;
-}
-
-// ── Constants ────────────────────────────────────────────────
-const TRIGGER_LABELS: Record<string, string> = {
-  new_message_received:   'New Message Received',
-  first_inbound_message:  'First Message from Contact',
-  keyword_match:          'Keyword Match',
-  new_contact_created:    'New Contact Created',
-  conversation_assigned:  'Conversation Assigned',
-  tag_added:              'Tag Added',
-  time_based:             'Time-Based Schedule',
-  interactive_reply:      'Button/List Reply',
-  lead_score_changed:     'Lead Score Changed',
-  deal_stage_changed:     'Deal Stage Changed',
-  deal_won:               'Deal Won',
-  deal_lost:              'Deal Lost',
-  follow_up_due:          'Follow-up Due',
-  follow_up_overdue:      'Follow-up Overdue',
-  ai_intent_detected:     'AI Intent Detected',
-  ai_score_threshold:     'AI Score Threshold Reached',
-};
-
-const TRIGGER_GROUPS = [
-  {
-    label: 'Conversations',
-    triggers: ['new_message_received','first_inbound_message','keyword_match','interactive_reply','conversation_assigned'],
-  },
-  {
-    label: 'Contacts & Leads',
-    triggers: ['new_contact_created','tag_added','lead_score_changed'],
-  },
-  {
-    label: 'Deals',
-    triggers: ['deal_stage_changed','deal_won','deal_lost'],
-  },
-  {
-    label: 'Follow-ups',
-    triggers: ['follow_up_due','follow_up_overdue'],
-  },
-  {
-    label: 'AI Intelligence',
-    triggers: ['ai_intent_detected','ai_score_threshold'],
-  },
-  {
-    label: 'Scheduled',
-    triggers: ['time_based'],
-  },
-];
-
-const STATUS_META: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
-  active:   { color: '#28c99a', bg: 'rgba(40,201,154,0.12)',  icon: <CheckCircle size={11} />, label: 'Active' },
-  paused:   { color: '#f4c95d', bg: 'rgba(244,201,93,0.12)',  icon: <Pause size={11} />,       label: 'Paused' },
-  draft:    { color: '#8790aa', bg: 'rgba(135,144,170,0.12)', icon: <Clock size={11} />,        label: 'Draft' },
-  error:    { color: '#f46b72', bg: 'rgba(244,107,114,0.12)', icon: <XCircle size={11} />,      label: 'Error' },
-  archived: { color: '#8790aa', bg: 'rgba(135,144,170,0.12)', icon: <X size={11} />,            label: 'Archived' },
-};
-
-const CATEGORY_COLORS: Record<string, string> = {
-  ai_powered:   '#8b5cf6',
-  lead_nurture: '#4d7cff',
-  sales:        '#28c99a',
-  support:      '#f46b72',
-  onboarding:   '#f4c95d',
-  retention:    '#ec78b5',
-  general:      '#8790aa',
-};
-
-function timeAgo(iso: string | null) {
-  if (!iso) return 'Never';
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60)    return 'Just now';
-  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-// ── Create Automation Modal ───────────────────────────────────
-function CreateAutomationModal({
-  onClose, onCreated, templates,
-}: {
-  onClose: () => void;
-  onCreated: (a: Automation) => void;
-  templates: AutomationTemplate[];
-}) {
-  const [step, setStep]           = useState<'template' | 'configure'>('template');
-  const [name, setName]           = useState('');
-  const [description, setDesc]    = useState('');
-  const [triggerType, setTrigger] = useState('new_message_received');
-  const [aiEnabled, setAI]        = useState(false);
-  const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-  const [selectedTemplate, setTemplate] = useState<AutomationTemplate | null>(null);
-
-  const applyTemplate = (t: AutomationTemplate) => {
-    setTemplate(t);
-    setName(t.name);
-    setDesc(t.description);
-    setTrigger(t.trigger_type);
-    setAI(t.ai_nodes.length > 0);
-    setStep('configure');
-  };
-
-  const handleSave = async () => {
-    if (!name.trim()) { setError('Name is required'); return; }
-    setSaving(true);
-    setError(null);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
     try {
+      const res = await fetch('/api/v3/automations');
+      const data = await res.json() as { automations?: Automation[]; summary?: AutomationSummary; error?: string };
+      if (!res.ok) throw new Error(data.error ?? 'Failed to load automations');
+      setAutomations(data.automations ?? []);
+      setSummary(data.summary ?? EMPTY_SUMMARY);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load automations');
+    } finally { setLoading(false); }
+  }, []);
+
+  const loadAgents = useCallback(async () => {
+    try {
+      const [aRes, tRes, cRes] = await Promise.all([
+        fetch('/api/v3/agents'),
+        fetch('/api/v3/agents/tools'),
+        fetch('/api/v3/automations/templates'),
+      ]);
+      if (aRes.ok) {
+        const d = await aRes.json() as { agents?: AgentLite[] };
+        setAgents(d.agents ?? []);
+      }
+      if (tRes.ok) {
+        const d = await tRes.json() as { tools?: { name?: string }[] };
+        const names = (d.tools ?? []).map(x => x.name).filter((n): n is string => !!n);
+        setTools(names);
+        setToolsCount(names.length);
+      }
+      if (cRes.ok) {
+        const d = await cRes.json() as { capabilities?: TemplateCapabilities };
+        if (d.capabilities) setCapabilities(d.capabilities);
+      }
+    } catch { /* agents + capabilities are optional context for the dashboard */ }
+  }, []);
+
+  useEffect(() => { void load(); void loadAgents(); }, [load, loadAgents]);
+
+  const refreshAll = useCallback(() => { void load(); void loadAgents(); }, [load, loadAgents]);
+
+  const filtered = useMemo(() => {
+    return automations.filter(a => {
+      if (filter !== 'all' && a.status !== filter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        return a.name.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q);
+      }
+      return true;
+    });
+  }, [automations, filter, search]);
+
+  const enabledAgents = useMemo(() => agents.filter(a => a.enabled), [agents]);
+  const toolsInUse = useMemo(() => new Set(enabledAgents.flatMap(a => a.allowed_tools)).size, [enabledAgents]);
+  const successRate = summary.executions > 0 ? Math.round((summary.successes / summary.executions) * 100) : 0;
+  const lastRunAt = useMemo(
+    () => automations.reduce<string | null>((acc, a) => (a.last_run_at && (!acc || a.last_run_at > acc) ? a.last_run_at : acc), null),
+    [automations],
+  );
+
+  const compatFor = useCallback(
+    (t: WorkflowTemplate): TemplateCompatibility =>
+      evaluateCompatibility(t, { agents, tools, capabilities }),
+    [agents, tools, capabilities],
+  );
+
+  async function toggleRow(a: Automation) {
+    setRowBusy(a.id);
+    try {
+      const next = a.status === 'active' ? 'paused' : 'active';
+      const res = await fetch(`/api/v3/automations/${a.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed'); }
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Failed'); }
+    finally { setRowBusy(null); }
+  }
+
+  async function deleteRow(a: Automation) {
+    if (!confirm(`Delete "${a.name}"? This cannot be undone.`)) return;
+    setRowBusy(a.id);
+    try {
+      const res = await fetch(`/api/v3/automations/${a.id}`, { method: 'DELETE' });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed'); }
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Failed'); }
+    finally { setRowBusy(null); }
+  }
+
+  function openCreate() {
+    setEditing(null); setShowBuilder(true);
+  }
+
+  // Install a template: validate → create a real editable DRAFT (never active)
+  // via the existing backend → open the existing builder for customisation.
+  async function installTemplate(t: WorkflowTemplate) {
+    const compat = compatFor(t);
+    if (compat.status === 'blocked') {
+      setError(compat.blockingReasons.join(' ') || 'This template is not compatible with your account yet.');
+      return;
+    }
+    setInstalling(t.id); setError(null);
+    try {
+      const steps = buildTemplateSteps(t, compat.agent);
       const res = await fetch('/api/v3/automations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name.trim(),
-          description: description || null,
-          trigger_type: triggerType,
-          trigger_config: {},
-          ai_enabled: aiEnabled,
-          steps: selectedTemplate?.steps ?? [],
-          ai_nodes: selectedTemplate?.ai_nodes ?? [],
+          name: t.name,
+          description: t.description,
+          trigger_type: t.triggerType,
+          trigger_config: t.triggerConfig,
+          ai_enabled: t.aiEnabled,
+          steps,
+          activate: false,
         }),
       });
-      if (!res.ok) {
-        const d = await res.json() as { error?: string };
-        throw new Error(d.error ?? 'Failed to create');
-      }
-      const d = await res.json() as { automation: Automation };
-      onCreated(d.automation);
+      const data = await res.json() as { automation?: Automation; error?: string };
+      if (!res.ok || !data.automation) throw new Error(data.error ?? 'Failed to create draft');
+      setPreview(null);
+      setEditing({ automation: data.automation });
+      setShowBuilder(true);
+      await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create automation');
-    } finally {
-      setSaving(false);
-    }
-  };
+      setError(e instanceof Error ? e.message : 'Failed to install template');
+    } finally { setInstalling(null); }
+  }
+
+  function browseTemplates() {
+    templatesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  const FILTERS = ['all', 'active', 'draft', 'paused', 'archived'];
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div className="crm-glass" style={{ width: '100%', maxWidth: 640, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0 }}>
-        {/* Header */}
-        <div style={{ padding: '18px 22px', borderBottom: '1px solid rgba(130,145,190,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 750, color: 'var(--crm-text)' }}>
-              {step === 'template' ? 'Choose a Template' : 'Configure Automation'}
-            </h2>
-            <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--crm-text-muted)' }}>
-              {step === 'template' ? 'Start from a template or build from scratch' : 'Set up your automation trigger and AI settings'}
-            </p>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4 }}><X size={18} /></button>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px' }}>
-          {step === 'template' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {/* Scratch option */}
-              <button onClick={() => setStep('configure')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 14, background: 'rgba(79,109,245,0.08)', border: '2px dashed rgba(79,109,245,0.30)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Plus size={18} color="white" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#4f6df5' }}>Build from Scratch</div>
-                  <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Create a custom automation with any trigger and actions</div>
-                </div>
-              </button>
-
-              {/* Templates */}
-              {templates.map(t => (
-                <button key={t.id} onClick={() => applyTemplate(t)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 14, background: 'rgba(255,255,255,0.50)', border: '1px solid rgba(255,255,255,0.75)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 12, background: `${CATEGORY_COLORS[t.category] ?? '#8790aa'}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {t.ai_nodes.length > 0 ? <Brain size={18} color={CATEGORY_COLORS[t.category] ?? '#8790aa'} /> : <Zap size={18} color={CATEGORY_COLORS[t.category] ?? '#8790aa'} />}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)' }}>{t.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 2 }}>{t.description}</div>
-                    <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
-                      {t.tags.slice(0, 3).map(tag => (
-                        <span key={tag} style={{ fontSize: 9, fontWeight: 600, color: CATEGORY_COLORS[t.category] ?? '#8790aa', background: `${CATEGORY_COLORS[t.category] ?? '#8790aa'}15`, borderRadius: 5, padding: '2px 6px' }}>{tag}</span>
-                      ))}
-                      {t.ai_nodes.length > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6', background: 'rgba(139,92,246,0.12)', borderRadius: 5, padding: '2px 6px' }}>✨ AI</span>}
-                    </div>
-                  </div>
-                  <ChevronRight size={14} color="var(--crm-text-muted)" />
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {selectedTemplate && (
-                <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(79,109,245,0.08)', border: '1px solid rgba(79,109,245,0.20)', fontSize: 12, color: '#4f6df5' }}>
-                  Using template: <strong>{selectedTemplate.name}</strong>
-                </div>
-              )}
-
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>Automation Name *</label>
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Hot Lead Follow-up" style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(130,145,190,0.25)', background: 'rgba(255,255,255,0.60)', fontSize: 13, color: 'var(--crm-text)', outline: 'none', boxSizing: 'border-box' }} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>Description</label>
-                <textarea value={description} onChange={e => setDesc(e.target.value)} placeholder="What does this automation do?" rows={2} style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(130,145,190,0.25)', background: 'rgba(255,255,255,0.60)', fontSize: 13, color: 'var(--crm-text)', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>Trigger</label>
-                <select value={triggerType} onChange={e => setTrigger(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(130,145,190,0.25)', background: 'rgba(255,255,255,0.60)', fontSize: 13, color: 'var(--crm-text)', outline: 'none', cursor: 'pointer' }}>
-                  {TRIGGER_GROUPS.map(g => (
-                    <optgroup key={g.label} label={g.label}>
-                      {g.triggers.map(t => (
-                        <option key={t} value={t}>{TRIGGER_LABELS[t] ?? t}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'linear-gradient(135deg,rgba(139,92,246,0.10),rgba(79,109,245,0.07))', border: '1px solid rgba(139,92,246,0.20)' }}>
-                <Brain size={16} color="#8b5cf6" />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)' }}>Enable AI Intelligence</div>
-                  <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Add AI score/intent/sentiment conditions to this automation</div>
-                </div>
-                <button onClick={() => setAI(p => !p)} style={{ width: 40, height: 22, borderRadius: 11, background: aiEnabled ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(130,145,190,0.25)', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 200ms' }}>
-                  <div style={{ width: 16, height: 16, borderRadius: '50%', background: 'white', position: 'absolute', top: 3, left: aiEnabled ? 21 : 3, transition: 'left 200ms', boxShadow: '0 1px 4px rgba(0,0,0,0.20)' }} />
-                </button>
-              </div>
-
-              {error && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.20)' }}>
-                  <AlertCircle size={12} color="#f46b72" />
-                  <span style={{ fontSize: 12, color: '#f46b72' }}>{error}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding: '14px 22px', borderTop: '1px solid rgba(130,145,190,0.10)', display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
-          {step === 'configure' && selectedTemplate && (
-            <button onClick={() => setStep('template')} style={{ padding: '8px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(130,145,190,0.25)', color: 'var(--crm-text-secondary)', fontSize: 13, cursor: 'pointer' }}>
-              Back
-            </button>
-          )}
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 10, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(130,145,190,0.25)', color: 'var(--crm-text-secondary)', fontSize: 13, cursor: 'pointer' }}>
-            Cancel
-          </button>
-          {step === 'configure' && (
-            <button onClick={() => void handleSave()} disabled={saving} style={{ padding: '8px 20px', borderRadius: 10, background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', border: 'none', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: saving ? 0.7 : 1 }}>
-              {saving ? 'Creating...' : 'Create Automation'}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Automation Detail Panel ───────────────────────────────────
-function AutomationDetailPanel({
-  automation, onClose, onToggle, onDelete,
-}: {
-  automation: Automation;
-  onClose: () => void;
-  onToggle: (id: string, active: boolean) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [logs, setLogs]       = useState<ExecutionLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [executing, setExec]  = useState(false);
-  const [testContactId, setTestContact] = useState('');
-  const [execResult, setExecResult] = useState<{ status: string; steps_log: { step_type: string; status: string; detail: string }[] } | null>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const res = await fetch(`/api/v3/automations/${automation.id}`);
-      if (res.ok) {
-        const d = await res.json() as { executions?: ExecutionLog[] };
-        setLogs(d.executions ?? []);
-      }
-      setLoading(false);
-    };
-    void load();
-  }, [automation.id]);
-
-  const handleTestRun = async () => {
-    if (!testContactId.trim()) return;
-    setExec(true);
-    setExecResult(null);
-    try {
-      const res = await fetch(`/api/v3/automations/${automation.id}/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contactId: testContactId.trim() }),
-      });
-      const d = await res.json() as { status: string; steps_log: { step_type: string; status: string; detail: string }[] };
-      setExecResult(d);
-    } catch {
-      setExecResult({ status: 'failed', steps_log: [{ step_type: 'error', status: 'failed', detail: 'Network error' }] });
-    } finally {
-      setExec(false);
-    }
-  };
-
-  const sm = STATUS_META[automation.status] ?? STATUS_META.draft;
-  const successRate = automation.execution_count > 0
-    ? Math.round((automation.success_count / automation.execution_count) * 100)
-    : 0;
-
-  return (
-    <div className="crm-glass" style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
+    <div style={{ padding: '24px 28px', maxWidth: 1240, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(130,145,190,0.10)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 4 }}>{automation.name}</div>
-            {automation.description && <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>{automation.description}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 22, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 46, height: 46, borderRadius: 14, background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 22px rgba(79,109,245,0.35)' }}>
+            <Zap size={22} color="white" />
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', flexShrink: 0 }}><X size={14} /></button>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 780, color: 'var(--crm-text)', letterSpacing: '-0.01em' }}>Automations</h1>
+            <p style={{ margin: '3px 0 0', fontSize: 13, color: 'var(--crm-text-muted)' }}>AI agents and trigger-based workflows that run for you, 24/7.</p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: sm.color, background: sm.bg, borderRadius: 6, padding: '2px 7px' }}>
-            {sm.icon}{sm.label}
-          </span>
-          {automation.ai_enabled && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', background: 'rgba(139,92,246,0.12)', borderRadius: 6, padding: '2px 7px' }}>✨ AI</span>
-          )}
-          <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', background: 'rgba(130,145,190,0.10)', borderRadius: 6, padding: '2px 7px' }}>
-            {TRIGGER_LABELS[automation.trigger_type] ?? automation.trigger_type}
-          </span>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={browseTemplates} style={hbtn('ghost')}><LayoutTemplate size={15} /> Browse Templates</button>
+          <button onClick={() => setShowActivity(true)} style={hbtn('ghost')}><History size={15} /> Execution History</button>
+          <button onClick={refreshAll} style={hbtn('ghost')} title="Refresh status"><RefreshCw size={15} className={loading ? 'spin' : ''} /> Refresh</button>
+          <button onClick={openCreate} style={hbtn('primary')}><Plus size={15} /> Create Automation</button>
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-          {[
-            { label: 'Total Runs', value: automation.execution_count, color: '#4d7cff' },
-            { label: 'Success Rate', value: `${successRate}%`, color: '#28c99a' },
-            { label: 'Failures', value: automation.failure_count, color: '#f46b72' },
-          ].map(s => (
-            <div key={s.label} style={{ background: 'rgba(255,255,255,0.45)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 750, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 9, color: 'var(--crm-text-muted)', marginTop: 2 }}>{s.label}</div>
-            </div>
-          ))}
+      {/* Summary cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 20 }}>
+        <Card icon={<Zap size={16} />} color="#4d7cff" label="Total" value={summary.total} />
+        <Card icon={<Play size={16} />} color="#28c99a" label="Active" value={summary.active} />
+        <Card icon={<Brain size={16} />} color="#8b5cf6" label="AI Agents" value={`${enabledAgents.length}/${agents.length}`} />
+        <Card icon={<BarChart3 size={16} />} color="#f4c95d" label="Executions" value={summary.executions} />
+        <Card icon={<Brain size={16} />} color="#f59e0b" label="Success Rate" value={`${successRate}%`} />
+      </div>
+
+      {/* Architecture pipeline */}
+      <div style={{ marginBottom: 20 }}>
+        <WorkflowPipeline
+          metrics={{
+            activeAutomations: summary.active,
+            totalAutomations: summary.total,
+            enabledAgents: enabledAgents.length,
+            totalAgents: agents.length,
+            toolsInUse,
+            totalExecutions: summary.executions,
+            completedExecutions: summary.successes,
+            successRate,
+            lastRunAt,
+          }}
+        />
+      </div>
+
+      {/* Agent fleet */}
+      <div style={{ marginBottom: 20 }}>
+        <AgentShowcase agents={agents} />
+      </div>
+
+      {/* Templates + Permissions */}
+      <div className="crm-auto-split">
+        <div ref={templatesRef}>
+          <TemplateGallery
+            templates={WORKFLOW_TEMPLATES}
+            compatFor={compatFor}
+            installing={installing}
+            onPreview={setPreview}
+            onUse={installTemplate}
+          />
+        </div>
+        <PermissionsPanel agents={agents} toolsAvailable={toolsCount} />
+      </div>
+
+      {/* Automations management */}
+      <div className="crm-glass" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid var(--crm-border-soft)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <Zap size={16} color="var(--crm-primary)" />
+            <span style={{ fontSize: 14, fontWeight: 750, color: 'var(--crm-text)' }}>Your Automations</span>
+          </div>
+          <div style={{ flex: 1 }} />
+          <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 300 }}>
+            <Search size={15} color="var(--crm-text-muted)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search automations…" style={{ width: '100%', padding: '9px 12px 9px 34px', borderRadius: 10, border: '1px solid rgba(130,145,190,0.25)', background: 'rgba(255,255,255,0.6)', fontSize: 13, color: 'var(--crm-text)', outline: 'none', boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {FILTERS.map(f => (
+              <button key={f} onClick={() => setFilter(f)} style={{ padding: '7px 12px', borderRadius: 9, fontSize: 12, fontWeight: 600, textTransform: 'capitalize', background: filter === f ? 'rgba(79,109,245,0.12)' : 'transparent', color: filter === f ? 'var(--crm-primary)' : 'var(--crm-text-muted)' }}>{f}</button>
+            ))}
+          </div>
         </div>
 
-        {/* Last error */}
-        {automation.last_error && (
-          <div style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.20)', display: 'flex', gap: 8 }}>
-            <AlertCircle size={12} color="#f46b72" style={{ flexShrink: 0, marginTop: 1 }} />
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#f46b72', marginBottom: 2 }}>Last Error</div>
-              <div style={{ fontSize: 11, color: '#f46b72' }}>{automation.last_error}</div>
-            </div>
+        {/* Error */}
+        {error && (
+          <div style={{ margin: 16, display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.2)' }}>
+            <AlertCircle size={15} color="#f46b72" /><span style={{ fontSize: 13, color: '#f46b72', flex: 1 }}>{error}</span>
+            <button onClick={() => setError(null)} style={{ color: '#f46b72' }}><X size={14} /></button>
           </div>
         )}
 
-        {/* Test run */}
-        <div style={{ background: 'rgba(255,255,255,0.45)', borderRadius: 12, padding: '12px 14px' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 8 }}>Test Run</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input
-              value={testContactId}
-              onChange={e => setTestContact(e.target.value)}
-              placeholder="Contact ID..."
-              style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(130,145,190,0.25)', background: 'rgba(255,255,255,0.60)', fontSize: 12, color: 'var(--crm-text)', outline: 'none' }}
-            />
-            <button
-              onClick={() => void handleTestRun()}
-              disabled={executing || !testContactId.trim()}
-              style={{ padding: '7px 12px', borderRadius: 8, background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', border: 'none', color: 'white', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: executing ? 0.7 : 1, whiteSpace: 'nowrap' }}
-            >
-              {executing ? '...' : <><Play size={10} style={{ display: 'inline', marginRight: 3 }} />Run</>}
-            </button>
+        {/* Body */}
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 18 }}>
+            {[0, 1, 2].map(i => <div key={i} className="crm-skeleton" style={{ height: 60, borderRadius: 12 }} />)}
           </div>
-          {execResult && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: execResult.status === 'completed' ? '#28c99a' : '#f46b72', marginBottom: 4 }}>
-                {execResult.status === 'completed' ? '✓ Completed' : '✗ Failed'}
-              </div>
-              {execResult.steps_log?.map((s, i) => (
-                <div key={i} style={{ fontSize: 10, color: 'var(--crm-text-muted)', padding: '2px 0', borderBottom: '1px solid rgba(130,145,190,0.08)' }}>
-                  <span style={{ color: s.status === 'completed' ? '#28c99a' : s.status === 'skipped' ? '#f4c95d' : '#f46b72' }}>
-                    {s.status === 'completed' ? '✓' : s.status === 'skipped' ? '→' : '✗'}
-                  </span>{' '}
-                  <strong>{s.step_type}</strong>: {s.detail}
-                </div>
-              ))}
+        ) : filtered.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '56px 20px', textAlign: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 18, background: 'rgba(79,109,245,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Inbox size={26} color="var(--crm-primary)" /></div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text)' }}>{automations.length === 0 ? 'No automations yet' : 'No matches'}</div>
+              <div style={{ fontSize: 13, color: 'var(--crm-text-muted)', marginTop: 4 }}>{automations.length === 0 ? 'Start from a template or create your first automation.' : 'Try a different search or filter.'}</div>
             </div>
-          )}
-        </div>
-
-        {/* Execution history */}
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 8 }}>Execution History</div>
-          {loading ? (
-            <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>Loading...</div>
-          ) : logs.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>No executions yet</div>
-          ) : logs.map(log => (
-            <div key={log.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid rgba(130,145,190,0.08)' }}>
-              <div style={{ width: 7, height: 7, borderRadius: '50%', background: log.status === 'completed' ? '#28c99a' : log.status === 'failed' ? '#f46b72' : '#f4c95d', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--crm-text)', textTransform: 'capitalize' }}>{log.status}</div>
-                {log.error_message && <div style={{ fontSize: 10, color: '#f46b72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.error_message}</div>}
-              </div>
-              <span style={{ fontSize: 10, color: 'var(--crm-text-muted)', flexShrink: 0 }}>{timeAgo(log.started_at)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(130,145,190,0.10)', display: 'flex', gap: 6, flexShrink: 0 }}>
-        <button
-          onClick={() => onToggle(automation.id, !automation.is_active)}
-          style={{ flex: 1, padding: '8px 0', borderRadius: 10, background: automation.is_active ? 'rgba(244,201,93,0.12)' : 'rgba(40,201,154,0.12)', border: `1px solid ${automation.is_active ? 'rgba(244,201,93,0.30)' : 'rgba(40,201,154,0.30)'}`, color: automation.is_active ? '#f4c95d' : '#28c99a', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
-        >
-          {automation.is_active ? <><Pause size={11} />Pause</> : <><Play size={11} />Activate</>}
-        </button>
-        <button
-          onClick={() => { if (confirm('Delete this automation?')) onDelete(automation.id); }}
-          style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.20)', color: '#f46b72', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-        >
-          <Trash2 size={11} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Main Page ────────────────────────────────────────────────
-export default function AutomationsPage() {
-  const supabase = createClient();
-  const [automations, setAutomations] = useState<Automation[]>([]);
-  const [templates, setTemplates]     = useState<AutomationTemplate[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [search, setSearch]           = useState('');
-  const [statusFilter, setStatus]     = useState('all');
-  const [selected, setSelected]       = useState<Automation | null>(null);
-  const [showCreate, setShowCreate]   = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams({ limit: '100' });
-    if (statusFilter !== 'all') params.set('status', statusFilter);
-    if (search) params.set('search', search);
-
-    const [autoRes, tmplRes] = await Promise.all([
-      fetch(`/api/v3/automations?${params.toString()}`),
-      fetch('/api/v3/automations/templates'),
-    ]);
-
-    if (autoRes.ok) {
-      const d = await autoRes.json() as { automations: Automation[] };
-      setAutomations(d.automations ?? []);
-    } else {
-      // Fallback: direct Supabase query
-      const { data } = await supabase
-        .from('automations')
-        .select('id,name,description,trigger_type,trigger_config,is_active,status,ai_enabled,execution_count,success_count,failure_count,last_run_at,last_error,created_at')
-        .order('created_at', { ascending: false })
-        .limit(100);
-      setAutomations((data as Automation[]) ?? []);
-    }
-
-    if (tmplRes.ok) {
-      const d = await tmplRes.json() as { templates: AutomationTemplate[] };
-      setTemplates(d.templates ?? []);
-    }
-
-    setLoading(false);
-  }, [statusFilter, search]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const handleToggle = useCallback(async (id: string, active: boolean) => {
-    const res = await fetch(`/api/v3/automations/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: active, status: active ? 'active' : 'paused' }),
-    });
-    if (res.ok) {
-      setAutomations(prev => prev.map(a => a.id === id ? { ...a, is_active: active, status: active ? 'active' : 'paused' } : a));
-      if (selected?.id === id) setSelected(prev => prev ? { ...prev, is_active: active, status: active ? 'active' : 'paused' } : prev);
-    }
-  }, [selected]);
-
-  const handleDelete = useCallback(async (id: string) => {
-    const res = await fetch(`/api/v3/automations/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      setAutomations(prev => prev.filter(a => a.id !== id));
-      if (selected?.id === id) setSelected(null);
-    }
-  }, [selected]);
-
-  const handleCreated = useCallback((a: Automation) => {
-    setAutomations(prev => [a, ...prev]);
-    setShowCreate(false);
-    setSelected(a);
-  }, []);
-
-  const active   = automations.filter(a => a.is_active).length;
-  const totalRuns = automations.reduce((s, a) => s + (a.execution_count ?? 0), 0);
-  const aiCount  = automations.filter(a => a.ai_enabled).length;
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: 'calc(100vh - 90px)', overflow: 'hidden' }}>
-      {/* Header */}
-      <div className="crm-page-header" style={{ flexShrink: 0 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 750, color: 'var(--crm-text)', margin: 0 }}>Smart Automations</h1>
-          <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--crm-text-secondary)' }}>
-            {active} active · {totalRuns.toLocaleString()} total runs · {aiCount} AI-powered
-          </p>
-        </div>
-        <button onClick={() => setShowCreate(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 12, background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', border: 'none', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-          <Plus size={14} /> New Automation
-        </button>
-      </div>
-
-      {/* AI Banner */}
-      <div className="crm-glass-ai" style={{ padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-        <div className="crm-ai-orb" style={{ width: 32, height: 32 }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)' }}>AI-Enhanced Automation Engine</div>
-          <div style={{ fontSize: 11, color: 'var(--crm-text-secondary)' }}>
-            Add AI score conditions, intent detection, and sentiment routing to any automation.
+            {automations.length === 0 && <button onClick={openCreate} style={hbtn('primary')}><Plus size={15} /> Create Automation</button>}
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          {['Score > 80 → Assign Sales', 'Negative Sentiment → Escalate', 'Pricing Intent → Create Deal'].map(chip => (
-            <span key={chip} style={{ fontSize: 10, fontWeight: 600, color: '#8b5cf6', background: 'rgba(139,92,246,0.12)', borderRadius: 8, padding: '4px 8px', whiteSpace: 'nowrap' }}>{chip}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* Flow diagram */}
-      <div className="crm-glass" style={{ padding: '12px 18px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 0, overflowX: 'auto' }}>
-          {[
-            { label: 'TRIGGER', color: '#4d7cff', desc: 'Event fires' },
-            { label: 'AI ANALYSIS', color: '#8b5cf6', desc: 'Score · Intent · Sentiment', ai: true },
-            { label: 'CONDITIONS', color: '#28c99a', desc: 'Evaluate rules' },
-            { label: 'ACTIONS', color: '#f4c95d', desc: 'Execute steps' },
-            { label: 'WAIT', color: '#8790aa', desc: 'Delay if needed' },
-            { label: 'LOG', color: '#4f6df5', desc: 'Record result' },
-          ].map((s, i) => (
-            <div key={s.label} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-              <div style={{ padding: '6px 12px', borderRadius: 8, background: s.ai ? 'linear-gradient(135deg,rgba(139,92,246,0.18),rgba(79,109,245,0.12))' : `${s.color}12`, border: `1px solid ${s.color}30`, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: s.color, whiteSpace: 'nowrap' }}>{s.label}</div>
-                <div style={{ fontSize: 9, color: 'var(--crm-text-muted)', whiteSpace: 'nowrap' }}>{s.desc}</div>
-              </div>
-              {i < 5 && <ArrowRight size={12} color="var(--crm-text-muted)" style={{ margin: '0 4px', flexShrink: 0 }} />}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', gap: 10, overflow: 'hidden', minHeight: 0 }}>
-        {/* List */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden', minWidth: 0 }}>
-          {/* Filters */}
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.60)', border: '1px solid rgba(255,255,255,0.80)', borderRadius: 10, padding: '7px 11px', flex: 1, maxWidth: 320 }}>
-              <Search size={12} color="var(--crm-text-muted)" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search automations..." style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 12, color: 'var(--crm-text)' }} />
-            </div>
-            <select value={statusFilter} onChange={e => setStatus(e.target.value)} style={{ padding: '7px 10px', borderRadius: 10, border: '1px solid rgba(130,145,190,0.25)', background: 'rgba(255,255,255,0.60)', fontSize: 12, color: 'var(--crm-text)', cursor: 'pointer', outline: 'none' }}>
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="draft">Draft</option>
-              <option value="error">Error</option>
-            </select>
-            <button onClick={() => void load()} style={{ padding: '7px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(130,145,190,0.20)', color: 'var(--crm-text-muted)', cursor: 'pointer' }}>
-              <RefreshCw size={13} />
-            </button>
-          </div>
-
-          {/* Automation list */}
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} style={{ height: 72, borderRadius: 14, background: 'rgba(255,255,255,0.40)' }} />
-              ))
-            ) : automations.length === 0 ? (
-              <div className="crm-glass" style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--crm-text-muted)' }}>
-                <Zap size={36} style={{ margin: '0 auto 10px', opacity: 0.2 }} />
-                <p style={{ margin: '0 0 12px', fontSize: 14 }}>No automations yet</p>
-                <button onClick={() => setShowCreate(true)} style={{ padding: '8px 18px', borderRadius: 10, background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', border: 'none', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                  Create First Automation
-                </button>
-              </div>
-            ) : automations.map(a => {
+        ) : (
+          <div>
+            {filtered.map(a => {
               const sm = STATUS_META[a.status] ?? STATUS_META.draft;
-              const isSelected = selected?.id === a.id;
-              const successRate = a.execution_count > 0 ? Math.round((a.success_count / a.execution_count) * 100) : null;
+              const trigger = TRIGGER_MAP[a.trigger_type];
+              const rate = a.execution_count > 0 ? Math.round((a.success_count / a.execution_count) * 100) : null;
               return (
-                <button
-                  key={a.id}
-                  onClick={() => setSelected(isSelected ? null : a)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
-                    borderRadius: 14, border: 'none', cursor: 'pointer', textAlign: 'left', width: '100%',
-                    background: isSelected
-                      ? 'linear-gradient(135deg,rgba(79,109,245,0.16),rgba(139,92,246,0.10))'
-                      : 'rgba(255,255,255,0.50)',
-                    borderLeft: isSelected ? '3px solid #4f6df5' : '3px solid transparent',
-                  }}
-                >
-                  <div style={{ width: 40, height: 40, borderRadius: 12, background: a.ai_enabled ? 'linear-gradient(135deg,rgba(139,92,246,0.18),rgba(79,109,245,0.12))' : 'rgba(79,109,245,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {a.ai_enabled ? <Brain size={18} color="#8b5cf6" /> : <Zap size={18} color="#4f6df5" />}
+                <div key={a.id} className="crm-row" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--crm-border-soft)', cursor: 'pointer' }} onClick={() => setDetail(a)}>
+                  <div style={{ width: 38, height: 38, borderRadius: 12, background: sm.bg, color: sm.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {a.status === 'active' ? <Play size={16} /> : a.status === 'paused' ? <Pause size={16} /> : <Zap size={16} />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
-                      {a.ai_enabled && <span style={{ fontSize: 9, fontWeight: 700, color: '#8b5cf6', background: 'rgba(139,92,246,0.12)', borderRadius: 5, padding: '1px 5px', flexShrink: 0 }}>AI</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--crm-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+                      {a.ai_enabled && <Brain size={12} color="#8b5cf6" />}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>
-                      {TRIGGER_LABELS[a.trigger_type] ?? a.trigger_type} · {a.execution_count} runs
-                      {successRate !== null && ` · ${successRate}% success`}
-                      {' · '}Last: {timeAgo(a.last_run_at)}
+                    <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {trigger?.label ?? a.trigger_type}{a.description ? ` · ${a.description}` : ''}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: sm.color, background: sm.bg, borderRadius: 7, padding: '3px 7px' }}>
-                      {sm.icon}{sm.label}
-                    </span>
-                    <button
-                      onClick={e => { e.stopPropagation(); void handleToggle(a.id, !a.is_active); }}
-                      style={{ padding: '5px 10px', borderRadius: 8, background: a.is_active ? 'rgba(244,201,93,0.10)' : 'rgba(40,201,154,0.10)', border: `1px solid ${a.is_active ? 'rgba(244,201,93,0.25)' : 'rgba(40,201,154,0.25)'}`, color: a.is_active ? '#f4c95d' : '#28c99a', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}
-                    >
-                      {a.is_active ? <><Pause size={10} />Pause</> : <><Play size={10} />Activate</>}
-                    </button>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: sm.color, background: sm.bg, borderRadius: 7, padding: '4px 9px', flexShrink: 0 }}>{sm.label}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 74, flexShrink: 0 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--crm-text)' }}>{a.execution_count ?? 0} runs</span>
+                    <span style={{ fontSize: 10, color: rate === null ? 'var(--crm-text-muted)' : rate >= 90 ? '#28c99a' : rate >= 70 ? '#f4c95d' : '#f46b72' }}>{rate === null ? '—' : `${rate}% ok`}</span>
                   </div>
-                </button>
+                  <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', minWidth: 74, flexShrink: 0, textAlign: 'right' }}>{timeAgo(a.last_run_at)}</div>
+                  <div style={{ display: 'flex', gap: 2, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    <IconBtn title={a.status === 'active' ? 'Pause' : 'Activate'} onClick={() => toggleRow(a)} disabled={rowBusy === a.id}>
+                      {rowBusy === a.id ? <Loader2 size={14} className="spin" /> : a.status === 'active' ? <Pause size={14} /> : <Play size={14} />}
+                    </IconBtn>
+                    <IconBtn title="Delete" danger onClick={() => deleteRow(a)} disabled={rowBusy === a.id}><Trash2 size={14} /></IconBtn>
+                    <IconBtn title="Open" onClick={() => setDetail(a)}><ChevronRight size={15} /></IconBtn>
+                  </div>
+                </div>
               );
             })}
           </div>
-        </div>
-
-        {/* Detail panel */}
-        {selected && (
-          <AutomationDetailPanel
-            automation={selected}
-            onClose={() => setSelected(null)}
-            onToggle={(id, active) => void handleToggle(id, active)}
-            onDelete={(id) => void handleDelete(id)}
-          />
         )}
       </div>
 
-      {/* Create modal */}
-      {showCreate && (
-        <CreateAutomationModal
-          onClose={() => setShowCreate(false)}
-          onCreated={handleCreated}
-          templates={templates}
+      {showBuilder && (
+        <AutomationBuilder
+          initial={editing}
+          onClose={() => { setShowBuilder(false); setEditing(null); }}
+          onSaved={() => { setShowBuilder(false); setEditing(null); void load(); }}
         />
       )}
+
+      {preview && (
+        <TemplatePreview
+          template={preview}
+          compatibility={compatFor(preview)}
+          installing={installing === preview.id}
+          onClose={() => setPreview(null)}
+          onUse={() => void installTemplate(preview)}
+        />
+      )}
+
+      {detail && (
+        <AutomationDetail
+          automation={detail}
+          onClose={() => setDetail(null)}
+          onChanged={load}
+          onEdit={(a) => { setDetail(null); setEditing({ automation: a }); setShowBuilder(true); }}
+        />
+      )}
+
+      {showActivity && <ActivityFeed onClose={() => setShowActivity(false)} />}
     </div>
   );
+}
+
+function Card({ icon, color, label, value }: { icon: React.ReactNode; color: string; label: string; value: number | string }) {
+  return (
+    <div className="crm-glass" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 11, background: `${color}18`, color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: 20, fontWeight: 780, color: 'var(--crm-text)', lineHeight: 1.1 }}>{value}</div>
+        <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', fontWeight: 600 }}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function IconBtn({ children, title, onClick, disabled, danger }: { children: React.ReactNode; title: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {
+  return (
+    <button title={title} onClick={onClick} disabled={disabled} style={{ padding: 8, borderRadius: 9, color: danger ? '#f46b72' : 'var(--crm-text-muted)', opacity: disabled ? 0.5 : 1 }}>
+      {children}
+    </button>
+  );
+}
+
+function hbtn(variant: 'primary' | 'ghost'): React.CSSProperties {
+  const base: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 15px', borderRadius: 11, fontSize: 13, fontWeight: 650 };
+  if (variant === 'primary') return { ...base, background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', color: 'white', boxShadow: '0 6px 18px rgba(79,109,245,0.28)' };
+  return { ...base, background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(130,145,190,0.28)', color: 'var(--crm-text-secondary)' };
 }

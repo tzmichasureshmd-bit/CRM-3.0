@@ -5,12 +5,14 @@ import { Calendar } from 'lucide-react';
 import { RANGE_PRESETS, type RangePreset } from '@/lib/reports-types';
 
 export function ReportRangePicker({
-  preset, from, to, onApply,
+  preset, from, to, onApply, presets: presetOptions = RANGE_PRESETS,
 }: {
   preset: RangePreset;
   from: string;
   to: string;
   onApply: (preset: RangePreset, from: string, to: string) => void;
+  /** preset buttons to render; defaults to the shared RANGE_PRESETS */
+  presets?: { id: RangePreset; label: string }[];
 }) {
   const [showCustom, setShowCustom] = useState(preset === 'custom');
   const [cf, setCf] = useState(from);
@@ -20,7 +22,7 @@ export function ReportRangePicker({
   useEffect(() => { setCf(from); }, [from]);
   useEffect(() => { setCt(to); }, [to]);
 
-  const presets = RANGE_PRESETS.filter(p => p.id !== 'custom');
+  const presets = presetOptions.filter(p => p.id !== 'custom');
 
   return (
     <div className="crm-rpt-range">

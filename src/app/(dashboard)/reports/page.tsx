@@ -33,6 +33,7 @@ const TITLES: Record<ReportId, string> = {
   overview: 'Overview', contacts: 'Contacts & Leads', sales: 'Sales & Revenue',
   campaigns: 'Campaigns', broadcasts: 'Broadcasts', conversations: 'Conversations',
   automations: 'Automations', conversion: 'Lead Conversion', agents: 'Agent Performance',
+  analytics: 'Analytics',
 };
 
 const STATUS_OPTIONS: Partial<Record<ReportId, { value: string; label: string }[]>> = {
