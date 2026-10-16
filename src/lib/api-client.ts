@@ -144,6 +144,7 @@ export interface Contact {
   lead_score_reason: string | null;
   source: string | null;
   tags: string[] | null;
+  opt_out?: boolean | null;
   created_at: string;
 }
 
@@ -271,12 +272,90 @@ export interface Broadcast {
   sent_count: number | null;
   delivered_count: number | null;
   read_count: number | null;
+  failed_count?: number | null;
   created_at: string;
   scheduled_at: string | null;
+  sent_at?: string | null;
+}
+
+export interface BroadcastRecipientItem {
+  contact_id: string;
+  name: string;
+  destination?: string;
+  reason?: string;
+}
+
+export interface BroadcastRecipientPreview {
+  broadcast_id?: string;
+  broadcast_name?: string;
+  message_preview?: string | null;
+  platform: string;
+  total_contacts: number;
+  eligible_count: number;
+  skipped_opt_out_count: number;
+  skipped_no_address_count: number;
+  eligible: BroadcastRecipientItem[];
+  skipped_opt_out: BroadcastRecipientItem[];
+  skipped_no_address: BroadcastRecipientItem[];
+}
+
+export interface BroadcastExecutionItem {
+  contact_id: string;
+  name: string;
+  destination: string | null;
+  status: 'sent' | 'failed' | 'skipped';
+  reason?: string;
+  error?: string;
+  provider_message_id?: string;
+  timestamp: string;
+}
+
+export interface BroadcastSendSummary {
+  broadcast_id: string;
+  account_id: string;
+  platform: string;
+  status: string;
+  total_recipients: number;
+  eligible_count: number;
+  sent_count: number;
+  failed_count: number;
+  skipped_count: number;
+  completed_at: string;
+  results: BroadcastExecutionItem[];
+}
+
+export interface BroadcastRetryResponse {
+  broadcast_id: string;
+  retried_count: number;
+  newly_sent: number;
+  still_failed: number;
+  message: string;
+  summary?: BroadcastSendSummary;
+}
+
+export interface BroadcastIndividualSendPayload {
+  contact_id: string;
+  platform: string;
+  message: string;
+  broadcast_id?: string;
+  subject?: string;
+}
+
+export interface BroadcastIndividualSendResponse {
+  success: boolean;
+  status: 'sent' | 'failed' | 'skipped';
+  provider_message_id?: string;
+  error?: string;
+  contact_id: string;
+  destination?: string;
+  platform: string;
 }
 
 export const getBroadcasts = (params?: Record<string, string>) =>
   req<{ data: Broadcast[]; total: number }>(`/broadcasts${params ? '?' + new URLSearchParams(params).toString() : ''}`);
+
+export const getBroadcast = (id: string) =>
+  req<Broadcast>(`/broadcasts/${id}`);
 
 export const createBroadcast = (body: Partial<Broadcast>) =>
   req<Broadcast>('/broadcasts', { method: 'POST', body: JSON.stringify(body) });
@@ -286,6 +365,30 @@ export const updateBroadcast = (id: string, body: Partial<Broadcast>) =>
 
 export const deleteBroadcast = (id: string) =>
   req(`/broadcasts/${id}`, { method: 'DELETE' });
+
+export const getBroadcastRecipientsPreview = (broadcastId: string) =>
+  req<BroadcastRecipientPreview>(`/broadcasts/${broadcastId}/recipients-preview`);
+
+export const sendBroadcastAll = (broadcastId: string, options?: { batch_size?: number; delay_ms?: number; selected_contact_ids?: string[] }) =>
+  req<BroadcastSendSummary>(`/broadcasts/${broadcastId}/send-all`, {
+    method: 'POST',
+    body: JSON.stringify(options ?? { batch_size: 20, delay_ms: 50 }),
+  });
+
+export const retryBroadcastFailed = (broadcastId: string, options?: { batch_size?: number; delay_ms?: number }) =>
+  req<BroadcastRetryResponse>(`/broadcasts/${broadcastId}/retry-failed`, {
+    method: 'POST',
+    body: JSON.stringify(options ?? { batch_size: 20, delay_ms: 50 }),
+  });
+
+export const getBroadcastResults = (broadcastId: string) =>
+  req<BroadcastSendSummary>(`/broadcasts/${broadcastId}/results`);
+
+export const sendBroadcastIndividual = (body: BroadcastIndividualSendPayload) =>
+  req<BroadcastIndividualSendResponse>('/broadcasts/send-individual', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 
 // ── APPOINTMENTS ──────────────────────────────────────────────
 export interface Appointment {
