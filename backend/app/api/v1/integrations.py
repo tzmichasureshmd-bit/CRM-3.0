@@ -30,6 +30,10 @@ CHANNEL_KEYS = {
         "WHATSAPP_VERIFY_TOKEN",
         "WHATSAPP_APP_SECRET",
     ],
+    "telegram": [
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_WEBHOOK_SECRET",
+    ],
 }
 
 

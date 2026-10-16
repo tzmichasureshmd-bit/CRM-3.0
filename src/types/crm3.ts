@@ -326,6 +326,8 @@ export interface CustomerJourneyEvent {
 // AI AGENTS
 // ============================================================
 
+export type AgentDepartment = 'sales' | 'customer_support' | 'marketing' | 'finance' | 'admin' | 'custom';
+
 export type AgentType =
   | 'lead_qualification'
   | 'sales_assistant'
@@ -343,31 +345,69 @@ export interface AIAgent {
   account_id: string;
   name: string;
   type: AgentType;
+  department?: AgentDepartment;
   description: string;
   status: AgentStatus;
+  enabled: boolean;
   instructions: string;
   allowed_tools: string[];
   requires_approval: boolean;
-  max_actions_per_run: number;
+  max_actions_per_run?: number;
   execution_count: number;
-  last_run_at?: string;
+  success_count?: number;
+  failure_count?: number;
+  last_run_at?: string | null;
+  model?: string;
+  provider?: string;
+  temperature?: number;
+  config?: Record<string, any>;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
-export interface AIAgentRun {
+export type AgentRunStatus = 'awaiting_approval' | 'running' | 'completed' | 'failed';
+
+export interface AgentRunAction {
+  tool: string;
+  category?: string;
+  input?: Record<string, any>;
+  output?: any;
+  status: 'success' | 'failed' | 'skipped' | 'pending_approval';
+  error?: string;
+  timestamp: string;
+  requires_approval?: boolean;
+}
+
+export interface AgentRun {
   id: string;
   account_id: string;
   agent_id: string;
-  triggered_by: string; // user_id or 'automation'
-  status: 'running' | 'completed' | 'failed' | 'awaiting_approval';
-  actions_taken: AgentAction[];
-  result_summary?: string;
-  error_message?: string;
+  agent_name?: string;
+  agent_type?: AgentType;
+  triggered_by: string;
+  status: AgentRunStatus;
+  actions_taken: AgentRunAction[];
+  result_summary?: string | null;
+  error_message?: string | null;
   tokens_used: number;
   started_at: string;
-  completed_at?: string;
+  completed_at?: string | null;
+  duration_ms?: number | null;
+  input_context?: Record<string, any>;
+  contact_id?: string | null;
+  conversation_id?: string | null;
 }
+
+export interface AgentMetrics {
+  total_agents: number;
+  enabled_agents: number;
+  total_executions: number;
+  pending_approvals: number;
+  success_rate: number;
+}
+
+// Legacy alias
+export interface AIAgentRun extends AgentRun {}
 
 export interface AgentAction {
   tool: string;

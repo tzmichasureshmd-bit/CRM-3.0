@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Heart, MessageCircle, Send, Bookmark, MoreHorizontal,
   Image, Play, RefreshCw, ExternalLink, Eye, Users,
-  TrendingUp, AtSign, ChevronRight, X, Reply,
+  TrendingUp, AtSign, X, Reply,
 } from 'lucide-react';
 
 // ── Types ────────────────────────────────────────────────────
@@ -26,10 +26,10 @@ interface IGComment {
   replies?: { data: IGComment[] };
 }
 
-type Tab = 'feed' | 'stories' | 'comments' | 'mentions' | 'insights';
+type Tab = 'feed' | 'stories' | 'comments' | 'mentions' | 'insights' | 'profile';
 
-const BACKEND = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000') : 'http://localhost:8000';
-const API = `${BACKEND}/api/v1/instagram`;
+const API = `/api/v3/instagram`;
+const SETTINGS_API = `/api/v3/instagram`;
 const getH = () => ({ Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : ''}` });
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -216,37 +216,89 @@ function InsightsTab({ profile }: { profile: IGProfile | null }) {
 
 // ── Main Page ────────────────────────────────────────────────
 export default function InstagramPage() {
-  const [tab, setTab]           = useState<Tab>('feed');
+  const [tab, setTab]           = useState<Tab>('profile');
   const [profile, setProfile]   = useState<IGProfile | null>(null);
   const [media, setMedia]       = useState<IGMedia[]>([]);
   const [stories, setStories]   = useState<IGStory[]>([]);
   const [loading, setLoading]   = useState(false);
   const [commentPost, setCommentPost] = useState<IGMedia | null>(null);
-  const [connected, setConnected]     = useState(true);
+  const [connected, setConnected]     = useState(false);
+  const [showProfilePanel, setShowProfilePanel] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  const [credentials, setCredentials] = useState({ INSTAGRAM_PAGE_ID: '', INSTAGRAM_VERIFY_TOKEN: '', INSTAGRAM_APP_SECRET: '', FACEBOOK_PAGE_ACCESS_TOKEN: '' });
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
+
+  // Load saved credentials
+  const loadCredentials = useCallback(async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const r = await fetch(`/api/v3/instagram/settings/integrations/instagram`, { headers: { Authorization: `Bearer ${token}` } });
+      if (r.ok) {
+        const d = await r.json() as Record<string, string>;
+        setCredentials(c => ({ ...c, ...d }));
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  const saveCredentials = async () => {
+    setSaving(true); setSaveMsg('');
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const r = await fetch(`/api/v3/instagram/settings/integrations/instagram`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(credentials),
+      });
+      if (r.ok) { setSaveMsg('✓ Saved! Loading profile...'); void load(); setShowConnectModal(false); }
+      else setSaveMsg('Save failed. Try again.');
+    } catch { setSaveMsg('Save failed.'); }
+    setSaving(false);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [profileRes, mediaRes, storiesRes] = await Promise.all([
-        fetch(`${API}/profile`, { headers: getH() }),
-        fetch(`${API}/media?limit=20`, { headers: getH() }),
-        fetch(`${API}/stories`, { headers: getH() }),
+      // Check status via proxy
+      const statusRes = await fetch(`${API}/status`);
+      if (statusRes.ok) {
+        const st = await statusRes.json() as { configured: boolean };
+        if (st.configured) {
+          setConnected(true);
+        } else {
+          setConnected(false);
+          setLoading(false);
+          return;
+        }
+      }
+      // Try profile/media/stories — failures don't affect connected state
+      const [profileRes, mediaRes, storiesRes] = await Promise.allSettled([
+        fetch(`${API}/profile`),
+        fetch(`${API}/media?limit=20`),
+        fetch(`${API}/stories`),
       ]);
-      if (!profileRes.ok) { setConnected(false); return; }
-      setProfile(await profileRes.json());
-      const md = await mediaRes.json(); setMedia(md.data || []);
-      const st = await storiesRes.json(); setStories(st.data || []);
-      setConnected(true);
+      if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
+        setProfile(await profileRes.value.json());
+      }
+      if (mediaRes.status === 'fulfilled' && mediaRes.value.ok) {
+        const md = await mediaRes.value.json() as { data?: IGMedia[] };
+        setMedia(md.data || []);
+      }
+      if (storiesRes.status === 'fulfilled' && storiesRes.value.ok) {
+        const st2 = await storiesRes.value.json() as { data?: IGStory[] };
+        setStories(st2.data || []);
+      }
     } catch {
-      setConnected(false);
+      // don't set connected=false on network errors
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void loadCredentials(); void load(); }, [load, loadCredentials]);
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'profile',  label: 'Profile',  icon: <Users size={14} /> },
     { id: 'feed',     label: 'Feed',     icon: <Image size={14} /> },
     { id: 'stories',  label: 'Stories',  icon: <Play size={14} /> },
     { id: 'comments', label: 'Comments', icon: <MessageCircle size={14} /> },
@@ -254,19 +306,51 @@ export default function InstagramPage() {
     { id: 'insights', label: 'Insights', icon: <TrendingUp size={14} /> },
   ];
 
-  if (!connected) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400, gap: 16 }}>
-      <div style={{ fontSize: 48 }}>📸</div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--crm-text)' }}>Instagram Not Connected</div>
-      <div style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>Configure your Instagram credentials in Settings → Integrations</div>
-      <a href="/settings/integrations" style={{ padding: '10px 20px', borderRadius: 12, background: '#E1306C', color: 'white', textDecoration: 'none', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <ChevronRight size={14} /> Go to Integrations
-      </a>
+  // Connect Modal
+  const ConnectModal = () => (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div className="crm-glass" style={{ width: '100%', maxWidth: 480, padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 12, background: 'linear-gradient(135deg,#f09433,#dc2743,#bc1888)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📸</div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text)' }}>Connect Instagram</div>
+              <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Settings are saved to your account</div>
+            </div>
+          </div>
+          <button onClick={() => setShowConnectModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}><X size={16} /></button>
+        </div>
+        {[{ key: 'INSTAGRAM_PAGE_ID', label: 'Instagram Page ID', ph: '17641442196029096' },
+          { key: 'FACEBOOK_PAGE_ACCESS_TOKEN', label: 'Page Access Token', ph: 'EAAxxxxx...', secret: true },
+          { key: 'INSTAGRAM_VERIFY_TOKEN', label: 'Verify Token', ph: 'tzmicha_crm3_verify_2024' },
+          { key: 'INSTAGRAM_APP_SECRET', label: 'App Secret', ph: 'abc123...', secret: true },
+        ].map(f => (
+          <div key={f.key}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>{f.label}</label>
+            <input
+              type={f.secret ? 'password' : 'text'}
+              placeholder={f.ph}
+              value={credentials[f.key as keyof typeof credentials] ?? ''}
+              onChange={e => setCredentials(c => ({ ...c, [f.key]: e.target.value }))}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid rgba(130,145,190,0.25)', background: 'rgba(255,255,255,0.60)', color: 'var(--crm-text)', fontSize: 13, boxSizing: 'border-box' }}
+            />
+          </div>
+        ))}
+        {saveMsg && <div style={{ fontSize: 12, color: saveMsg.startsWith('✓') ? '#28c99a' : '#f46b72', fontWeight: 600 }}>{saveMsg}</div>}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => void saveCredentials()} disabled={saving} style={{ flex: 1, padding: '10px', borderRadius: 10, background: 'linear-gradient(135deg,#E1306C,#8b5cf6)', border: 'none', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            {saving ? 'Saving...' : 'Save & Connect'}
+          </button>
+          <a href="/settings/integrations" style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(130,145,190,0.25)', color: 'var(--crm-text-muted)', fontSize: 12, textDecoration: 'none', display: 'flex', alignItems: 'center' }}>Full Settings</a>
+        </div>
+      </div>
     </div>
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      {/* Main content */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -274,12 +358,37 @@ export default function InstagramPage() {
           <div>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 750, color: 'var(--crm-text)' }}>Instagram</h1>
             {profile && <div style={{ fontSize: 12, color: '#E1306C' }}>@{profile.username} · {fmt(profile.followers_count)} followers</div>}
+            {!connected && !loading && <div style={{ fontSize: 12, color: '#f4c95d' }}>Not connected</div>}
           </div>
         </div>
-        <button onClick={load} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, background: 'rgba(225,48,108,0.1)', border: '1px solid rgba(225,48,108,0.25)', color: '#E1306C', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-          <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {!connected && (
+            <button onClick={() => setShowConnectModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#E1306C,#8b5cf6)', border: 'none', color: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              Connect
+            </button>
+          )}
+          {connected && (
+            <button onClick={() => setShowProfilePanel(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, background: showProfilePanel ? 'rgba(225,48,108,0.18)' : 'rgba(225,48,108,0.08)', border: '1px solid rgba(225,48,108,0.25)', color: '#E1306C', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+              <Users size={13} /> {showProfilePanel ? 'Hide Profile' : 'Show Profile'}
+            </button>
+          )}
+          <button onClick={() => void load()} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, background: 'rgba(225,48,108,0.1)', border: '1px solid rgba(225,48,108,0.25)', color: '#E1306C', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+            <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Not connected banner */}
+      {!connected && !loading && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 12, background: 'rgba(225,48,108,0.08)', border: '1px solid rgba(225,48,108,0.25)' }}>
+          <span style={{ fontSize: 20 }}>📸</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#E1306C' }}>Instagram not connected</div>
+            <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>Add your credentials to load feed, stories & profile data.</div>
+          </div>
+          <button onClick={() => setShowConnectModal(true)} style={{ padding: '7px 14px', borderRadius: 9, background: '#E1306C', color: 'white', border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Connect Now</button>
+        </div>
+      )}
 
       {/* Stories row */}
       {stories.length > 0 && (
@@ -356,8 +465,111 @@ export default function InstagramPage() {
 
       {tab === 'insights' && <InsightsTab profile={profile} />}
 
+      {tab === 'profile' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
+          {!connected ? (
+            <div className="crm-glass" style={{ padding: '28px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+              <div style={{ fontSize: 48 }}>📸</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--crm-text)' }}>Instagram Not Connected</div>
+              <div style={{ fontSize: 13, color: 'var(--crm-text-muted)', maxWidth: 320 }}>Connect your Instagram Business account to see your profile, feed, stories and receive DMs in the inbox.</div>
+              <button onClick={() => setShowConnectModal(true)} style={{ padding: '11px 28px', borderRadius: 12, background: 'linear-gradient(135deg,#E1306C,#8b5cf6)', border: 'none', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                Connect Instagram
+              </button>
+              <a href="/settings/integrations" style={{ fontSize: 12, color: '#4f6df5', textDecoration: 'none' }}>Or go to full Settings →</a>
+            </div>
+          ) : !profile ? (
+            <div style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>Loading profile...</div>
+          ) : (
+            <>
+              <div className="crm-glass" style={{ padding: '20px 24px', display: 'flex', gap: 20, alignItems: 'center' }}>
+                {profile.profile_picture_url
+                  ? <img src={profile.profile_picture_url} alt="" style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', border: '3px solid #E1306C' }} />
+                  : <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg,#E1306C,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32 }}>📸</div>
+                }
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 18, fontWeight: 750, color: 'var(--crm-text)' }}>{profile.name}</div>
+                  <div style={{ fontSize: 14, color: '#E1306C', marginTop: 2 }}>@{profile.username}</div>
+                  {profile.website && <a href={profile.website} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#4f6df5', marginTop: 4, display: 'block' }}>{profile.website}</a>}
+                  {profile.biography && <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 6, lineHeight: 1.5 }}>{profile.biography}</div>}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+                {[
+                  { label: 'Followers', value: fmt(profile.followers_count), color: '#E1306C' },
+                  { label: 'Following', value: fmt(profile.follows_count), color: '#8b5cf6' },
+                  { label: 'Posts', value: fmt(profile.media_count), color: '#4f6df5' },
+                ].map(s => (
+                  <div key={s.label} className="crm-glass" style={{ padding: '16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 24, fontWeight: 750, color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="crm-glass" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c99a' }} />
+                <span style={{ fontSize: 13, color: '#28c99a', fontWeight: 600 }}>Connected</span>
+                <span style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginLeft: 4 }}>· Instagram Business API</span>
+                <a href="/settings/integrations" style={{ marginLeft: 'auto', fontSize: 12, color: '#4f6df5', textDecoration: 'none' }}>Manage →</a>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Comment modal */}
       {commentPost && <CommentPanel post={commentPost} onClose={() => setCommentPost(null)} />}
+      {/* Connect modal */}
+      {showConnectModal && <ConnectModal />}
+      </div>{/* end main content */}
+
+      {/* Right-side Profile Panel */}
+      {showProfilePanel && (
+        <div className="crm-glass" style={{ width: 260, flexShrink: 0, padding: '16px', display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Connected Profile</span>
+            <button onClick={() => setShowProfilePanel(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 0 }}><X size={13} /></button>
+          </div>
+          {!profile ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '16px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: 32 }}>📸</div>
+              <div style={{ fontSize: 13, color: 'var(--crm-text-muted)' }}>Not connected</div>
+              <button onClick={() => setShowConnectModal(true)} style={{ padding: '8px 16px', borderRadius: 9, background: 'linear-gradient(135deg,#E1306C,#8b5cf6)', border: 'none', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Connect</button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '8px 0' }}>
+                {profile.profile_picture_url
+                  ? <img src={profile.profile_picture_url} alt="" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '3px solid #E1306C' }} />
+                  : <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg,#E1306C,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>📸</div>
+                }
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--crm-text)' }}>{profile.name}</div>
+                  <div style={{ fontSize: 12, color: '#E1306C' }}>@{profile.username}</div>
+                </div>
+              </div>
+              {profile.biography && <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', lineHeight: 1.5, textAlign: 'center' }}>{profile.biography}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                {[
+                  { label: 'Followers', value: fmt(profile.followers_count) },
+                  { label: 'Following', value: fmt(profile.follows_count) },
+                  { label: 'Posts', value: fmt(profile.media_count) },
+                ].map(s => (
+                  <div key={s.label} style={{ textAlign: 'center', padding: '8px 4px', borderRadius: 10, background: 'rgba(225,48,108,0.07)' }}>
+                    <div style={{ fontSize: 16, fontWeight: 750, color: '#E1306C' }}>{s.value}</div>
+                    <div style={{ fontSize: 10, color: 'var(--crm-text-muted)', marginTop: 2 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(40,201,154,0.08)', border: '1px solid rgba(40,201,154,0.20)' }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#28c99a', flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: '#28c99a', fontWeight: 600 }}>Connected · Instagram API</span>
+              </div>
+              {profile.website && <a href={profile.website} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#4f6df5', textAlign: 'center', textDecoration: 'none' }}>{profile.website}</a>}
+              <button onClick={() => setShowConnectModal(true)} style={{ fontSize: 11, color: 'var(--crm-text-muted)', textAlign: 'center', padding: '6px', borderRadius: 8, border: '1px solid rgba(130,145,190,0.2)', background: 'none', cursor: 'pointer' }}>⚙ Update Credentials</button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

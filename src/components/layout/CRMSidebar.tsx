@@ -43,6 +43,7 @@ const NAV = [
       { href: '/inbox/instagram', icon: AtSign, label: 'Instagram' },
       { href: '/inbox/facebook', icon: MessageSquare, label: 'Facebook' },
       { href: '/inbox/email', icon: Mail, label: 'Email' },
+      { href: '/inbox/telegram', icon: MessageSquare, label: 'Telegram' },
     ],
   },
   {

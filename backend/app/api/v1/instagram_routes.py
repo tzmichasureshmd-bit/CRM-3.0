@@ -17,23 +17,29 @@ def _get_ig_credentials() -> tuple[str, str]:
     """Load Instagram credentials from account_settings DB, fallback to env."""
     try:
         supabase = get_supabase()
-        res = supabase.table("account_settings") \
-            .select("key, value") \
-            .in_("key", ["INSTAGRAM_PAGE_ID", "FACEBOOK_PAGE_ACCESS_TOKEN"]) \
-            .execute()
-        data = {row["key"]: row["value"] for row in (res.data or [])}
-        ig_id = data.get("INSTAGRAM_PAGE_ID") or settings.instagram_page_id
-        token = data.get("FACEBOOK_PAGE_ACCESS_TOKEN") or settings.facebook_page_access_token
-        return ig_id, token
+        # Get first account_id
+        acc_res = supabase.table("account_settings").select("account_id").limit(1).execute()
+        account_id = acc_res.data[0]["account_id"] if acc_res.data else None
+        if account_id:
+            res = supabase.table("account_settings") \
+                .select("key, value") \
+                .eq("account_id", account_id) \
+                .in_("key", ["INSTAGRAM_PAGE_ID", "FACEBOOK_PAGE_ACCESS_TOKEN"]) \
+                .execute()
+            data = {row["key"]: row["value"] for row in (res.data or [])}
+            ig_id = data.get("INSTAGRAM_PAGE_ID") or settings.instagram_page_id
+            token = data.get("FACEBOOK_PAGE_ACCESS_TOKEN") or settings.facebook_page_access_token
+            return ig_id, token
     except Exception:
-        return settings.instagram_page_id, settings.facebook_page_access_token
+        pass
+    return settings.instagram_page_id, settings.facebook_page_access_token
 
 
 async def _get(path: str, params: dict = {}) -> dict:
     ig_id, token = _get_ig_credentials()
     if not ig_id or not token:
         raise HTTPException(status_code=400, detail="Instagram not configured. Go to Settings → Integrations.")
-    params["access_token"] = token
+    params = {**params, "access_token": token}  # don't mutate default arg
     async with httpx.AsyncClient(timeout=15) as client:
         res = await client.get(f"{GRAPH}{path}", params=params)
         if res.status_code != 200:
@@ -49,6 +55,13 @@ async def _post(path: str, data: dict = {}) -> dict:
         if res.status_code != 200:
             raise HTTPException(status_code=res.status_code, detail=res.text)
         return res.json()
+
+
+# ── Status check ─────────────────────────────────────────────
+@router.get("/instagram/status")
+async def get_ig_status():
+    ig_id, token = _get_ig_credentials()
+    return {"configured": bool(ig_id and token), "ig_id": ig_id if ig_id else None}
 
 
 # ── Profile ──────────────────────────────────────────────────

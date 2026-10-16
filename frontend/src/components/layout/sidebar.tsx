@@ -53,7 +53,7 @@ const NAV: NavSection[] = [
   {
     group: "CONVERSATIONS",
     items: [
-      { href: "/inbox",          label: "Conversations",  icon: MessageSquare },
+      { href: "/inbox/facebook",  label: "Conversations",  icon: MessageSquare },
       { href: "/content-studio", label: "Content Studio", icon: FileText },
       { href: "/campaigns",      label: "Campaigns",      icon: Megaphone },
     ],

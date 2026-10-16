@@ -59,6 +59,7 @@ const PLATFORM_META: Record<string, { label: string; color: string; bg: string; 
   instagram: { label: 'IG',  color: '#e1306c', bg: 'rgba(225,48,108,0.15)', icon: <MessageSquare size={10} /> },
   facebook:  { label: 'FB',  color: '#1877f2', bg: 'rgba(24,119,242,0.15)', icon: <MessageSquare size={10} /> },
   email:     { label: 'EM',  color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)', icon: <Mail size={10} /> },
+  telegram:  { label: 'TG',  color: '#229ed9', bg: 'rgba(34,158,217,0.15)', icon: <MessageSquare size={10} /> },
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -158,6 +159,7 @@ function ConvListPanel({
           <option value="instagram">Instagram</option>
           <option value="facebook">Facebook</option>
           <option value="email">Email</option>
+          <option value="telegram">Telegram</option>
         </select>
         {/* Status filter */}
         <select
@@ -458,7 +460,7 @@ export default function InboxPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ch = params.get('channel');
-    if (ch && ['whatsapp', 'instagram', 'facebook', 'email'].includes(ch)) {
+    if (ch && ['whatsapp', 'instagram', 'facebook', 'email', 'telegram'].includes(ch)) {
       setPlatform(ch);
     } else {
       setPlatform('all');

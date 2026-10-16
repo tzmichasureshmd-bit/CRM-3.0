@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     facebook_page_id: str = ""
     facebook_page_access_token: str = ""
 
+    # Telegram Bot API
+    telegram_bot_token: str = ""
+    telegram_webhook_secret: str = ""
+
     # Email (SMTP/IMAP)
     email_smtp_host: str = "smtp.gmail.com"
     email_smtp_port: int = 587
