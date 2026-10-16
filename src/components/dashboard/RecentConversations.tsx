@@ -45,7 +45,11 @@ export function RecentConversations() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/conversations?status=open&limit=5');
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+      const res = await fetch(`${BACKEND}/api/v1/conversations?status=open&limit=5`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const d = await res.json() as { data?: RawConv[] };
         setConvos((d.data ?? []).map(c => ({

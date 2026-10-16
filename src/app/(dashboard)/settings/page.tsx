@@ -1,6 +1,6 @@
 'use client';
 
-import { User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight } from 'lucide-react';
+import { User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight, Brain } from 'lucide-react';
 import Link from 'next/link';
 
 const SECTIONS = [
@@ -17,7 +17,7 @@ const SECTIONS = [
       { icon: <Smartphone size={16} />, label: 'WhatsApp Business', desc: 'Connect WhatsApp API', color: '#25D366', href: '/settings/integrations' },
       { icon: <AtSign size={16} />, label: 'Instagram', desc: 'Connect Instagram DMs', color: '#E1306C', href: '/settings/integrations' },
       { icon: <MessageSquare size={16} />, label: 'Facebook', desc: 'Connect Facebook Messenger', color: '#1877F2', href: '/settings/integrations' },
-      { icon: <Mail size={16} />, label: 'Email', desc: 'SMTP / Gmail / Outlook', color: '#8b5cf6', href: '/settings/integrations' },
+      { icon: <Mail size={16} />, label: 'Email', desc: 'SMTP / Gmail / Outlook', color: '#8b5cf6', href: '/settings/email' },
     ],
   },
   {
@@ -25,6 +25,7 @@ const SECTIONS = [
     items: [
       { icon: <Shield size={16} />, label: 'Security', desc: 'Password, 2FA, sessions', color: '#28c99a', href: '/settings/security' },
       { icon: <Key size={16} />, label: 'API Keys', desc: 'Manage API access keys', color: '#f4c95d', href: '/settings/security' },
+      { icon: <Brain size={16} />, label: 'AI API Keys', desc: 'OpenAI, Anthropic, Groq, Gemini', color: '#8b5cf6', href: '/settings/ai-keys' },
     ],
   },
   {

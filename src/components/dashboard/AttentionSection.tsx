@@ -27,7 +27,10 @@ export function AttentionSection() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/command-center');
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${BACKEND}/api/v1/command-center`, { headers });
       if (res.ok) setData(await res.json() as CommandState);
     } finally {
       setLoading(false);

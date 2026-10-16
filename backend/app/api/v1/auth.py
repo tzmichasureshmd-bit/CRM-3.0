@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from passlib.context import CryptContext
 import pyotp, qrcode
 from io import BytesIO
-import base64, httpx, logging, secrets
+import base64, logging, secrets
 from google.oauth2 import id_token as google_id_token
 from google.auth.transport import requests as google_requests
 
@@ -63,18 +63,10 @@ def create_token(user_id: str, account_id: str, role: str, partial: bool = False
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
-FIREBASE_CERT_URL = "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com"
-
 async def verify_firebase_token(id_token: str) -> dict:
     """Verify Firebase ID token using google-auth library."""
     import asyncio
     try:
-        # Fetch Firebase public certs
-        async with httpx.AsyncClient() as client:
-            certs_resp = await client.get(FIREBASE_CERT_URL)
-        certs = certs_resp.json()
-
-        # Verify token in thread (google-auth is sync)
         def _verify():
             request = google_requests.Request()
             return google_id_token.verify_firebase_token(
@@ -82,7 +74,6 @@ async def verify_firebase_token(id_token: str) -> dict:
                 request,
                 audience=settings.firebase_project_id,
             )
-
         payload = await asyncio.to_thread(_verify)
         logger.info(f"[firebase] verified sub={payload.get('sub')} email={payload.get('email')}")
         return payload
@@ -94,7 +85,7 @@ async def verify_firebase_token(id_token: str) -> dict:
 def get_profile(db, user_id: str) -> dict:
     res = db.table("profiles").select("user_id,account_id,role,full_name,email,avatar_url,totp_secret,totp_enabled") \
             .eq("user_id", user_id).maybe_single().execute()
-    return res.data or {}
+    return (res.data if res else None) or {}
 
 
 # ── Email / Password ──────────────────────────────────────────────────────────
@@ -103,7 +94,7 @@ def get_profile(db, user_id: str) -> dict:
 async def register(body: RegisterRequest, db=Depends(get_db)):
     # Check duplicate
     existing = db.table("profiles").select("user_id").eq("email", body.email.lower()).maybe_single().execute()
-    if existing.data:
+    if existing and existing.data:
         raise HTTPException(status_code=409, detail="Email already registered. Please sign in.")
 
     try:
@@ -139,7 +130,7 @@ async def register(body: RegisterRequest, db=Depends(get_db)):
 async def login(body: LoginRequest, db=Depends(get_db)):
     profile = db.table("profiles").select("user_id,account_id,role,full_name,email,avatar_url,password_hash,totp_secret,totp_enabled") \
                 .eq("email", body.email.lower()).maybe_single().execute()
-    p = profile.data
+    p = profile.data if profile else None
     if not p or not p.get("password_hash"):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not pwd_ctx.verify(body.password, p["password_hash"]):
@@ -167,7 +158,7 @@ async def google_auth(body: GoogleAuthRequest, db=Depends(get_db)):
     avatar_url = payload.get("picture", "")
 
     existing = db.table("profiles").select("user_id,account_id,role").eq("google_id", google_id).maybe_single().execute()
-    if existing.data:
+    if existing and existing.data:
         p = existing.data
         return TokenResponse(
             access_token=create_token(p["user_id"], p["account_id"], p["role"]),
@@ -181,17 +172,19 @@ async def google_auth(body: GoogleAuthRequest, db=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create workspace: {e}")
 
+    import uuid
+    user_id = str(uuid.uuid4())
     try:
         db.table("profiles").insert({
-            "user_id": google_id, "account_id": account_id, "full_name": full_name,
+            "user_id": user_id, "account_id": account_id, "full_name": full_name,
             "email": email, "avatar_url": avatar_url, "google_id": google_id, "role": "owner",
         }).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create profile: {e}")
 
     return TokenResponse(
-        access_token=create_token(google_id, account_id, "owner"),
-        user_id=google_id, account_id=account_id, role="owner",
+        access_token=create_token(user_id, account_id, "owner"),
+        user_id=user_id, account_id=account_id, role="owner",
         full_name=full_name, email=email, avatar_url=avatar_url,
     )
 
@@ -335,7 +328,7 @@ async def otp_send(body: OtpSendRequest, db=Depends(get_db)):
 async def otp_verify(body: OtpVerifyRequest, db=Depends(get_db)):
     """Verify OTP, auto-create account if new user, return CRM JWT."""
     row = db.table("email_otps").select("*").eq("email", body.email.lower()).maybe_single().execute()
-    r = row.data
+    r = row.data if row else None
     if not r:
         raise HTTPException(status_code=400, detail="No OTP found for this email. Request a new code.")
     if r.get("used"):
@@ -352,7 +345,7 @@ async def otp_verify(body: OtpVerifyRequest, db=Depends(get_db)):
     existing = db.table("profiles").select("user_id,account_id,role,full_name,email,avatar_url") \
                  .eq("email", body.email.lower()).maybe_single().execute()
 
-    if existing.data:
+    if existing and existing.data:
         p = existing.data
         return TokenResponse(
             access_token=create_token(p["user_id"], p["account_id"], p["role"]),

@@ -33,9 +33,12 @@ export function PipelineOverview() {
     setLoading(true);
     setError(false);
     try {
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
       const [dealsRes, stagesRes] = await Promise.all([
-        fetch('/api/v1/deals?status=open&limit=100').then(r => r.json()) as Promise<{ data?: { id: string; title: string; value: number; currency: string; stage_id: string }[] }>,
-        fetch('/api/v1/pipeline-stages').then(r => r.json()) as Promise<{ data?: { id: string; name: string }[] }>,
+        fetch(`${BACKEND}/api/v1/deals?status=open&limit=100`, { headers }).then(r => r.json()) as Promise<{ data?: { id: string; title: string; value: number; currency: string; stage_id: string }[] }>,
+        fetch(`${BACKEND}/api/v1/pipeline-stages`, { headers }).then(r => r.json()) as Promise<{ data?: { id: string; name: string }[] }>,
       ]);
       const data = dealsRes.data ?? [];
       const stageMap = Object.fromEntries((stagesRes.data ?? []).map(s => [s.id, s.name]));

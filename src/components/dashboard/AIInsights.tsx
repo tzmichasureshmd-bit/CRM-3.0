@@ -30,7 +30,11 @@ export function AIInsights() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/command-center');
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+      const res = await fetch(`${BACKEND}/api/v1/command-center`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const d = await res.json() as { ai_recommendations?: Insight[] };
         setInsights(d.ai_recommendations ?? []);

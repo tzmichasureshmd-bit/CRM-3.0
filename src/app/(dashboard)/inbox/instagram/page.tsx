@@ -28,7 +28,9 @@ interface IGComment {
 
 type Tab = 'feed' | 'stories' | 'comments' | 'mentions' | 'insights';
 
-const API = '/api/v3/instagram';
+const BACKEND = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000') : 'http://localhost:8000';
+const API = `${BACKEND}/api/v1/instagram`;
+const getH = () => ({ Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : ''}` });
 
 // ── Helpers ──────────────────────────────────────────────────
 function timeAgo(iso: string) {
@@ -226,9 +228,9 @@ export default function InstagramPage() {
     setLoading(true);
     try {
       const [profileRes, mediaRes, storiesRes] = await Promise.all([
-        fetch(`${API}/profile`),
-        fetch(`${API}/media?limit=20`),
-        fetch(`${API}/stories`),
+        fetch(`${API}/profile`, { headers: getH() }),
+        fetch(`${API}/media?limit=20`, { headers: getH() }),
+        fetch(`${API}/stories`, { headers: getH() }),
       ]);
       if (!profileRes.ok) { setConnected(false); return; }
       setProfile(await profileRes.json());

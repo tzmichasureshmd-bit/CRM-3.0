@@ -58,11 +58,14 @@ export default function ReportsPage() {
     setLoading(true);
     setError(null);
     try {
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const H = { Authorization: `Bearer ${token}` };
       const [ovRes, fcRes, wlRes, coRes] = await Promise.all([
-        fetch('/api/v3/revenue-intelligence?view=overview'),
-        fetch('/api/v3/revenue-intelligence?view=forecast'),
-        fetch('/api/v3/revenue-intelligence?view=win_loss'),
-        fetch('/api/v3/revenue-intelligence?view=cohort'),
+        fetch(`${BACKEND}/api/v1/revenue-intelligence?view=overview`, { headers: H }),
+        fetch(`${BACKEND}/api/v1/revenue-intelligence?view=forecast`, { headers: H }),
+        fetch(`${BACKEND}/api/v1/revenue-intelligence?view=win_loss`, { headers: H }),
+        fetch(`${BACKEND}/api/v1/revenue-intelligence?view=cohort`, { headers: H }),
       ]);
 
       if (ovRes.ok) {

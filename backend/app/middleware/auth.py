@@ -1,7 +1,7 @@
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
-from app.db.supabase import get_db
+from app.db.supabase import get_supabase
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -10,8 +10,8 @@ bearer = HTTPBearer()
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Security(bearer),
-    db=Depends(get_db),
 ) -> dict:
+    db = get_supabase()
     token = credentials.credentials
     try:
         # Supabase JWTs are signed with the JWT secret (found in Supabase dashboard → Settings → API)
@@ -30,10 +30,10 @@ def get_current_user(
             db.table("profiles")
             .select("account_id, role")
             .eq("user_id", user_id)
-            .single()
+            .maybe_single()
             .execute()
         )
-        if not profile_res.data:
+        if not profile_res or not profile_res.data:
             raise HTTPException(status_code=403, detail="Profile not found")
 
         return {

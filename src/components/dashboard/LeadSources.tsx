@@ -14,7 +14,11 @@ export function LeadSources() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/v3/revenue-intelligence?view=overview');
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+      const res = await fetch(`${BACKEND}/api/v1/revenue-intelligence?view=overview`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (res.ok) {
         const d = await res.json() as { source_breakdown?: SourceRow[]; overview?: { total_contacts: number } };
         setData(d.source_breakdown ?? []);

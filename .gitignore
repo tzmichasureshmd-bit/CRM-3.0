@@ -16,9 +16,13 @@ crm2/
 
 # env files
 .env
+.env.local
 .env.development.local
 .env.test.local
 .env.production.local
+frontend/.env.local
+backend/.env
+ai-service/.env
 
 # debug
 npm-debug.log*

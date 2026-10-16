@@ -89,7 +89,11 @@ export default function CopilotPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/v3/copilot', {
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const res = await fetch(`${BACKEND}/api/v1/copilot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: query.trim() }),

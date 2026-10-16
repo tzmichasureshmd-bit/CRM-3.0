@@ -6,9 +6,80 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.middleware.auth import get_current_user
 from app.db.supabase import get_supabase
-from app.services.email_service import get_email_service
+from app.services.email_service import get_email_service, EmailService
 
 router = APIRouter()
+
+
+class SmtpSettings(BaseModel):
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    from_name: str = "CRM"
+    from_address: str = ""
+    imap_host: str = ""
+    imap_port: int = 993
+
+
+@router.get("/email/smtp-settings")
+async def get_smtp_settings(current_user: dict = Depends(get_current_user)):
+    db = get_supabase()
+    account_id = current_user["account_id"]
+    res = db.table("account_settings").select("*").eq("account_id", account_id).eq("key", "smtp").maybe_single().execute()
+    if res and res.data:
+        return res.data["value"]
+    # Return current env-based config (masked password)
+    svc = get_email_service()
+    return {
+        "smtp_host":     svc.smtp_host or "",
+        "smtp_port":     svc.smtp_port or 587,
+        "smtp_user":     svc.smtp_user or "",
+        "smtp_password": "" if not svc.smtp_password else "••••••••",
+        "from_name":     svc.from_name or "CRM",
+        "from_address":  svc.from_address or "",
+        "imap_host":     svc.imap_host or "",
+        "imap_port":     svc.imap_port or 993,
+    }
+
+
+@router.post("/email/smtp-settings")
+async def save_smtp_settings(payload: SmtpSettings, current_user: dict = Depends(get_current_user)):
+    db = get_supabase()
+    account_id = current_user["account_id"]
+    value = payload.model_dump()
+    # Upsert into account_settings
+    db.table("account_settings").upsert({
+        "account_id": account_id,
+        "key": "smtp",
+        "value": value,
+    }, on_conflict="account_id,key").execute()
+    # Hot-reload the email service with new settings
+    svc = get_email_service()
+    svc.smtp_host     = payload.smtp_host
+    svc.smtp_port     = payload.smtp_port
+    svc.smtp_user     = payload.smtp_user
+    svc.smtp_password = payload.smtp_password
+    svc.from_name     = payload.from_name
+    svc.from_address  = payload.from_address or payload.smtp_user
+    svc.imap_host     = payload.imap_host or payload.smtp_host.replace("smtp.", "imap.")
+    svc.imap_port     = payload.imap_port
+    return {"status": "saved"}
+
+
+@router.post("/email/test-smtp")
+async def test_smtp(current_user: dict = Depends(get_current_user)):
+    svc = get_email_service()
+    if not svc.smtp_user:
+        raise HTTPException(status_code=400, detail="SMTP not configured")
+    result = await svc.send_email(
+        to=svc.smtp_user,
+        subject="TZMICHA CRM — SMTP Test",
+        body="Your SMTP is working correctly!",
+    )
+    if result["status"] == "failed":
+        raise HTTPException(status_code=500, detail=result.get("error", "Test failed"))
+    return {"status": "ok", "message": f"Test email sent to {svc.smtp_user}"}
 
 
 class AttachmentIn(BaseModel):

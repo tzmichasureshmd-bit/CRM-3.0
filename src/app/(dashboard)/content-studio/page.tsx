@@ -55,7 +55,10 @@ function AIGeneratorPanel({ onGenerated }: { onGenerated: (content: GeneratedCon
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch('/api/v3/ai/generate-content', {
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const H = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+      const res = await fetch(`${BACKEND}/api/v1/content/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, options: { platform, tone } }),
@@ -284,7 +287,9 @@ export default function ContentStudioPage() {
   const loadDrafts = useCallback(async () => {
     setLoadingDrafts(true);
     try {
-      const res = await fetch('/api/v3/content?status=ai_generated');
+      const BACKEND2 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token2 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const res = await fetch(`${BACKEND2}/api/v1/content?status=ai_generated`, { headers: { Authorization: `Bearer ${token2}` } });
       if (res.ok) {
         const d = await res.json() as { data: Partial<ContentItem>[] };
         setDraftContent(d.data ?? []);
@@ -297,7 +302,9 @@ export default function ContentStudioPage() {
   const loadPublished = useCallback(async () => {
     setLoadingPublished(true);
     try {
-      const res = await fetch('/api/v3/content?status=published');
+      const BACKEND3 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token3 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const res = await fetch(`${BACKEND3}/api/v1/content?status=published`, { headers: { Authorization: `Bearer ${token3}` } });
       if (res.ok) {
         const d = await res.json() as { data: Partial<ContentItem>[] };
         setPublishedContent(d.data ?? []);
@@ -308,7 +315,10 @@ export default function ContentStudioPage() {
   }, []);
 
   const handlePublish = useCallback(async (id: string) => {
-    const res = await fetch(`/api/v3/content/${id}`, {
+    const BACKEND4 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+    const token4 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+    const res = await fetch(`${BACKEND4}/api/v1/content/${id}`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token4}` },
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'published' }),
@@ -323,7 +333,10 @@ export default function ContentStudioPage() {
   const handleGenerated = useCallback(async (content: GeneratedContent) => {
     // Persist to DB
     try {
-      const res = await fetch('/api/v3/content', {
+      const BACKEND5 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const token5 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const res = await fetch(`${BACKEND5}/api/v1/content`, {
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token5}` },
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

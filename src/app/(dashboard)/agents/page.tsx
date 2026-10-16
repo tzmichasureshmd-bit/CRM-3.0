@@ -2,6 +2,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bot, Plus, Play, Pause, Trash2, CheckCircle, XCircle, Clock, AlertCircle, Sparkles, Shield, Zap, Brain, RefreshCw, X, Check } from 'lucide-react';
 
+const BACKEND = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000') : 'http://localhost:8000';
+const getH = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : ''}` });
+
 // ── Types ─────────────────────────────────────────────────────
 interface Agent {
   id: string;
@@ -472,7 +475,7 @@ export default function AgentsPage() {
   const loadAgents = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v3/agents');
+      const res = await fetch(`${BACKEND}/api/v1/agents`);
       if (res.ok) {
         const d = await res.json() as { agents: Agent[] };
         setAgents(d.agents ?? []);
@@ -483,7 +486,7 @@ export default function AgentsPage() {
   }, []);
 
   const loadTools = useCallback(async () => {
-    const res = await fetch('/api/v3/agents/tools');
+    const res = await fetch(`${BACKEND}/api/v1/agents/tools`, { headers: getH() });
     if (res.ok) {
       const d = await res.json() as { tools: ToolDef[] };
       setTools(d.tools ?? []);
@@ -496,10 +499,10 @@ export default function AgentsPage() {
   }, [loadAgents, loadTools]);
 
   const loadExecutions = useCallback(async (agentId: string) => {
-    const res = await fetch(`/api/v3/agents/${agentId}/executions`);
+    const res = await fetch(`${BACKEND}/api/v1/agents/${agentId}/runs`, { headers: getH() });
     if (res.ok) {
-      const d = await res.json() as { executions: Execution[] };
-      setExecutions(d.executions ?? []);
+      const d = await res.json() as { data: Execution[] };
+      setExecutions(d.data ?? []);
     }
   }, []);
 
@@ -512,9 +515,9 @@ export default function AgentsPage() {
   }, [loadExecutions]);
 
   const handleCreate = useCallback(async (data: Record<string, unknown>) => {
-    const res = await fetch('/api/v3/agents', {
+    const res = await fetch(`${BACKEND}/api/v1/agents`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getH(),
       body: JSON.stringify(data),
     });
     if (!res.ok) {
@@ -525,9 +528,9 @@ export default function AgentsPage() {
   }, [loadAgents]);
 
   const handleToggle = useCallback(async (agent: Agent) => {
-    const res = await fetch(`/api/v3/agents/${agent.id}`, {
+    const res = await fetch(`${BACKEND}/api/v1/agents/${agent.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getH(),
       body: JSON.stringify({ enabled: !agent.enabled }),
     });
     if (res.ok) {
@@ -538,7 +541,7 @@ export default function AgentsPage() {
 
   const handleDelete = useCallback(async (agent: Agent) => {
     if (!confirm(`Delete agent "${agent.name}"? This cannot be undone.`)) return;
-    const res = await fetch(`/api/v3/agents/${agent.id}`, { method: 'DELETE' });
+    const res = await fetch(`${BACKEND}/api/v1/agents/${agent.id}`, { method: 'DELETE', headers: getH() });
     if (res.ok) {
       setAgents(prev => prev.filter(a => a.id !== agent.id));
       if (activeAgent?.id === agent.id) setActiveAgent(null);
@@ -551,9 +554,9 @@ export default function AgentsPage() {
     setRunResult(null);
     setError(null);
     try {
-      const res = await fetch(`/api/v3/agents/${activeAgent.id}/execute`, {
+      const res = await fetch(`${BACKEND}/api/v1/agents/${activeAgent.id}/run`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getH(),
         body: JSON.stringify({ input, contact_id: contactId }),
       });
       const d = await res.json() as { summary?: string; error?: string; status?: string; steps?: Step[]; pendingApprovals?: Approval[] };
@@ -568,11 +571,11 @@ export default function AgentsPage() {
       }
       await loadExecutions(activeAgent.id);
       // Refresh agent stats
-      const agentRes = await fetch(`/api/v3/agents/${activeAgent.id}`);
+      const agentRes = await fetch(`${BACKEND}/api/v1/agents/${activeAgent.id}`, { headers: getH() });
       if (agentRes.ok) {
-        const agentData = await agentRes.json() as { agent: Agent };
-        setAgents(prev => prev.map(a => a.id === activeAgent.id ? agentData.agent : a));
-        setActiveAgent(agentData.agent);
+        const agentData = await agentRes.json() as { data: Agent };
+        setAgents(prev => prev.map(a => a.id === activeAgent.id ? agentData.data : a));
+        setActiveAgent(agentData.data);
       }
     } catch {
       setRunResult('Agent execution failed. Check console for details.');
@@ -583,9 +586,9 @@ export default function AgentsPage() {
 
   const handleApprove = useCallback(async (approvalId: string, decision: 'approved' | 'rejected') => {
     if (!activeAgent) return;
-    const res = await fetch(`/api/v3/agents/${activeAgent.id}/approve`, {
+    const res = await fetch(`${BACKEND}/api/v1/agents/${activeAgent.id}/approve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getH(),
       body: JSON.stringify({ approval_id: approvalId, decision }),
     });
     if (res.ok) {

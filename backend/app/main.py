@@ -12,6 +12,7 @@ from app.api.v1 import (
     content, agents, reports, health, webhooks,
     follow_ups, broadcasts, appointments, segments, journeys,
     revenue_intelligence, attribution, copilot, ai_routes, email_routes, meta, instagram_routes,
+    ai_settings,
 )
 
 settings = get_settings()
@@ -68,6 +69,7 @@ app.include_router(ai_routes.router,             prefix=PREFIX, tags=["AI"])
 app.include_router(email_routes.router,          prefix=PREFIX, tags=["Email"])
 app.include_router(meta.router,                  prefix=PREFIX, tags=["Meta"])
 app.include_router(instagram_routes.router,      prefix=PREFIX, tags=["Instagram"])
+app.include_router(ai_settings.router,           prefix=PREFIX, tags=["AI Settings"])
 
 
 @app.get("/")
