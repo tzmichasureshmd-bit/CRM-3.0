@@ -94,8 +94,6 @@ export default function CopilotPage() {
       const res = await fetch(`${BACKEND}/api/v1/copilot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: query.trim() }),
       });
 

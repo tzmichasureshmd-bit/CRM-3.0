@@ -318,9 +318,8 @@ export default function ContentStudioPage() {
     const BACKEND4 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
     const token4 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
     const res = await fetch(`${BACKEND4}/api/v1/content/${id}`, {
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token4}` },
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token4}` },
       body: JSON.stringify({ status: 'published' }),
     });
     if (res.ok) {
@@ -336,9 +335,8 @@ export default function ContentStudioPage() {
       const BACKEND5 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
       const token5 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
       const res = await fetch(`${BACKEND5}/api/v1/content`, {
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token5}` },
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token5}` },
         body: JSON.stringify({
           title: content.headline || 'AI Generated Content',
           caption: content.caption,
