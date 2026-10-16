@@ -69,16 +69,32 @@ function ChannelCard({ ch }: { ch: ChannelConfig }) {
   const [copied, setCopied]     = useState(false);
   const [expanded, setExpanded] = useState(false);
 
+  const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+  const webhookUrl = `https://crm3.tzmicha.com${ch.webhookPath}`;
   const isConnected = ch.fields.every(f => values[f.key]?.trim());
-  const webhookUrl  = `${typeof window !== 'undefined' ? window.location.origin.replace('3000', '8000') : 'https://your-backend.com'}${ch.webhookPath}`;
+
+  // Load saved values on mount
+  useState(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : '';
+    fetch(`${BACKEND}/api/v1/settings/integrations/${ch.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.ok ? r.json() : null).then(d => { if (d) setValues(d); }).catch(() => {});
+  });
 
   const handleSave = async () => {
     setSaving(true);
-    // In production: POST to /api/v3/settings/integrations with values
-    await new Promise(r => setTimeout(r, 600));
-    setSaved(true);
-    setSaving(false);
-    setTimeout(() => setSaved(false), 3000);
+    const token = localStorage.getItem('crm_token') ?? '';
+    try {
+      await fetch(`${BACKEND}/api/v1/settings/integrations/${ch.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(values),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const copyWebhook = () => {

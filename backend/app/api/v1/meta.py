@@ -13,19 +13,37 @@ def _verify_signature(body: bytes, signature: str, secret: str) -> bool:
 
 
 # ── Shared message processor ─────────────────────────────────
+# Default account_id — first account in DB (single-tenant CRM)
+_DEFAULT_ACCOUNT_ID = None
+
+def _get_default_account_id(supabase) -> str:
+    global _DEFAULT_ACCOUNT_ID
+    if not _DEFAULT_ACCOUNT_ID:
+        res = supabase.table("accounts").select("id").limit(1).execute()
+        if res.data:
+            _DEFAULT_ACCOUNT_ID = res.data[0]["id"]
+    return _DEFAULT_ACCOUNT_ID
+
+
 def _save_message(platform: str, sender_id: str, sender_name: str, text: str, raw: dict):
     supabase = get_supabase_client()
+    account_id = _get_default_account_id(supabase)
 
-    # Find or create contact
-    res = supabase.table("contacts").select("id, account_id").eq("platform_id", sender_id).limit(1).execute()
+    # Find or create contact — use correct column per platform
+    if platform == "instagram":
+        res = supabase.table("contacts").select("id, account_id").eq("instagram_user_id", sender_id).eq("account_id", account_id).limit(1).execute()
+        new_contact = {"name": sender_name or f"Instagram {sender_id[:8]}", "instagram_user_id": sender_id, "source": "instagram", "account_id": account_id}
+    elif platform == "whatsapp":
+        res = supabase.table("contacts").select("id, account_id").eq("phone", sender_id).eq("account_id", account_id).limit(1).execute()
+        new_contact = {"name": sender_name or f"WA {sender_id}", "phone": sender_id, "source": "whatsapp", "account_id": account_id}
+    else:  # facebook
+        res = supabase.table("contacts").select("id, account_id").eq("instagram_user_id", sender_id).eq("account_id", account_id).limit(1).execute()
+        new_contact = {"name": sender_name or f"FB {sender_id[:8]}", "instagram_user_id": sender_id, "source": "facebook", "account_id": account_id}
+
     if res.data:
         contact = res.data[0]
     else:
-        res = supabase.table("contacts").insert({
-            "name": sender_name or sender_id,
-            "platform_id": sender_id,
-            "source": platform,
-        }).execute()
+        res = supabase.table("contacts").insert(new_contact).execute()
         contact = res.data[0]
 
     # Find open conversation or create
@@ -35,24 +53,28 @@ def _save_message(platform: str, sender_id: str, sender_name: str, text: str, ra
     else:
         conv_res = supabase.table("conversations").insert({
             "contact_id": contact["id"],
-            "account_id": contact.get("account_id"),
+            "account_id": account_id,
             "platform": platform,
             "status": "open",
             "priority": "normal",
             "last_message_text": text[:200] if text else "",
+            "last_message_at": "now()",
+            "unread_count": 1,
         }).execute()
         conv_id = conv_res.data[0]["id"]
 
-    # Save message
+    # Save message — use correct column names from schema
     supabase.table("messages").insert({
         "conversation_id": conv_id,
-        "content_text": text or "[media]",
-        "sender_type": "customer",
+        "account_id": account_id,
+        "content": text or "[media]",
+        "content_type": "text",
+        "sender_type": "contact",
         "status": "received",
-        "raw_payload": json.dumps(raw),
+        "metadata": {"raw": raw},
     }).execute()
 
-    # Update conversation last message
+    # Update conversation
     supabase.table("conversations").update({
         "last_message_text": text[:200] if text else "[media]",
     }).eq("id", conv_id).execute()
@@ -137,23 +159,29 @@ async def instagram_webhook(request: Request):
             val   = change.get("value", {})
 
             if field == "comments":
-                supabase.table("instagram_comments").upsert({
-                    "comment_id":  val.get("id"),
-                    "media_id":    val.get("media", {}).get("id"),
-                    "from_id":     val.get("from", {}).get("id"),
-                    "from_name":   val.get("from", {}).get("name", ""),
-                    "text":        val.get("text", ""),
-                    "timestamp":   val.get("timestamp"),
-                    "raw":         json.dumps(val),
-                }, on_conflict="comment_id").execute()
+                try:
+                    supabase.table("instagram_comments").upsert({
+                        "comment_id":  val.get("id"),
+                        "media_id":    val.get("media", {}).get("id"),
+                        "from_id":     val.get("from", {}).get("id"),
+                        "from_name":   val.get("from", {}).get("name", ""),
+                        "text":        val.get("text", ""),
+                        "timestamp":   val.get("timestamp"),
+                        "raw":         json.dumps(val),
+                    }, on_conflict="comment_id").execute()
+                except Exception:
+                    pass  # table may not exist yet
 
             elif field == "mentions":
-                supabase.table("instagram_mentions").upsert({
-                    "mention_id":  val.get("comment_id") or val.get("media_id"),
-                    "media_id":    val.get("media_id"),
-                    "comment_id":  val.get("comment_id"),
-                    "raw":         json.dumps(val),
-                }, on_conflict="mention_id").execute()
+                try:
+                    supabase.table("instagram_mentions").upsert({
+                        "mention_id":  val.get("comment_id") or val.get("media_id"),
+                        "media_id":    val.get("media_id"),
+                        "comment_id":  val.get("comment_id"),
+                        "raw":         json.dumps(val),
+                    }, on_conflict="mention_id").execute()
+                except Exception:
+                    pass  # table may not exist yet
 
     return {"status": "ok"}
 
