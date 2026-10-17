@@ -5,7 +5,7 @@ import { Send, RefreshCw, Plus, X, ChevronLeft, AlertCircle, Search, Loader2, St
 // ── Google Colors ─────────────────────────────────────────────
 const G = { blue: '#4285F4', red: '#EA4335', yellow: '#FBBC05', green: '#34A853', gray: '#5F6368', lightGray: '#F1F3F4', border: '#E8EAED', white: '#FFFFFF', dark: '#202124', mid: '#3C4043' };
 
-const BASE = (typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000') : 'http://localhost:8000') + '/api/v1';
+const BASE = 'http://localhost:8000/api/v1';
 const getH = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : ''}` });
 
 interface EmailConv { id: string; last_message_text: string | null; last_message_at: string | null; status: string | null; unread_count: number; contact: { name: string | null; email: string | null } | null; }
@@ -26,7 +26,7 @@ function aColor(n: string) {
 }
 
 // ── Google-style icon button ──────────────────────────────────
-function IconBtn({ icon, title, color, onClick }: { icon: React.ReactNode; title: string; color?: string; onClick?: () => void }) {
+function IconBtn({ icon, title, color, onClick }: { icon: React.ReactNode; title: string; color?: string; onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void }) {
   const [hov, setHov] = useState(false);
   return (
     <button title={title} onClick={onClick}
@@ -249,8 +249,8 @@ function ReadingPane({ conv, onBack, onReply, onDelete, onArchive }: {
                   {atts.length > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: G.gray }}><Paperclip size={12} />{atts.length}</div>}
                   <span style={{ fontSize: 12, color: G.gray }}>{fmt(msg.created_at)}</span>
                   {isOpen && <>
-                    <IconBtn icon={<Reply size={15} />} title="Reply" onClick={() => { onReply(); }} />
-                    <IconBtn icon={<Forward size={15} />} title="Forward" onClick={() => { setForwardingId(isForwarding ? null : msg.id); setForwardTo(''); }} />
+                    <IconBtn icon={<Reply size={15} />} title="Reply" onClick={e => { (e as unknown as React.MouseEvent).stopPropagation(); onReply(); }} />
+                    <IconBtn icon={<Forward size={15} />} title="Forward" onClick={e => { (e as unknown as React.MouseEvent).stopPropagation(); setForwardingId(isForwarding ? null : msg.id); setForwardTo(''); }} />
                   </>}
                 </div>
               </div>
@@ -432,8 +432,8 @@ export default function EmailInboxPage() {
         <div style={{ padding: '0 8px 8px' }}>
           <button onClick={() => { setReplyData(null); setShowCompose(true); }}
             style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', borderRadius: 16, border: 'none', background: G.white, boxShadow: '0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.14)', cursor: 'pointer', fontSize: 14, fontWeight: 500, color: G.dark, width: '100%', transition: 'box-shadow 150ms' }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.14)'}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.14)'}>
+            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2), 0 2px 4px rgba(0,0,0,0.14)'}
+            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.14)'}>
             <Plus size={20} color={G.blue} strokeWidth={2} /> Compose
           </button>
         </div>
@@ -445,8 +445,8 @@ export default function EmailInboxPage() {
             return (
               <button key={f.label} onClick={() => switchFolder(f.label)}
                 style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '0 16px', height: 40, borderRadius: '0 20px 20px 0', border: 'none', background: isActive ? '#D3E3FD' : 'none', cursor: 'pointer', fontSize: 14, fontWeight: isActive ? 700 : 400, color: isActive ? '#0B57D0' : G.dark, width: '100%', textAlign: 'left', transition: 'background 120ms', marginBottom: 2 }}
-                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => { if (!isActive) e.currentTarget.style.background = G.lightGray; }}
-                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => { if (!isActive) e.currentTarget.style.background = 'none'; }}>
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = G.lightGray; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'none'; }}>
                 <span style={{ color: isActive ? '#0B57D0' : G.gray }}>{f.icon}</span>
                 <span style={{ flex: 1 }}>{f.label}</span>
                 {f.count > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#0B57D0' : G.gray }}>{f.count}</span>}
@@ -564,8 +564,8 @@ export default function EmailInboxPage() {
               return (
                 <div key={conv.id} onClick={() => setActive(conv)}
                   style={{ padding: '0 16px', borderBottom: `1px solid ${G.border}`, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', background: isUnread ? G.white : '#F2F6FC', height: 52, transition: 'background 100ms' }}
-                  onMouseEnter={(e: React.MouseEvent<HTMLDivElement>) => e.currentTarget.style.background = '#EAF1FB'}
-                  onMouseLeave={(e: React.MouseEvent<HTMLDivElement>) => e.currentTarget.style.background = isUnread ? G.white : '#F2F6FC'}>
+                  onMouseEnter={e => e.currentTarget.style.background = '#EAF1FB'}
+                  onMouseLeave={e => e.currentTarget.style.background = isUnread ? G.white : '#F2F6FC'}>
                   {/* Avatar */}
                   <div style={{ width: 36, height: 36, borderRadius: '50%', background: col, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 14, fontWeight: 500, flexShrink: 0 }}>
                     {name[0]?.toUpperCase()}

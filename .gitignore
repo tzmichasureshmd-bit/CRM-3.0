@@ -11,9 +11,8 @@ dist/
 
 # other project folders
 Tzmicha_CRM-main/
+ai-service/
 docker/
-crm2/
-SHARVAANNII/
 
 # env files
 .env
@@ -21,9 +20,6 @@ SHARVAANNII/
 .env.development.local
 .env.test.local
 .env.production.local
-frontend/.env.local
-backend/.env
-ai-service/.env
 
 # debug
 npm-debug.log*
@@ -49,9 +45,17 @@ dev.log
 # assets (large images)
 assets/
 
-# docs & markdown (local only)
+# docs (local only)
 *.md
-*.docs
-docs/
-__pycache__/
+
+# python
+backend/venv/
+backend/__pycache__/
+**/__pycache__/
+*.pyc
+
+# python
+backend/venv/
+backend/__pycache__/
+**/__pycache__/
 *.pyc

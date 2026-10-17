@@ -32,11 +32,15 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       input?: string;
       contact_id?: string;
       conversation_id?: string;
+      idempotency_key?: string;
     };
 
     if (!body.input?.trim()) {
       return NextResponse.json({ error: 'input is required' }, { status: 400 });
     }
+
+    // Optional idempotency header override (useful for retried webhook calls).
+    const idempotencyKey = req.headers.get('Idempotency-Key') ?? body.idempotency_key;
 
     const result = await runAgent(
       {
@@ -46,6 +50,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
         input: body.input.trim(),
         contactId: body.contact_id,
         conversationId: body.conversation_id,
+        idempotencyKey: idempotencyKey ?? undefined,
       },
       supabase
     );

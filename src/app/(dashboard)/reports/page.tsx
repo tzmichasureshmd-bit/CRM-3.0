@@ -1,389 +1,400 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, DollarSign, Target, Users, RefreshCw, AlertTriangle } from 'lucide-react';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowLeftRight, Bot, DollarSign, LayoutDashboard, Lightbulb, Megaphone, MessageSquare, RefreshCw,
+  Send, TrendingUp, TriangleAlert, Users, Workflow, type LucideIcon,
+} from 'lucide-react';
+import type { ColumnType, RangePreset, ReportChart, ReportId, ReportResponse } from '@/lib/reports-types';
+import { createClient } from '@/lib/supabase/client';
+import { fetchApi, SessionExpiredError, ForbiddenError, clearSession } from '@/lib/auth-client';
+import { exportCSV, exportExcel, exportPDF } from '@/lib/report-export';
+import { kindForKey } from '@/components/reports/theme';
+import { ReportKpiCard } from '@/components/reports/ReportKpiCard';
+import { ReportChartCard } from '@/components/reports/ReportChartCard';
+import { ReportDataTable } from '@/components/reports/ReportDataTable';
+import { ReportRangePicker } from '@/components/reports/ReportRangePicker';
+import { ReportExportMenu, type ExportFormat } from '@/components/reports/ReportExportMenu';
+import { ReportDrilldown } from '@/components/reports/ReportDrilldown';
 
-// ── Types ─────────────────────────────────────────────────────
-interface RIOverview {
-  total_revenue: number; pipeline_value: number; weighted_pipeline: number;
-  win_rate: number; avg_deal_value: number; total_deals: number;
-  open_deals: number; won_deals: number; lost_deals: number;
-  total_contacts: number; currency: string; lost_value: number;
-}
-interface MonthlyRow { label: string; revenue: number; }
-interface ForecastRow { label: string; projected: number; confidence: string; }
-interface WinLossRow { label: string; win_rate: number; won: number; lost: number; }
-interface CohortRow { label: string; total: number; hot: number; warm: number; qualified: number; }
-interface SourceRow { source: string; count: number; }
-interface TierBreakdown { hot: number; warm: number; cold: number; }
-interface PipelineStage { stage: string; count: number; value: number; color: string; }
+const TABS: { id: ReportId; label: string; icon: LucideIcon }[] = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'contacts', label: 'Contacts & Leads', icon: Users },
+  { id: 'sales', label: 'Sales & Revenue', icon: DollarSign },
+  { id: 'campaigns', label: 'Campaigns', icon: Megaphone },
+  { id: 'broadcasts', label: 'Broadcasts', icon: Send },
+  { id: 'conversations', label: 'Conversations', icon: MessageSquare },
+  { id: 'automations', label: 'Automations', icon: Workflow },
+  { id: 'conversion', label: 'Conversion', icon: TrendingUp },
+  { id: 'agents', label: 'Agent Performance', icon: Bot },
+];
 
-// ── Helpers ───────────────────────────────────────────────────
-function fmt(v: number, currency = 'USD') {
-  const sym = currency === 'INR' ? '₹' : '$';
-  if (v >= 1_000_000) return `${sym}${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 100_000)   return `${sym}${(v / 100_000).toFixed(1)}L`;
-  if (v >= 1_000)     return `${sym}${(v / 1_000).toFixed(0)}K`;
-  return `${sym}${Math.round(v)}`;
-}
+const TITLES: Record<ReportId, string> = {
+  overview: 'Overview', contacts: 'Contacts & Leads', sales: 'Sales & Revenue',
+  campaigns: 'Campaigns', broadcasts: 'Broadcasts', conversations: 'Conversations',
+  automations: 'Automations', conversion: 'Lead Conversion', agents: 'Agent Performance',
+  analytics: 'Analytics',
+};
 
-const COLORS = ['#4f6df5', '#8b5cf6', '#28c99a', '#f4c95d', '#f46b72', '#06b6d4'];
+const STATUS_OPTIONS: Partial<Record<ReportId, { value: string; label: string }[]>> = {
+  contacts: ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'].map(v => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })),
+  sales: ['open', 'won', 'lost'].map(v => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })),
+  broadcasts: ['draft', 'scheduled', 'sending', 'sent', 'failed', 'cancelled'].map(v => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })),
+  conversations: ['open', 'pending', 'resolved', 'closed'].map(v => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })),
+  automations: ['draft', 'active', 'paused', 'archived', 'error'].map(v => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })),
+};
 
-const CONF_COLORS: Record<string, string> = { high: '#28c99a', medium: '#f4c95d', low: '#8790aa' };
+const TIER_OPTIONS = ['hot', 'warm', 'cold'].map(v => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }));
+const PLATFORM_OPTIONS = ['whatsapp', 'instagram', 'facebook', 'telegram', 'email', 'web'].map(v => ({ value: v, label: v[0].toUpperCase() + v.slice(1) }));
 
-function EmptyState({ msg }: { msg: string }) {
-  return (
-    <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--crm-text-muted)', fontSize: 12 }}>
-      {msg}
-    </div>
-  );
-}
+const PAGE_SIZE = 25;
+const REALTIME_TABLES = ['contacts', 'deals', 'conversations', 'messages', 'campaigns', 'crm3_content', 'broadcasts', 'automations', 'crm3_automation_executions', 'crm3_ai_agents', 'crm3_ai_agent_runs'];
 
-// ── Main Page ─────────────────────────────────────────────────
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'forecast' | 'win_loss' | 'cohort'>('overview');
-  const [loading, setLoading] = useState(true);
-  const [overview, setOverview] = useState<RIOverview | null>(null);
-  const [monthly, setMonthly] = useState<MonthlyRow[]>([]);
-  const [sources, setSources] = useState<SourceRow[]>([]);
-  const [tiers, setTiers] = useState<TierBreakdown>({ hot: 0, warm: 0, cold: 0 });
-  const [pipeline, setPipeline] = useState<PipelineStage[]>([]);
-  const [forecast, setForecast] = useState<ForecastRow[]>([]);
-  const [winLoss, setWinLoss] = useState<WinLossRow[]>([]);
-  const [cohort, setCohort] = useState<CohortRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<ReportId>('overview');
+  const [preset, setPreset] = useState<RangePreset>('30d');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [compare, setCompare] = useState(false);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('');
+  const [tierFilter, setTierFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [stageFilter, setStageFilter] = useState('');
+  const [campaignFilter, setCampaignFilter] = useState('');
+  const [agentFilter, setAgentFilter] = useState('');
+  const [triggerFilter, setTriggerFilter] = useState('');
+  const [sort, setSort] = useState<string | null>(null);
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const [data, setData] = useState<ReportResponse | null>(null);
+  const [pending, setPending] = useState(true);
+  const [error, setError] = useState<{ message: string; auth: boolean } | null>(null);
+  const [live, setLive] = useState(false);
+  const [nonce, setNonce] = useState(0);
+
+  const [drillRow, setDrillRow] = useState<Record<string, unknown> | null>(null);
+  const [chartDrill, setChartDrill] = useState<{ datum: Record<string, unknown>; chart: ReportChart } | null>(null);
+
+  // Reset view state when switching reports.
+  useEffect(() => {
+    setSearch(''); setDebouncedSearch(''); setSort(null); setOrder('desc'); setPage(1);
+    setStatusFilter(''); setPlatformFilter(''); setTierFilter(''); setSourceFilter('');
+    setStageFilter(''); setCampaignFilter(''); setAgentFilter(''); setTriggerFilter('');
+  }, [report]);
+
+  // Debounce search input.
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Build the current query string (shared by fetch + export).
+  const buildQuery = useMemo(() => {
+    return (pageSize: number, pageNum: number) => {
+      const qs = new URLSearchParams({ report, pageSize: String(pageSize), page: String(pageNum) });
+      if (preset === 'custom' && from && to) { qs.set('from', from); qs.set('to', to); }
+      else qs.set('preset', preset);
+      if (compare) qs.set('compare', '1');
+      if (debouncedSearch) qs.set('q', debouncedSearch);
+      if (sort) { qs.set('sort', sort); qs.set('order', order); }
+      if (statusFilter) qs.set('status', statusFilter);
+      if (platformFilter) qs.set('platform', platformFilter);
+      if (tierFilter) qs.set('tier', tierFilter);
+      if (sourceFilter) qs.set('source', sourceFilter);
+      if (stageFilter) qs.set('stage', stageFilter);
+      if (campaignFilter) qs.set('campaign', campaignFilter);
+      if (agentFilter) qs.set('agent', agentFilter);
+      if (triggerFilter) qs.set('trigger', triggerFilter);
+      return qs.toString();
+    };
+  }, [report, preset, from, to, compare, debouncedSearch, sort, order, statusFilter, platformFilter, tierFilter, sourceFilter, stageFilter, campaignFilter, agentFilter, triggerFilter]);
+
+  // Fetch the active report.
+  useEffect(() => {
+    let cancelled = false;
+    setPending(true);
     setError(null);
-    try {
-      const [ovRes, fcRes, wlRes, coRes] = await Promise.all([
-        fetch('/api/v3/revenue-intelligence?view=overview'),
-        fetch('/api/v3/revenue-intelligence?view=forecast'),
-        fetch('/api/v3/revenue-intelligence?view=win_loss'),
-        fetch('/api/v3/revenue-intelligence?view=cohort'),
-      ]);
+    void (async () => {
+      try {
+        const json = await fetchApi<ReportResponse>(`/api/v3/reports?${buildQuery(PAGE_SIZE, page)}`);
+        if (!cancelled) setData(json);
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof SessionExpiredError) setError({ message: err.message, auth: true });
+        else if (err instanceof ForbiddenError) setError({ message: err.message, auth: false });
+        else setError({ message: err instanceof Error ? err.message : 'Failed to load report.', auth: false });
+      } finally {
+        if (!cancelled) setPending(false);
+      }
+    })();
 
-      if (ovRes.ok) {
-        const d = await ovRes.json() as {
-          overview: RIOverview;
-          monthly_revenue: MonthlyRow[];
-          source_breakdown: SourceRow[];
-          tier_breakdown: TierBreakdown;
-        };
-        setOverview(d.overview);
-        setMonthly(d.monthly_revenue ?? []);
-        setSources(d.source_breakdown ?? []);
-        setTiers(d.tier_breakdown ?? { hot: 0, warm: 0, cold: 0 });
-        setPipeline([
-          { stage: 'Open', count: d.overview.open_deals, value: d.overview.pipeline_value, color: '#4f6df5' },
-          { stage: 'Won', count: d.overview.won_deals, value: d.overview.total_revenue, color: '#28c99a' },
-          { stage: 'Lost', count: d.overview.lost_deals, value: d.overview.lost_value, color: '#f46b72' },
-        ]);
-      } else if (ovRes.status === 401) {
-        setError('Not authenticated. Please log in.');
-      }
+    return () => { cancelled = true; };
+  }, [buildQuery, page, nonce]);
 
-      if (fcRes.ok) {
-        const d = await fcRes.json() as { forecast: ForecastRow[] };
-        setForecast(d.forecast ?? []);
-      }
-      if (wlRes.ok) {
-        const d = await wlRes.json() as { win_rate_by_month: WinLossRow[] };
-        setWinLoss(d.win_rate_by_month ?? []);
-      }
-      if (coRes.ok) {
-        const d = await coRes.json() as { cohort: CohortRow[] };
-        setCohort(d.cohort ?? []);
-      }
-    } catch {
-      setError('Failed to load revenue data. Check your connection.');
-    } finally {
-      setLoading(false);
-    }
+  // Realtime: auto-refresh on data changes (debounced).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const supabase = createClient();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      setLive(true);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { setNonce(n => n + 1); setLive(false); }, 1200);
+    };
+    const channel = supabase.channel('crm-reports-live');
+    REALTIME_TABLES.forEach(table => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, schedule);
+    });
+    channel.subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  useEffect(() => { void loadAll(); }, [loadAll]);
+  const currency = data?.meta.currency ?? 'USD';
+  const showSkeleton = pending && (!data || data.report !== report);
+  const analysis = data && data.report === report ? data : null;
 
-  const cur = overview?.currency ?? 'USD';
-  const tierData = [
-    { name: '🔥 Hot', value: tiers.hot, color: '#f46b72' },
-    { name: '⚡ Warm', value: tiers.warm, color: '#f4c95d' },
-    { name: '❄️ Cold', value: tiers.cold, color: '#8790aa' },
-  ];
-  const sourceData = sources.map(s => ({ name: s.source, value: s.count }));
+  const statusOptions = STATUS_OPTIONS[report] ?? [];
+  const f = analysis?.filter_options ?? null;
+  const showPlatform = report === 'conversations' || report === 'campaigns' || report === 'broadcasts';
+  const showTier = report === 'contacts';
+  const showSource = report === 'contacts' || report === 'conversion';
+  const showStage = report === 'sales';
+  const showCampaign = report === 'campaigns';
+  const showAgent = report === 'agents';
+  const showTrigger = report === 'automations';
 
-  const kpis = overview ? [
-    { label: 'Total Revenue', value: fmt(overview.total_revenue, cur), sub: `${overview.won_deals} deals won`, color: '#28c99a', icon: <DollarSign size={18} /> },
-    { label: 'Pipeline', value: fmt(overview.pipeline_value, cur), sub: `Weighted: ${fmt(overview.weighted_pipeline, cur)}`, color: '#4d7cff', icon: <Target size={18} /> },
-    { label: 'Win Rate', value: `${overview.win_rate}%`, sub: `Avg deal: ${fmt(overview.avg_deal_value, cur)}`, color: '#8b5cf6', icon: <TrendingUp size={18} /> },
-    { label: 'Contacts', value: String(overview.total_contacts), sub: `${tiers.hot} hot leads`, color: '#f4c95d', icon: <Users size={18} /> },
-  ] : [];
+  const title = TITLES[report];
+  const subtitle = analysis?.meta.account_name
+    ? `${analysis.meta.account_name} · updated ${new Date(analysis.generated_at).toLocaleTimeString()}`
+    : `updated ${new Date().toLocaleTimeString()}`;
+
+  const drillColumns = analysis?.table?.columns ?? [];
+  const chartColumns = chartDrill
+    ? ([
+        { key: chartDrill.chart.xKey, label: 'Category', type: 'text' as ColumnType },
+        ...chartDrill.chart.series.map(s => ({ key: s.key, label: s.label, type: kindForKey(s.key) as ColumnType })),
+      ])
+    : [];
+
+  const handleSort = (key: string) => {
+    if (sort === key) setOrder(o => (o === 'asc' ? 'desc' : 'asc'));
+    else { setSort(key); setOrder('desc'); }
+    setPage(1);
+  };
+
+  const applyRange = (p: RangePreset, fr: string, t: string) => {
+    setPreset(p); setFrom(fr); setTo(t); setPage(1);
+    if (p === 'custom') setSort(null);
+  };
+
+  const handleExport = async (format: ExportFormat) => {
+    if (!analysis) return;
+    let table = analysis.table;
+    try {
+      const full = await fetchApi<ReportResponse>(`/api/v3/reports?${buildQuery(2000, 1)}`);
+      table = full.table;
+    } catch { /* fall back to on-screen page */ }
+
+    if (format === 'csv') exportCSV(analysis, table);
+    else if (format === 'xls') exportExcel(analysis, table);
+    else if (format === 'pdf') exportPDF(analysis, table);
+  };
+
+  const kpis = useMemo(() => analysis?.kpis ?? [], [analysis]);
+  const charts = analysis?.charts ?? [];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div className="crm-rpt-page">
+      <header className="crm-rpt-header">
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 750, color: 'var(--crm-text)', margin: 0 }}>Revenue Intelligence</h1>
-          <p style={{ margin: '3px 0 0', fontSize: 12, color: 'var(--crm-text-muted)' }}>Real data · No fabricated numbers</p>
+          <h1 className="crm-rpt-title">Reports</h1>
+          <p className="crm-rpt-subtitle">
+            {subtitle}
+            {live && <span className="crm-rpt-live"><i /> live</span>}
+          </p>
         </div>
-        <button onClick={() => void loadAll()} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px', borderRadius: 9, border: '1px solid rgba(130,145,190,0.20)', background: 'rgba(255,255,255,0.50)', fontSize: 12, cursor: 'pointer', color: 'var(--crm-text-muted)' }}>
-          <RefreshCw size={12} /> Refresh
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4 }}>
-        {([['overview','Overview'],['forecast','Forecast'],['win_loss','Win/Loss'],['cohort','Cohort']] as const).map(([id, label]) => (
-          <button key={id} onClick={() => setActiveTab(id)} style={{ padding: '6px 14px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: activeTab === id ? 700 : 400, background: activeTab === id ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(255,255,255,0.50)', color: activeTab === id ? 'white' : 'var(--crm-text-secondary)' }}>
-            {label}
+        <div className="crm-rpt-header-actions">
+          <button className="crm-rpt-refresh" onClick={() => setNonce(n => n + 1)} disabled={pending}>
+            <RefreshCw size={13} className={pending ? 'crm-rpt-spin' : undefined} /> Refresh
           </button>
-        ))}
+          <ReportExportMenu onExport={handleExport} disabled={!analysis} />
+        </div>
+      </header>
+
+      <nav className="crm-rpt-tabs">
+        {TABS.map(tab => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              className={`crm-rpt-tab${report === tab.id ? ' is-active' : ''}`}
+              onClick={() => setReport(tab.id)}
+            >
+              <Icon size={14} /> {tab.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="crm-rpt-toolbar">
+        <ReportRangePicker preset={preset} from={from} to={to} onApply={applyRange} />
+        <div className="crm-rpt-filters">
+          <button
+            className={`crm-rpt-compare${compare ? ' is-active' : ''}`}
+            onClick={() => setCompare(v => !v)}
+            title="Compare with the previous period of equal length"
+          >
+            <ArrowLeftRight size={12} /> Compare
+          </button>
+          {statusOptions.length > 0 && (
+            <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
+              <option value="">All statuses</option>
+              {statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
+          {showPlatform && (
+            <select value={platformFilter} onChange={e => { setPlatformFilter(e.target.value); setPage(1); }}>
+              <option value="">All channels</option>
+              {PLATFORM_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
+          {showTier && (
+            <select value={tierFilter} onChange={e => { setTierFilter(e.target.value); setPage(1); }}>
+              <option value="">All tiers</option>
+              {TIER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
+          {showSource && (f?.source?.length ?? 0) > 0 && (
+            <select value={sourceFilter} onChange={e => { setSourceFilter(e.target.value); setPage(1); }}>
+              <option value="">All sources</option>
+              {f!.source!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
+          {showStage && (f?.stage?.length ?? 0) > 0 && (
+            <select value={stageFilter} onChange={e => { setStageFilter(e.target.value); setPage(1); }}>
+              <option value="">All stages</option>
+              {f!.stage!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
+          {showCampaign && (f?.campaign?.length ?? 0) > 0 && (
+            <select value={campaignFilter} onChange={e => { setCampaignFilter(e.target.value); setPage(1); }}>
+              <option value="">All campaigns</option>
+              {f!.campaign!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
+          {showAgent && (f?.agent?.length ?? 0) > 0 && (
+            <select value={agentFilter} onChange={e => { setAgentFilter(e.target.value); setPage(1); }}>
+              <option value="">All agents</option>
+              {f!.agent!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
+          {showTrigger && (f?.trigger?.length ?? 0) > 0 && (
+            <select value={triggerFilter} onChange={e => { setTriggerFilter(e.target.value); setPage(1); }}>
+              <option value="">All triggers</option>
+              {f!.trigger!.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
+        </div>
       </div>
 
       {error && (
-        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.20)', color: '#f46b72', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <AlertTriangle size={13} /> {error}
+        <div className="crm-rpt-error">
+          <TriangleAlert size={14} /> {error.message}
+          <div className="crm-rpt-error-actions">
+            {error.auth && <button onClick={() => { void clearSession().finally(() => window.location.replace('/login')); }}>Sign in</button>}
+            <button onClick={() => setNonce(n => n + 1)}>Retry</button>
+          </div>
         </div>
       )}
 
-      {loading ? (
-        <div className="crm-glass" style={{ padding: 40, textAlign: 'center', color: 'var(--crm-text-muted)' }}>Loading revenue intelligence...</div>
-      ) : (
+      {showSkeleton ? (
+        <div className="crm-rpt-skeleton-grid">
+          {[0, 1, 2, 3].map(i => <div key={i} className="crm-rpt-skeleton" />)}
+        </div>
+      ) : analysis?.restricted ? (
+        <div className="crm-rpt-restricted">
+          <Bot size={24} />
+          <h3>{title}</h3>
+          {analysis.notes.map((n, i) => <p key={i}>{n}</p>)}
+        </div>
+      ) : analysis ? (
         <>
-          {/* KPIs — always visible */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
-            {kpis.map(k => (
-              <div key={k.label} className="crm-glass-soft" style={{ padding: '14px 16px', borderRadius: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <div style={{ width: 30, height: 30, borderRadius: 9, background: `${k.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: k.color }}>{k.icon}</div>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase' }}>{k.label}</span>
-                </div>
-                <div style={{ fontSize: 20, fontWeight: 750, color: 'var(--crm-text)' }}>{k.value}</div>
-                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 3 }}>{k.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* OVERVIEW TAB */}
-          {activeTab === 'overview' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* Revenue trend */}
-              <div className="crm-glass" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 14 }}>Revenue Trend (6 months)</div>
-                {monthly.every(m => m.revenue === 0) ? <EmptyState msg="No won deals yet. Revenue will appear here once deals are marked won." /> : (
-                  <ResponsiveContainer width="100%" height={180}>
-                    <AreaChart data={monthly}>
-                      <defs>
-                        <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#4f6df5" stopOpacity={0.25} />
-                          <stop offset="95%" stopColor="#4f6df5" stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(130,145,190,0.12)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} />
-                      <YAxis tickFormatter={v => fmt(v as number, cur)} tick={{ fontSize: 11, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} width={60} />
-                      <Tooltip formatter={(v: unknown) => [fmt(v as number, cur), 'Revenue']} contentStyle={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(130,145,190,0.20)', borderRadius: 10, fontSize: 12 }} />
-                      <Area type="monotone" dataKey="revenue" stroke="#4f6df5" strokeWidth={2} fill="url(#rg)" dot={false} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                {/* Deal funnel */}
-                <div className="crm-glass" style={{ padding: '18px 20px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 14 }}>Deal Funnel</div>
-                  {pipeline.length === 0 ? <EmptyState msg="No deals yet." /> : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {pipeline.map(row => (
-                        <div key={row.stage} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: row.color, flexShrink: 0 }} />
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--crm-text)' }}>{row.stage}</span>
-                              <span style={{ fontSize: 12, fontWeight: 700, color: row.color }}>{row.count} · {fmt(row.value, cur)}</span>
-                            </div>
-                            <div style={{ height: 4, borderRadius: 2, background: 'rgba(130,145,190,0.15)' }}>
-                              <div style={{ height: '100%', width: `${Math.min(100, overview ? (row.count / Math.max(1, overview.total_deals)) * 100 : 0)}%`, background: row.color, borderRadius: 2 }} />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Lead sources */}
-                <div className="crm-glass" style={{ padding: '18px 20px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 14 }}>Lead Sources</div>
-                  {sourceData.length === 0 ? <EmptyState msg="No source data. Add source to contacts." /> : (
-                    <ResponsiveContainer width="100%" height={150}>
-                      <BarChart data={sourceData} layout="vertical">
-                        <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} width={65} />
-                        <Tooltip contentStyle={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(130,145,190,0.20)', borderRadius: 10, fontSize: 12 }} />
-                        <Bar dataKey="value" radius={[0, 5, 5, 0]}>
-                          {sourceData.map((_e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
-
-              {/* Lead quality */}
-              <div className="crm-glass" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 14 }}>Lead Quality Breakdown</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                  <ResponsiveContainer width={120} height={120}>
-                    <PieChart>
-                      <Pie data={tierData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value" paddingAngle={2}>
-                        {tierData.map((_e, i) => <Cell key={i} fill={tierData[i].color} />)}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {tierData.map(t => (
-                      <div key={t.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: 'var(--crm-text)', flex: 1 }}>{t.name}</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--crm-text)' }}>{t.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+          {analysis.notes.length > 0 && (
+            <div className="crm-rpt-notes">
+              {analysis.notes.map((n, i) => <div key={i} className="crm-rpt-note"><TriangleAlert size={12} /> {n}</div>)}
             </div>
           )}
 
-          {/* FORECAST TAB */}
-          {activeTab === 'forecast' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="crm-glass" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 6 }}>Revenue Forecast (Next 3 Months)</div>
-                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginBottom: 14 }}>
-                  Forecast = Won Revenue + Σ(Open Deal Value × Win Rate). Transparent rule-based methodology.
-                </div>
-                {forecast.length === 0 ? <EmptyState msg="Insufficient historical data for forecast." /> : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {forecast.map(f => (
-                      <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.70)' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)' }}>{f.label}</div>
-                          <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 2 }}>Confidence: <span style={{ color: CONF_COLORS[f.confidence] ?? '#8790aa', fontWeight: 700 }}>{f.confidence}</span></div>
-                        </div>
-                        <div style={{ fontSize: 20, fontWeight: 750, color: CONF_COLORS[f.confidence] ?? '#8790aa' }}>{fmt(f.projected, cur)}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {overview && (
-                <div className="crm-glass" style={{ padding: '18px 20px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 14 }}>Pipeline Summary</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
-                    {[
-                      { label: 'Open Pipeline', value: fmt(overview.pipeline_value, cur), color: '#4f6df5' },
-                      { label: 'Weighted Forecast', value: fmt(overview.weighted_pipeline, cur), color: '#8b5cf6' },
-                      { label: 'Won Revenue', value: fmt(overview.total_revenue, cur), color: '#28c99a' },
-                    ].map(s => (
-                      <div key={s.label} style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.70)' }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>{s.label}</div>
-                        <div style={{ fontSize: 18, fontWeight: 750, color: s.color }}>{s.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {kpis.length > 0 && (
+            <div className="crm-rpt-kpi-grid" style={{ opacity: pending ? 0.6 : 1 }}>
+              {kpis.map(k => <ReportKpiCard key={k.key} kpi={k} currency={currency} />)}
             </div>
           )}
 
-          {/* WIN/LOSS TAB */}
-          {activeTab === 'win_loss' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="crm-glass" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 14 }}>Win Rate by Month</div>
-                {winLoss.every(w => w.won === 0 && w.lost === 0) ? <EmptyState msg="No won or lost deals yet." /> : (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={winLoss}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(130,145,190,0.12)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} />
-                      <YAxis tickFormatter={v => `${v as number}%`} tick={{ fontSize: 11, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                      <Tooltip formatter={(v: unknown) => [`${v as number}%`, 'Win Rate']} contentStyle={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(130,145,190,0.20)', borderRadius: 10, fontSize: 12 }} />
-                      <Line type="monotone" dataKey="win_rate" stroke="#28c99a" strokeWidth={2} dot={{ fill: '#28c99a', r: 3 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                )}
+          {(analysis.insights?.length ?? 0) > 0 && (
+            <section className="crm-ri-insights">
+              <div className="crm-ri-insights-head">
+                <Lightbulb size={14} /> Business Insights
+                <span className="crm-ri-insights-tag">rule-based · from live data</span>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="crm-glass" style={{ padding: '18px 20px' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 14 }}>Won vs Lost</div>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <BarChart data={winLoss}>
-                      <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(130,145,190,0.20)', borderRadius: 10, fontSize: 12 }} />
-                      <Bar dataKey="won" fill="#28c99a" radius={[3, 3, 0, 0]} name="Won" />
-                      <Bar dataKey="lost" fill="#f46b72" radius={[3, 3, 0, 0]} name="Lost" />
-                    </BarChart>
-                  </ResponsiveContainer>
+              <ul className="crm-ri-insights-list">
+                {analysis.insights!.map((s, i) => <li key={i}>{s}</li>)}
+              </ul>
+            </section>
+          )}
+
+          {charts.length > 0 && (
+            <div className="crm-rpt-chart-grid" style={{ opacity: pending ? 0.6 : 1 }}>
+              {charts.map(c => (
+                <div key={c.key} className={charts.length === 1 ? 'crm-rpt-chart-full' : undefined}>
+                  <ReportChartCard chart={c} currency={currency} onSelect={(datum, chart) => setChartDrill({ datum, chart })} />
                 </div>
-                {overview && (
-                  <div className="crm-glass" style={{ padding: '18px 20px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 14 }}>Summary</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {[
-                        { label: 'Overall Win Rate', value: `${overview.win_rate}%`, color: '#28c99a' },
-                        { label: 'Won Deals', value: String(overview.won_deals), color: '#28c99a' },
-                        { label: 'Lost Deals', value: String(overview.lost_deals), color: '#f46b72' },
-                        { label: 'Avg Deal Value', value: fmt(overview.avg_deal_value, cur), color: '#4f6df5' },
-                      ].map(s => (
-                        <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(130,145,190,0.08)' }}>
-                          <span style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{s.label}</span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              ))}
             </div>
           )}
 
-          {/* COHORT TAB */}
-          {activeTab === 'cohort' && (
-            <div className="crm-glass" style={{ padding: '18px 20px' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)', marginBottom: 14 }}>Contact Cohort by Month</div>
-              {cohort.every(c => c.total === 0) ? <EmptyState msg="No contacts yet." /> : (
-                <>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={cohort}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(130,145,190,0.12)" vertical={false} />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: 'var(--crm-text-muted)' }} axisLine={false} tickLine={false} />
-                      <Tooltip contentStyle={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(130,145,190,0.20)', borderRadius: 10, fontSize: 12 }} />
-                      <Bar dataKey="total" fill="#4f6df5" radius={[3, 3, 0, 0]} name="Total" />
-                      <Bar dataKey="hot" fill="#f46b72" radius={[3, 3, 0, 0]} name="Hot" />
-                      <Bar dataKey="qualified" fill="#28c99a" radius={[3, 3, 0, 0]} name="Qualified" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                  <div style={{ display: 'flex', gap: 14, marginTop: 10, fontSize: 11 }}>
-                    {[['#4f6df5','Total'],['#f46b72','Hot'],['#28c99a','Qualified']].map(([c,l]) => (
-                      <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: 2, background: c }} />
-                        <span style={{ color: 'var(--crm-text-muted)' }}>{l}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+          {analysis.table && (
+            <div style={{ opacity: pending ? 0.6 : 1 }}>
+              <ReportDataTable
+                table={analysis.table}
+                currency={currency}
+                search={search}
+                onSearch={setSearch}
+                onSort={handleSort}
+                onPage={setPage}
+                onRowClick={setDrillRow}
+              />
             </div>
           )}
         </>
-      )}
+      ) : null}
+
+      <ReportDrilldown
+        open={drillRow !== null}
+        row={drillRow}
+        columns={drillColumns}
+        currency={currency}
+        title={`${title} — Detail`}
+        href={analysis?.drilldown}
+        onClose={() => setDrillRow(null)}
+      />
+
+      <ReportDrilldown
+        open={chartDrill !== null}
+        row={chartDrill?.datum ?? null}
+        columns={chartColumns}
+        currency={currency}
+        title={chartDrill?.chart.title ?? ''}
+        href={analysis?.drilldown}
+        onClose={() => setChartDrill(null)}
+      />
     </div>
   );
 }

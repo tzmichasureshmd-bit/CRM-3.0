@@ -84,9 +84,18 @@ const NAV = [
 
 type NavItem = { href: string; icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; label: string };
 
+const ALL_HREFS: string[] = NAV.flatMap(section => section.items.map(item => item.href));
+
+function isPathMatch(pathname: string, href: string): boolean {
+  return pathname === href || (href !== '/dashboard' && pathname.startsWith(`${href}/`));
+}
+
 function NavItemLink({ href, icon: Icon, label }: NavItem) {
   const pathname = usePathname();
-  const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
+  // Highlight only the single most specific route so a parent like /settings
+  // does not stay active while a child like /settings/billing is open.
+  const active = isPathMatch(pathname, href) &&
+    !ALL_HREFS.some(other => other !== href && other.length > href.length && isPathMatch(pathname, other));
   return (
     <Link href={href} className={`crm-nav-item${active ? ' active' : ''}`}>
       <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />

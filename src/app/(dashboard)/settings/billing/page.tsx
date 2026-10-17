@@ -1,221 +1,88 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { CreditCard, ChevronLeft, CheckCircle2, Zap, Star, Building2, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { ChevronLeft, Copy, Check, Clock, ShieldCheck, Headphones } from 'lucide-react';
 
-interface AccountData {
-  plan: string;
-  name: string;
-  currency: string;
+const WHATSAPP_DISPLAY = '9346947043';
+const WHATSAPP_INTL = '919346947043';
+const WHATSAPP_MESSAGE = 'Hello, I need assistance with TZMICHA CRM billing.';
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP_INTL}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
+
+function WhatsAppIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+    </svg>
+  );
 }
-
-interface UsageStats {
-  contacts: number;
-  conversations: number;
-  deals: number;
-  automations: number;
-}
-
-const PLANS = [
-  {
-    id: 'free', label: 'Free', price: '$0', period: '/month', color: '#8790aa',
-    icon: <Zap size={18} />,
-    features: ['500 contacts', '1,000 messages/month', '3 automations', '1 user', 'Basic analytics'],
-  },
-  {
-    id: 'starter', label: 'Starter', price: '$29', period: '/month', color: '#4f6df5',
-    icon: <Star size={18} />,
-    features: ['5,000 contacts', '10,000 messages/month', '20 automations', '5 users', 'AI lead scoring', 'WhatsApp + Instagram'],
-  },
-  {
-    id: 'pro', label: 'Pro', price: '$79', period: '/month', color: '#8b5cf6',
-    icon: <Star size={18} />,
-    features: ['Unlimited contacts', 'Unlimited messages', 'Unlimited automations', '20 users', 'All AI features', 'All channels', 'Priority support'],
-    popular: true,
-  },
-  {
-    id: 'enterprise', label: 'Enterprise', price: 'Custom', period: '', color: '#f4c95d',
-    icon: <Building2 size={18} />,
-    features: ['Everything in Pro', 'Dedicated support', 'Custom integrations', 'SLA guarantee', 'On-premise option'],
-  },
-];
-
-const INVOICES = [
-  { id: 'INV-001', date: 'Jan 1, 2025', amount: '$0.00', status: 'paid', plan: 'Free' },
-];
 
 export default function BillingPage() {
-  const [account, setAccount] = useState<AccountData | null>(null);
-  const [usage, setUsage] = useState<UsageStats>({ contacts: 0, conversations: 0, deals: 0, automations: 0 });
-  const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const [copied, setCopied] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).maybeSingle();
-      if (!profile?.account_id) return;
-
-      const [accRes, contactsRes, convsRes, dealsRes, autoRes] = await Promise.all([
-        supabase.from('accounts').select('plan, name, currency').eq('id', profile.account_id).maybeSingle(),
-        supabase.from('contacts').select('id', { count: 'exact', head: true }).eq('account_id', profile.account_id),
-        supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('account_id', profile.account_id),
-        supabase.from('deals').select('id', { count: 'exact', head: true }).eq('account_id', profile.account_id),
-        supabase.from('automations').select('id', { count: 'exact', head: true }).eq('account_id', profile.account_id),
-      ]);
-
-      if (accRes.data) setAccount(accRes.data as AccountData);
-      setUsage({
-        contacts: contactsRes.count ?? 0,
-        conversations: convsRes.count ?? 0,
-        deals: dealsRes.count ?? 0,
-        automations: autoRes.count ?? 0,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase]);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const currentPlan = PLANS.find(p => p.id === (account?.plan ?? 'free')) ?? PLANS[0];
-
-  const usageItems = [
-    { label: 'Contacts', value: usage.contacts, limit: currentPlan.id === 'free' ? 500 : currentPlan.id === 'starter' ? 5000 : null, color: '#4f6df5' },
-    { label: 'Conversations', value: usage.conversations, limit: null, color: '#8b5cf6' },
-    { label: 'Deals', value: usage.deals, limit: null, color: '#28c99a' },
-    { label: 'Automations', value: usage.automations, limit: currentPlan.id === 'free' ? 3 : currentPlan.id === 'starter' ? 20 : null, color: '#f4c95d' },
-  ];
+  const handleCopy = () => {
+    void navigator.clipboard?.writeText(WHATSAPP_DISPLAY);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 760 }}>
-      <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: 'var(--crm-text-muted)', textDecoration: 'none', fontWeight: 500, width: 'fit-content' }}>
-        <ChevronLeft size={16} /> Settings
-      </Link>
+    <div className="crm-bill-page">
+      <div className="crm-bill-inner">
+        <Link href="/settings" className="crm-bill-breadcrumb">
+          <ChevronLeft size={16} /> Settings
+        </Link>
 
-      <div>
-        <h1 style={{ fontSize: 24, fontWeight: 750, color: 'var(--crm-text)', margin: 0 }}>Billing</h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--crm-text-secondary)' }}>Manage your plan and usage</p>
-      </div>
-
-      {/* Current Plan */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Current Plan</div>
-        <div className="crm-glass" style={{ padding: '20px', borderRadius: 14 }}>
-          {loading ? (
-            <div style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>Loading...</div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: `${currentPlan.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: currentPlan.color, flexShrink: 0 }}>
-                {currentPlan.icon}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 20, fontWeight: 750, color: 'var(--crm-text)' }}>{currentPlan.label}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: currentPlan.color, background: `${currentPlan.color}15`, borderRadius: 8, padding: '3px 8px' }}>Active</span>
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--crm-text-muted)', marginTop: 4 }}>
-                  {account?.name ?? 'Your workspace'} · {currentPlan.price}{currentPlan.period}
-                </div>
-              </div>
-              <a href="https://calculator.aws" target="_blank" rel="noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', color: 'white', textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
-                Upgrade <ExternalLink size={12} />
-              </a>
-            </div>
-          )}
+        <div className="crm-bill-hero">
+          <span className="crm-bill-badge">
+            <i /> Consultant Support
+          </span>
+          <h1 className="crm-bill-title">Billing &amp; Support</h1>
+          <p className="crm-bill-subtitle">
+            Need help with your CRM plan or billing? Our consultant is here to help.
+          </p>
         </div>
-      </div>
 
-      {/* Usage */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Usage This Month</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
-          {usageItems.map(item => {
-            const pct = item.limit ? Math.min(100, Math.round((item.value / item.limit) * 100)) : null;
-            const isNearLimit = pct !== null && pct >= 80;
-            return (
-              <div key={item.label} className="crm-glass-soft" style={{ padding: '14px 16px', borderRadius: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)' }}>{item.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: isNearLimit ? '#f46b72' : item.color }}>
-                    {item.value.toLocaleString()}{item.limit ? ` / ${item.limit.toLocaleString()}` : ''}
-                  </span>
-                </div>
-                {pct !== null && (
-                  <div style={{ height: 5, borderRadius: 3, background: 'rgba(130,145,190,0.15)' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: isNearLimit ? '#f46b72' : item.color, borderRadius: 3, transition: 'width 600ms ease' }} />
-                  </div>
-                )}
-                {pct === null && (
-                  <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Unlimited on {currentPlan.label}</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+        <div className="crm-glass crm-bill-card">
+          <div className="crm-bill-avatar">
+            <WhatsAppIcon size={40} />
+            <span className="crm-bill-online" />
+          </div>
 
-      {/* Plans */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Available Plans</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
-          {PLANS.map(plan => {
-            const isCurrent = plan.id === (account?.plan ?? 'free');
-            return (
-              <div key={plan.id} className="crm-glass-soft" style={{ padding: '16px', borderRadius: 14, border: isCurrent ? `1.5px solid ${plan.color}` : '1px solid rgba(130,145,190,0.14)', position: 'relative' }}>
-                {(plan as { popular?: boolean }).popular && (
-                  <div style={{ position: 'absolute', top: -10, right: 14, fontSize: 10, fontWeight: 700, color: 'white', background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', borderRadius: 6, padding: '2px 8px' }}>POPULAR</div>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 10, background: `${plan.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: plan.color }}>{plan.icon}</div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--crm-text)' }}>{plan.label}</div>
-                    <div style={{ fontSize: 13, fontWeight: 750, color: plan.color }}>{plan.price}<span style={{ fontSize: 11, fontWeight: 400, color: 'var(--crm-text-muted)' }}>{plan.period}</span></div>
-                  </div>
-                  {isCurrent && <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: plan.color, background: `${plan.color}15`, borderRadius: 6, padding: '2px 7px' }}>Current</span>}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {plan.features.map(f => (
-                    <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--crm-text-secondary)' }}>
-                      <CheckCircle2 size={12} color={plan.color} /> {f}
-                    </div>
-                  ))}
-                </div>
-                {!isCurrent && (
-                  <a href="https://calculator.aws" target="_blank" rel="noreferrer"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 12, padding: '7px', borderRadius: 9, background: `${plan.color}15`, color: plan.color, textDecoration: 'none', fontSize: 12, fontWeight: 600 }}>
-                    {plan.id === 'enterprise' ? 'Contact Sales' : 'Upgrade'} <ExternalLink size={11} />
-                  </a>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+          <div>
+            <div className="crm-bill-label">WhatsApp Contact</div>
+          </div>
 
-      {/* Invoices */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Invoice History</div>
-        <div className="crm-glass" style={{ borderRadius: 14, overflow: 'hidden' }}>
-          {INVOICES.map((inv, i) => (
-            <div key={inv.id} style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14, borderBottom: i < INVOICES.length - 1 ? '1px solid rgba(130,145,190,0.08)' : 'none' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(40,201,154,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#28c99a', flexShrink: 0 }}>
-                <CreditCard size={16} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)' }}>{inv.id} — {inv.plan} Plan</div>
-                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 2 }}>{inv.date}</div>
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)' }}>{inv.amount}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#28c99a', background: 'rgba(40,201,154,0.12)', borderRadius: 7, padding: '3px 8px' }}>{inv.status}</span>
-            </div>
-          ))}
+          <div className="crm-bill-number">
+            <span>{WHATSAPP_DISPLAY}</span>
+            <button type="button" onClick={handleCopy} aria-label="Copy consultant number" title="Copy number">
+              {copied ? <Check size={15} /> : <Copy size={15} />}
+            </button>
+          </div>
+
+          <p className="crm-bill-note">
+            Contact our consultant for plan details, billing assistance, and account-related queries.
+          </p>
+
+          <a
+            className="crm-bill-cta"
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <WhatsAppIcon size={20} /> Chat on WhatsApp
+          </a>
+
+          <div className="crm-bill-meta">
+            <span className="crm-bill-chip"><Headphones size={13} /> Dedicated consultant</span>
+            <span className="crm-bill-chip"><Clock size={13} /> Typically replies quickly</span>
+            <span className="crm-bill-chip"><ShieldCheck size={13} /> Account &amp; plan help</span>
+          </div>
         </div>
+
+        <p className="crm-bill-foot">
+          Opens WhatsApp in a new tab · Available on desktop and mobile
+        </p>
       </div>
     </div>
   );
