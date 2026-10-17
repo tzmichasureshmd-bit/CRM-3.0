@@ -268,10 +268,7 @@ export default function RevenuePage() {
   }, [dateRange]);
 
   const loadOverview = useCallback(async () => {
-    const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-    const H = { Authorization: `Bearer ${token}` };
-    const res = await fetch(`${BACKEND}/api/v1/attribution?view=overview${buildDateParams()}`, { headers: H });
+    const res = await fetch(`/api/v3/attribution?view=overview${buildDateParams()}`);
     if (res.ok) {
       const d = await res.json() as { overview: Overview };
       setOverview(d.overview);
@@ -279,9 +276,7 @@ export default function RevenuePage() {
   }, [buildDateParams]);
 
   const loadContent = useCallback(async () => {
-    const BACKEND2 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-    const token2 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-    const res = await fetch(`${BACKEND2}/api/v1/attribution?view=content${buildDateParams()}`, { headers: { Authorization: `Bearer ${token2}` } });
+    const res = await fetch(`/api/v3/attribution?view=content${buildDateParams()}`);
     if (res.ok) {
       const d = await res.json() as { content: ContentRow[]; overview: Overview };
       setContentRows(d.content ?? []);
@@ -290,9 +285,7 @@ export default function RevenuePage() {
   }, [buildDateParams]);
 
   const loadSource = useCallback(async () => {
-    const BACKEND3 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-    const token3 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-    const res = await fetch(`${BACKEND3}/api/v1/attribution?view=source${buildDateParams()}`, { headers: { Authorization: `Bearer ${token3}` } });
+    const res = await fetch(`/api/v3/attribution?view=source${buildDateParams()}`);
     if (res.ok) {
       const d = await res.json() as { sources: SourceRow[]; overview: Overview };
       setSourceRows(d.sources ?? []);
@@ -301,9 +294,7 @@ export default function RevenuePage() {
   }, [buildDateParams]);
 
   const loadTimeline = useCallback(async () => {
-    const BACKEND4 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-    const token4 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-    const res = await fetch(`${BACKEND4}/api/v1/attribution?view=timeline${buildDateParams()}`, { headers: { Authorization: `Bearer ${token4}` } });
+    const res = await fetch(`/api/v3/attribution?view=timeline${buildDateParams()}`);
     if (res.ok) {
       const d = await res.json() as { timeline: TimelineRow[]; overview: Overview };
       setTimelineRows(d.timeline ?? []);

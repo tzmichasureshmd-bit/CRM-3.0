@@ -26,7 +26,7 @@ interface IGComment {
   replies?: { data: IGComment[] };
 }
 
-type Tab = 'feed' | 'stories' | 'comments' | 'mentions' | 'insights' | 'profile';
+type Tab = 'feed' | 'stories' | 'comments' | 'mentions' | 'insights' | 'profile' | 'messages';
 
 const API = `/api/v3/instagram`;
 const SETTINGS_API = `/api/v3/instagram`;
@@ -121,7 +121,8 @@ function CommentPanel({ post, onClose }: { post: IGMedia; onClose: () => void })
   const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/media/${post.id}/comments`)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+    fetch(`${API}/media/${post.id}/comments`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(d => setComments(d.data || []))
       .finally(() => setLoading(false));
@@ -129,8 +130,9 @@ function CommentPanel({ post, onClose }: { post: IGMedia; onClose: () => void })
 
   const sendReply = async (commentId: string) => {
     if (!reply.trim()) return;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
     await fetch(`${API}/comments/${commentId}/reply`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ text: reply }),
     });
     setReply(''); setReplyTo(null);
@@ -228,6 +230,12 @@ export default function InstagramPage() {
   const [credentials, setCredentials] = useState({ INSTAGRAM_PAGE_ID: '', INSTAGRAM_VERIFY_TOKEN: '', INSTAGRAM_APP_SECRET: '', FACEBOOK_PAGE_ACCESS_TOKEN: '' });
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+  // DM state
+  const [convs, setConvs] = useState<{id:string;username:string;user_id:string;last_message:string;timestamp:string;unread:number}[]>([]);
+  const [selConv, setSelConv] = useState<{id:string;username:string;user_id:string;last_message:string;timestamp:string;unread:number}|null>(null);
+  const [msgs, setMsgs] = useState<{id:string;from:string;from_id:string;message:string;created_time:string;is_mine:boolean}[]>([]);
+  const [dmReply, setDmReply] = useState('');
+  const [dmSending, setDmSending] = useState(false);
 
   // Load saved credentials
   const loadCredentials = useCallback(async () => {
@@ -260,7 +268,8 @@ export default function InstagramPage() {
     setLoading(true);
     try {
       // Check status via proxy
-      const statusRes = await fetch(`${API}/status`);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const statusRes = await fetch(`${API}/status`, { headers: { Authorization: `Bearer ${token}` } });
       if (statusRes.ok) {
         const st = await statusRes.json() as { configured: boolean };
         if (st.configured) {
@@ -273,9 +282,9 @@ export default function InstagramPage() {
       }
       // Try profile/media/stories — failures don't affect connected state
       const [profileRes, mediaRes, storiesRes] = await Promise.allSettled([
-        fetch(`${API}/profile`),
-        fetch(`${API}/media?limit=20`),
-        fetch(`${API}/stories`),
+        fetch(`${API}/profile`, { headers: getH() }),
+        fetch(`${API}/media?limit=20`, { headers: getH() }),
+        fetch(`${API}/stories`, { headers: getH() }),
       ]);
       if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
         setProfile(await profileRes.value.json());
@@ -288,6 +297,9 @@ export default function InstagramPage() {
         const st2 = await storiesRes.value.json() as { data?: IGStory[] };
         setStories(st2.data || []);
       }
+      // Load DM conversations
+      const cvRes = await fetch(`${API}/conversations`, { headers: getH() });
+      if (cvRes.ok) { const d = await cvRes.json(); setConvs(d.data || []); }
     } catch {
       // don't set connected=false on network errors
     } finally {
@@ -295,13 +307,36 @@ export default function InstagramPage() {
     }
   }, []);
 
+  type Conv = {id:string;username:string;user_id:string;last_message:string;timestamp:string;unread:number};
+
+  const loadMsgs = useCallback(async (conv: Conv) => {
+    setMsgs([]);
+    const r = await fetch(`${API}/conversations/${conv.id}/messages`, { headers: getH() });
+    if (r.ok) { const d = await r.json(); setMsgs(d.data || []); }
+  }, []);
+
+  const sendDmReply = async () => {
+    if (!dmReply.trim() || !selConv || dmSending) return;
+    setDmSending(true);
+    try {
+      await fetch(`${API}/conversations/${selConv.id}/reply`, {
+        method: 'POST',
+        headers: { ...getH(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: dmReply, recipient_id: selConv.user_id }),
+      });
+      setDmReply('');
+      void loadMsgs(selConv);
+    } finally { setDmSending(false); }
+  };
+
   useEffect(() => { void loadCredentials(); void load(); }, [load, loadCredentials]);
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'profile',  label: 'Profile',  icon: <Users size={14} /> },
     { id: 'feed',     label: 'Feed',     icon: <Image size={14} /> },
     { id: 'stories',  label: 'Stories',  icon: <Play size={14} /> },
-    { id: 'comments', label: 'Comments', icon: <MessageCircle size={14} /> },
+    { id: 'messages', label: 'Messages', icon: <MessageCircle size={14} /> },
+    { id: 'comments', label: 'Comments', icon: <Reply size={14} /> },
     { id: 'mentions', label: 'Mentions', icon: <AtSign size={14} /> },
     { id: 'insights', label: 'Insights', icon: <TrendingUp size={14} /> },
   ];
@@ -410,6 +445,50 @@ export default function InstagramPage() {
       </div>
 
       {/* Tab content */}
+      {tab === 'messages' && (
+        <div className="crm-glass" style={{ display: 'flex', minHeight: 500, overflow: 'hidden', borderRadius: 16 }}>
+          {/* Conv list */}
+          <div style={{ width: 260, borderRight: '1px solid rgba(130,145,190,0.12)', flexShrink: 0, overflowY: 'auto' }}>
+            <div style={{ padding: '12px 16px', fontWeight: 700, fontSize: 13, borderBottom: '1px solid rgba(130,145,190,0.12)', color: 'var(--crm-text)' }}>DMs ({convs.length})</div>
+            {convs.length === 0 && <div style={{ padding: 20, color: 'var(--crm-text-muted)', fontSize: 13 }}>No conversations</div>}
+            {convs.map(c => (
+              <div key={c.id} onClick={() => { setSelConv(c); void loadMsgs(c); }}
+                style={{ padding: '10px 14px', cursor: 'pointer', background: selConv?.id === c.id ? 'rgba(225,48,108,0.08)' : 'transparent', borderBottom: '1px solid rgba(130,145,190,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#E1306C,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>{c.username.charAt(0).toUpperCase()}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--crm-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{c.username}</div>
+                  <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.last_message || 'No messages'}</div>
+                </div>
+                {c.unread > 0 && <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#E1306C', color: 'white', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{c.unread}</div>}
+              </div>
+            ))}
+          </div>
+          {/* Chat */}
+          {selConv ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(130,145,190,0.12)', fontWeight: 600, fontSize: 13, color: 'var(--crm-text)' }}>@{selConv.username}</div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[...msgs].reverse().map(m => (
+                  <div key={m.id} style={{ display: 'flex', justifyContent: m.is_mine ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ maxWidth: '70%', padding: '8px 12px', borderRadius: 16, fontSize: 13, background: m.is_mine ? 'linear-gradient(135deg,#E1306C,#8b5cf6)' : 'rgba(130,145,190,0.12)', color: m.is_mine ? 'white' : 'var(--crm-text)' }}>{m.message}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(130,145,190,0.12)', display: 'flex', gap: 8 }}>
+                <input value={dmReply} onChange={e => setDmReply(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') void sendDmReply(); }}
+                  placeholder="Reply via Instagram DM..."
+                  style={{ flex: 1, padding: '8px 14px', borderRadius: 20, border: '1px solid rgba(130,145,190,0.2)', background: 'rgba(255,255,255,0.05)', color: 'var(--crm-text)', fontSize: 13, outline: 'none' }} />
+                <button onClick={() => void sendDmReply()} disabled={!dmReply.trim() || dmSending}
+                  style={{ padding: '8px 16px', borderRadius: 20, background: 'linear-gradient(135deg,#E1306C,#8b5cf6)', color: 'white', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: (!dmReply.trim() || dmSending) ? 0.5 : 1 }}>Send</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--crm-text-muted)', fontSize: 13 }}>Select a conversation</div>
+          )}
+        </div>
+      )}
+
       {tab === 'feed' && (
         <div>
           {media.length === 0 && !loading && <div style={{ color: 'var(--crm-text-muted)', fontSize: 13 }}>No posts found</div>}

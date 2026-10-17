@@ -14,20 +14,29 @@ import {
   CheckCircle2,
   ExternalLink,
   AlertCircle,
+  Pencil,
+  Trash2,
+  Tag,
+  Inbox,
+  Sparkles,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import {
   type ContactRecord,
+  appendAutomationLog,
+  deleteLocalContact,
   formatErrorSummary,
   formatSupabaseError,
   generateLocalId,
+  isUuid,
   mergeRecordsById,
   readLocalContacts,
   resolveTenantAccountId,
   updateLocalContact,
   upsertLocalContact,
 } from '@/lib/crm-pipeline-store';
+import { LeadAutomationModal } from './LeadAutomationModal';
 
 type Contact = ContactRecord;
 
@@ -68,7 +77,29 @@ export function CrmTab() {
   const [newEmail, setNewEmail] = useState('');
   const [newCompany, setNewCompany] = useState('');
   const [newTier, setNewTier] = useState<'hot' | 'warm' | 'cold'>('warm');
+  const [newTags, setNewTags] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Edit Contact Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editCompany, setEditCompany] = useState('');
+  const [editStatus, setEditStatus] = useState('new');
+  const [editTier, setEditTier] = useState<'hot' | 'warm' | 'cold'>('warm');
+  const [editTags, setEditTags] = useState('');
+  const [updating, setUpdating] = useState(false);
+
+  // Delete Contact Confirmation State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Lead Automation Modal State
+  const [isAutomationModalOpen, setIsAutomationModalOpen] = useState(false);
+
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -134,12 +165,25 @@ export function CrmTab() {
     setNewEmail('');
     setNewCompany('');
     setNewTier('warm');
+    setNewTags('');
     setFormError(null);
     setIsAddModalOpen(true);
   };
 
+  const handleOpenEditModal = (contact: Contact) => {
+    setEditingContact(contact);
+    setEditName(contact.name || '');
+    setEditPhone(contact.phone || '');
+    setEditEmail(contact.email || '');
+    setEditCompany(contact.company || '');
+    setEditStatus(contact.lead_status || 'new');
+    setEditTier((contact.lead_score_tier as 'hot' | 'warm' | 'cold') || 'warm');
+    setEditTags(Array.isArray(contact.tags) ? contact.tags.join(', ') : '');
+    setFormError(null);
+    setIsEditModalOpen(true);
+  };
+
   const handleMoveStatus = async (contactId: string, newStatus: string) => {
-    // Optimistic update
     setContacts(prev =>
       prev.map(c => (c.id === contactId ? { ...c, lead_status: newStatus } : c))
     );
@@ -149,13 +193,15 @@ export function CrmTab() {
     }
 
     try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({ lead_status: newStatus })
-        .eq('id', contactId);
-      if (error) {
-        const info = formatSupabaseError(error);
-        console.warn(`Lead status update notice (${formatErrorSummary(info)})`, info);
+      if (isUuid(contactId)) {
+        const { error } = await supabase
+          .from('contacts')
+          .update({ lead_status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', contactId);
+        if (error) {
+          const info = formatSupabaseError(error);
+          console.warn(`Lead status update notice (${formatErrorSummary(info)})`, info);
+        }
       }
     } catch (err) {
       const info = formatSupabaseError(err);
@@ -184,7 +230,11 @@ export function CrmTab() {
     }
 
     const score = newTier === 'hot' ? 85 : newTier === 'warm' ? 60 : 25;
-    const displayLabel = trimmedName || trimmedPhone || trimmedEmail || 'Lead';
+    const displayLabel = trimmedName || trimmedCompany || trimmedPhone || trimmedEmail || 'Lead';
+    const parsedTags = newTags
+      .split(',')
+      .map(t => t.trim().replace(/^#/, ''))
+      .filter(Boolean);
 
     setSaving(true);
     try {
@@ -202,6 +252,7 @@ export function CrmTab() {
         lead_score_tier: newTier,
         lead_score: score,
         source: 'manual',
+        tags: parsedTags,
       };
       if (accountId) {
         payload.account_id = accountId;
@@ -229,7 +280,7 @@ export function CrmTab() {
           lead_score: score,
           lead_score_tier: newTier,
           lead_score_reason: null,
-          tags: null,
+          tags: parsedTags.length > 0 ? parsedTags : null,
           created_at: new Date().toISOString(),
         };
 
@@ -256,6 +307,254 @@ export function CrmTab() {
       setFormError(`Unable to create contact: ${info.message}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleUpdateContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingContact) return;
+
+    setFormError(null);
+    setBanner(null);
+
+    const trimmedName = editName.trim();
+    const trimmedPhone = editPhone.trim();
+    const trimmedEmail = editEmail.trim();
+    const trimmedCompany = editCompany.trim();
+
+    if (!trimmedName && !trimmedPhone && !trimmedEmail) {
+      setFormError('Please provide at least a name, phone number, or email address.');
+      return;
+    }
+
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setFormError('Please enter a valid email address.');
+      return;
+    }
+
+    const parsedTags = editTags
+      .split(',')
+      .map(t => t.trim().replace(/^#/, ''))
+      .filter(Boolean);
+
+    const score =
+      editTier === editingContact.lead_score_tier && editingContact.lead_score !== null
+        ? editingContact.lead_score
+        : editTier === 'hot'
+        ? 85
+        : editTier === 'warm'
+        ? 60
+        : 25;
+
+    const displayLabel = trimmedName || trimmedCompany || trimmedPhone || trimmedEmail || 'Lead';
+
+    setUpdating(true);
+    try {
+      const updatedContact: Contact = {
+        ...editingContact,
+        name: trimmedName || null,
+        phone: trimmedPhone || null,
+        email: trimmedEmail || null,
+        company: trimmedCompany || null,
+        lead_status: editStatus,
+        lead_score_tier: editTier,
+        lead_score: score,
+        tags: parsedTags.length > 0 ? parsedTags : null,
+      };
+
+      setContacts(prev => prev.map(c => (c.id === editingContact.id ? updatedContact : c)));
+      updateLocalContact(editingContact.id, {
+        name: trimmedName || null,
+        phone: trimmedPhone || null,
+        email: trimmedEmail || null,
+        company: trimmedCompany || null,
+        lead_status: editStatus,
+        lead_score_tier: editTier,
+        lead_score: score,
+        tags: parsedTags.length > 0 ? parsedTags : null,
+      });
+
+      if (selectedContact?.id === editingContact.id) {
+        setSelectedContact(updatedContact);
+      }
+
+      if (isUuid(editingContact.id)) {
+        const { error } = await supabase
+          .from('contacts')
+          .update({
+            name: trimmedName || null,
+            phone: trimmedPhone || null,
+            email: trimmedEmail || null,
+            company: trimmedCompany || null,
+            lead_status: editStatus,
+            lead_score_tier: editTier,
+            lead_score: score,
+            tags: parsedTags,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', editingContact.id);
+
+        if (error) {
+          const info = formatSupabaseError(error);
+          console.warn(`Lead update in Supabase notice (${formatErrorSummary(info)})`, info);
+        }
+      }
+
+      setIsEditModalOpen(false);
+      setEditingContact(null);
+      setBanner({
+        type: 'success',
+        text: `Contact "${displayLabel}" updated successfully.`,
+      });
+    } catch (err) {
+      const info = formatSupabaseError(err);
+      console.warn(`Update contact exception (${formatErrorSummary(info)})`, info);
+      setFormError(`Unable to update contact: ${info.message}`);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // ── Delete Contact Handlers ───────────────────────────────────
+  const handleOpenDeleteModal = (contact: Contact) => {
+    setDeletingContact(contact);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingContact) return;
+    setIsDeleting(true);
+    setFormError(null);
+
+    const contactToDelete = deletingContact;
+    const contactName =
+      contactToDelete.name || contactToDelete.company || contactToDelete.phone || contactToDelete.email || 'Lead';
+
+    try {
+      // 1. Call server API endpoint for lead deletion
+      const res = await fetch(`/api/v3/contacts/${encodeURIComponent(contactToDelete.id)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const errMsg = errJson.error || `Server responded with status ${res.status}`;
+        throw new Error(errMsg);
+      }
+
+      // 2. Persist removal to local storage
+      deleteLocalContact(contactToDelete.id);
+
+      // 3. Update component state and lead statistics
+      setContacts(prev => prev.filter(c => c.id !== contactToDelete.id));
+
+      if (selectedContact?.id === contactToDelete.id) {
+        setSelectedContact(null);
+      }
+
+      setIsDeleteModalOpen(false);
+      setDeletingContact(null);
+      setBanner({
+        type: 'success',
+        text: `Lead "${contactName}" deleted successfully.`,
+      });
+    } catch (err: unknown) {
+      console.error(`Exception while deleting lead:`, err);
+      const msg = err instanceof Error ? err.message : 'An unexpected error occurred.';
+      setBanner({
+        type: 'error',
+        text: `Failed to delete lead: ${msg}`,
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // ── Lead Automation Confirmation Callback ─────────────────────
+  const handleConfirmLeadAutomation = async (params: {
+    name: string;
+    phone: string | null;
+    email: string | null;
+    company: string | null;
+    stageId: string;
+    tier: 'hot' | 'warm' | 'cold';
+    score: number;
+    tags: string[];
+    rationale: string;
+    originalPrompt: string;
+  }): Promise<{ success: boolean; contactId?: string; error?: string }> => {
+    try {
+      const accountId = await resolveTenantAccountId(
+        supabase,
+        contacts.map(c => c.account_id)
+      );
+
+      const contactId = generateLocalId();
+      const localContact: Contact = {
+        id: contactId,
+        account_id: accountId,
+        name: params.name || null,
+        phone: params.phone || null,
+        email: params.email || null,
+        company: params.company || null,
+        source: 'ai_automation',
+        lead_status: params.stageId,
+        lead_score: params.score,
+        lead_score_tier: params.tier,
+        lead_score_reason: params.rationale || null,
+        tags: params.tags.length > 0 ? params.tags : null,
+        created_at: new Date().toISOString(),
+      };
+
+      if (accountId && isUuid(accountId)) {
+        try {
+          const payload: Record<string, unknown> = {
+            name: params.name || null,
+            phone: params.phone || null,
+            email: params.email || null,
+            company: params.company || null,
+            source: 'ai_automation',
+            lead_status: params.stageId,
+            lead_score: params.score,
+            lead_score_tier: params.tier,
+            lead_score_reason: params.rationale || null,
+            tags: params.tags,
+            account_id: accountId,
+          };
+          const { data, error } = await supabase.from('contacts').insert(payload).select('id').single();
+          if (!error && data?.id) {
+            localContact.id = data.id;
+          }
+        } catch {
+          // Fallback to local
+        }
+      }
+
+      upsertLocalContact(localContact);
+      setContacts(prev => [localContact, ...prev.filter(c => c.id !== localContact.id)]);
+
+      appendAutomationLog({
+        id: generateLocalId(),
+        timestamp: new Date().toISOString(),
+        prompt: params.originalPrompt,
+        contact_id: localContact.id,
+        contact_name: localContact.name || localContact.company,
+        status: 'completed',
+        message: `Successfully created automated lead "${localContact.name}" (${params.tier.toUpperCase()}).`,
+      });
+
+      setBanner({
+        type: 'success',
+        text: `Lead automation completed: "${localContact.name || 'New Lead'}" registered.`,
+      });
+
+      return { success: true, contactId: localContact.id };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Lead automation failed';
+      return { success: false, error: msg };
     }
   };
 
@@ -302,7 +601,7 @@ export function CrmTab() {
         </div>
       )}
 
-      {/* KPI Overview */}
+      {/* KPI Overview Cards */}
       <div
         style={{
           display: 'grid',
@@ -523,32 +822,55 @@ export function CrmTab() {
           </div>
         </div>
 
-        <button
-          onClick={() => handleOpenAddModal('new')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 16px',
-            borderRadius: 12,
-            background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)',
-            border: 'none',
-            color: 'white',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(79,109,245,0.25)',
-          }}
-        >
-          <Plus size={14} /> Add Lead
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setIsAutomationModalOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 16px',
+              borderRadius: 12,
+              background: 'rgba(255, 255, 255, 0.85)',
+              border: '1px solid rgba(79, 109, 245, 0.35)',
+              color: '#4f6df5',
+              fontSize: 13,
+              fontWeight: 650,
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(79, 109, 245, 0.12)',
+              transition: 'all 120ms ease',
+            }}
+          >
+            <Sparkles size={14} color="#4f6df5" /> Automate Lead
+          </button>
+
+          <button
+            onClick={() => handleOpenAddModal('new')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 16px',
+              borderRadius: 12,
+              background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)',
+              border: 'none',
+              color: 'white',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(79,109,245,0.25)',
+            }}
+          >
+            <Plus size={14} /> Add Lead
+          </button>
+        </div>
       </div>
 
       {/* CRM Lead Board */}
       {loading ? (
         <div
           style={{
-            minHeight: 320,
+            minHeight: 280,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -565,7 +887,6 @@ export function CrmTab() {
             gap: 12,
             overflowX: 'auto',
             paddingBottom: 12,
-            minHeight: 'calc(100vh - 280px)',
           }}
         >
           {CRM_STAGES.map(stage => {
@@ -623,174 +944,247 @@ export function CrmTab() {
                     flexDirection: 'column',
                     gap: 8,
                     overflowY: 'auto',
+                    minHeight: 120,
                   }}
                 >
-                  {stageLeads.map(lead => {
-                    const tier = lead.lead_score_tier ?? 'cold';
-                    const tierInfo = TIER_META[tier] ?? TIER_META.cold;
+                  {stageLeads.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '18px 12px',
+                        textAlign: 'center',
+                        color: 'var(--crm-text-muted)',
+                        fontSize: 12,
+                        borderRadius: 10,
+                        border: '1px dashed rgba(130, 145, 190, 0.25)',
+                      }}
+                    >
+                      <Inbox size={18} style={{ margin: '0 auto 4px', opacity: 0.35 }} />
+                      No leads in this stage
+                    </div>
+                  ) : (
+                    stageLeads.map(lead => {
+                      const tier = lead.lead_score_tier ?? 'cold';
+                      const tierInfo = TIER_META[tier] ?? TIER_META.cold;
 
-                    return (
-                      <div
-                        key={lead.id}
-                        className="crm-glass-soft"
-                        onClick={() => setSelectedContact(lead)}
-                        style={{
-                          padding: '12px 14px',
-                          borderRadius: 10,
-                          borderLeft: `3px solid ${color}`,
-                          cursor: 'pointer',
-                          transition: 'transform 120ms ease, box-shadow 120ms ease',
-                        }}
-                      >
+                      return (
                         <div
+                          key={lead.id}
+                          className="crm-glass-soft"
+                          onClick={() => setSelectedContact(lead)}
                           style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            justifyContent: 'space-between',
-                            marginBottom: 4,
+                            padding: '12px 14px',
+                            borderRadius: 10,
+                            borderLeft: `3px solid ${color}`,
+                            cursor: 'pointer',
+                            transition: 'transform 120ms ease, box-shadow 120ms ease',
                           }}
                         >
+                          {/* Card Header with Name & Edit Button */}
                           <div
                             style={{
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: 'var(--crm-text-strong)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              maxWidth: 160,
-                            }}
-                          >
-                            {lead.name || lead.phone || lead.email || 'Unnamed Lead'}
-                          </div>
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: tierInfo.color,
-                              background: `${tierInfo.color}15`,
-                              padding: '1px 6px',
-                              borderRadius: 6,
-                            }}
-                          >
-                            {tierInfo.icon} {lead.lead_score ?? 0}
-                          </span>
-                        </div>
-
-                        {lead.company && (
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: 'var(--crm-text-secondary)',
-                              marginBottom: 6,
                               display: 'flex',
-                              alignItems: 'center',
-                              gap: 4,
+                              alignItems: 'flex-start',
+                              justifyContent: 'space-between',
+                              gap: 6,
+                              marginBottom: 4,
                             }}
                           >
-                            <Building2 size={11} color="var(--crm-text-muted)" />
-                            {lead.company}
-                          </div>
-                        )}
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
-                          {lead.phone && (
                             <div
                               style={{
-                                fontSize: 11,
-                                color: 'var(--crm-text-muted)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4,
-                              }}
-                            >
-                              <Phone size={10} />
-                              {lead.phone}
-                            </div>
-                          )}
-                          {lead.email && (
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: 'var(--crm-text-muted)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4,
+                                fontSize: 13,
+                                fontWeight: 650,
+                                color: 'var(--crm-text-strong)',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
+                                flex: 1,
+                              }}
+                              title={lead.name || lead.phone || lead.email || 'Unnamed Lead'}
+                            >
+                              {lead.name || lead.phone || lead.email || 'Unnamed Lead'}
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleOpenEditModal(lead);
+                                }}
+                                title="Edit lead"
+                                style={{
+                                  background: 'rgba(130,145,190,0.12)',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '2px 5px',
+                                  borderRadius: 5,
+                                  color: 'var(--crm-text-secondary)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 2,
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <Pencil size={10} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleOpenDeleteModal(lead);
+                                }}
+                                title="Delete lead"
+                                style={{
+                                  background: 'rgba(244,107,114,0.12)',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '2px 5px',
+                                  borderRadius: 5,
+                                  color: '#f46b72',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 2,
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <Trash2 size={10} />
+                              </button>
+
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: tierInfo.color,
+                                  background: `${tierInfo.color}15`,
+                                  padding: '1px 6px',
+                                  borderRadius: 6,
+                                }}
+                              >
+                                {tierInfo.icon} {lead.lead_score ?? 0}
+                              </span>
+                            </div>
+                          </div>
+
+                          {lead.company && (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: 'var(--crm-text-secondary)',
+                                marginBottom: 6,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
                               }}
                             >
-                              <Mail size={10} />
-                              {lead.email}
+                              <Building2 size={11} color="var(--crm-text-muted)" />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {lead.company}
+                              </span>
                             </div>
                           )}
-                        </div>
 
-                        {lead.tags && lead.tags.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
+                            {lead.phone && (
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: 'var(--crm-text-muted)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                }}
+                              >
+                                <Phone size={10} />
+                                {lead.phone}
+                              </div>
+                            )}
+                            {lead.email && (
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: 'var(--crm-text-muted)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                <Mail size={10} />
+                                {lead.email}
+                              </div>
+                            )}
+                          </div>
+
+                          {lead.tags && lead.tags.length > 0 && (
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: 4,
+                                marginBottom: 8,
+                              }}
+                            >
+                              {lead.tags.slice(0, 3).map((t, idx) => (
+                                <span
+                                  key={idx}
+                                  style={{
+                                    fontSize: 9,
+                                    fontWeight: 600,
+                                    color: 'var(--crm-text-secondary)',
+                                    background: 'rgba(130,145,190,0.12)',
+                                    padding: '1px 5px',
+                                    borderRadius: 4,
+                                  }}
+                                >
+                                  #{t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Move Stage Selector */}
                           <div
                             style={{
                               display: 'flex',
-                              flexWrap: 'wrap',
-                              gap: 4,
-                              marginBottom: 8,
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              borderTop: '1px solid rgba(130,145,190,0.10)',
+                              paddingTop: 6,
+                              marginTop: 4,
                             }}
+                            onClick={e => e.stopPropagation()}
                           >
-                            {lead.tags.slice(0, 3).map((t, idx) => (
-                              <span
-                                key={idx}
-                                style={{
-                                  fontSize: 9,
-                                  fontWeight: 600,
-                                  color: 'var(--crm-text-secondary)',
-                                  background: 'rgba(130,145,190,0.12)',
-                                  padding: '1px 5px',
-                                  borderRadius: 4,
-                                }}
-                              >
-                                #{t}
-                              </span>
-                            ))}
+                            <span style={{ fontSize: 10, color: 'var(--crm-text-muted)' }}>Status:</span>
+                            <select
+                              value={lead.lead_status ?? stage.id}
+                              onChange={e => handleMoveStatus(lead.id, e.target.value)}
+                              style={{
+                                fontSize: 11,
+                                padding: '2px 6px',
+                                borderRadius: 6,
+                                border: '1px solid rgba(130,145,190,0.20)',
+                                background: 'white',
+                                color: 'var(--crm-text-secondary)',
+                                cursor: 'pointer',
+                                outline: 'none',
+                              }}
+                            >
+                              {CRM_STAGES.map(s => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name}
+                                </option>
+                              ))}
+                            </select>
                           </div>
-                        )}
-
-                        {/* Move stage selector */}
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            borderTop: '1px solid rgba(130,145,190,0.10)',
-                            paddingTop: 6,
-                            marginTop: 4,
-                          }}
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <span style={{ fontSize: 10, color: 'var(--crm-text-muted)' }}>Status:</span>
-                          <select
-                            value={lead.lead_status ?? stage.id}
-                            onChange={e => handleMoveStatus(lead.id, e.target.value)}
-                            style={{
-                              fontSize: 11,
-                              padding: '2px 6px',
-                              borderRadius: 6,
-                              border: '1px solid rgba(130,145,190,0.20)',
-                              background: 'white',
-                              color: 'var(--crm-text-secondary)',
-                              cursor: 'pointer',
-                              outline: 'none',
-                            }}
-                          >
-                            {CRM_STAGES.map(s => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
-                          </select>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
 
                   <button
                     onClick={() => handleOpenAddModal(stage.id)}
@@ -1029,6 +1423,29 @@ export function CrmTab() {
                 </div>
               </div>
 
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 4 }}>
+                  Tags (comma separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="enterprise, inbound, urgent"
+                  value={newTags}
+                  onChange={e => setNewTags(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(130,145,190,0.25)',
+                    background: 'white',
+                    fontSize: 13,
+                    color: 'var(--crm-text)',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
                 <button
                   type="button"
@@ -1069,6 +1486,283 @@ export function CrmTab() {
         </div>
       )}
 
+      {/* Edit Lead Modal */}
+      {isEditModalOpen && editingContact && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            background: 'rgba(0,0,0,0.40)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            className="crm-glass"
+            style={{
+              width: '100%',
+              maxWidth: 450,
+              borderRadius: 16,
+              padding: 24,
+              boxShadow: '0 20px 50px rgba(0,0,0,0.20)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 18,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Pencil size={16} color="var(--crm-primary)" />
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--crm-text)' }}>
+                  Edit Lead Information
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateContact} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {formError && (
+                <div
+                  style={{
+                    padding: '9px 12px',
+                    borderRadius: 10,
+                    background: 'rgba(244,107,114,0.12)',
+                    border: '1px solid rgba(244,107,114,0.28)',
+                    color: '#f46b72',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <AlertCircle size={14} />
+                  {formError}
+                </div>
+              )}
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 4 }}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(130,145,190,0.25)',
+                    background: 'white',
+                    fontSize: 13,
+                    color: 'var(--crm-text)',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 4 }}>
+                    Phone (WhatsApp)
+                  </label>
+                  <input
+                    type="text"
+                    value={editPhone}
+                    onChange={e => setEditPhone(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(130,145,190,0.25)',
+                      background: 'white',
+                      fontSize: 13,
+                      color: 'var(--crm-text)',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 4 }}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editEmail}
+                    onChange={e => setEditEmail(e.target.value)}
+                    placeholder="john@example.com"
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(130,145,190,0.25)',
+                      background: 'white',
+                      fontSize: 13,
+                      color: 'var(--crm-text)',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 4 }}>
+                  Company Name
+                </label>
+                <input
+                  type="text"
+                  value={editCompany}
+                  onChange={e => setEditCompany(e.target.value)}
+                  placeholder="e.g. Acme Corp"
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(130,145,190,0.25)',
+                    background: 'white',
+                    fontSize: 13,
+                    color: 'var(--crm-text)',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 4 }}>
+                    Stage
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={e => setEditStatus(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(130,145,190,0.25)',
+                      background: 'white',
+                      fontSize: 13,
+                      color: 'var(--crm-text)',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  >
+                    {CRM_STAGES.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 4 }}>
+                    Priority / Tier
+                  </label>
+                  <select
+                    value={editTier}
+                    onChange={e => setEditTier(e.target.value as 'hot' | 'warm' | 'cold')}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(130,145,190,0.25)',
+                      background: 'white',
+                      fontSize: 13,
+                      color: 'var(--crm-text)',
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="hot">🔥 Hot</option>
+                    <option value="warm">⚡ Warm</option>
+                    <option value="cold">❄️ Cold</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--crm-text-secondary)', marginBottom: 4 }}>
+                  Tags (comma separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="enterprise, inbound, urgent"
+                  value={editTags}
+                  onChange={e => setEditTags(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '9px 12px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(130,145,190,0.25)',
+                    background: 'white',
+                    fontSize: 13,
+                    color: 'var(--crm-text)',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 10,
+                    border: '1px solid rgba(130,145,190,0.25)',
+                    background: 'white',
+                    color: 'var(--crm-text-secondary)',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updating}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)',
+                    color: 'white',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    opacity: updating ? 0.7 : 1,
+                  }}
+                >
+                  {updating ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Selected Contact Detail Slide-out Drawer */}
       {selectedContact && (
         <div
@@ -1087,9 +1781,9 @@ export function CrmTab() {
             className="crm-glass"
             style={{
               width: '100%',
-              maxWidth: 380,
+              maxWidth: 400,
               height: '100%',
-              background: 'rgba(255,255,255,0.95)',
+              background: 'rgba(255,255,255,0.97)',
               padding: 24,
               boxShadow: '-10px 0 30px rgba(0,0,0,0.15)',
               display: 'flex',
@@ -1112,9 +1806,53 @@ export function CrmTab() {
             </div>
 
             <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', color: 'var(--crm-text-strong)' }}>
-                {selectedContact.name || 'Unnamed Lead'}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 4px', color: 'var(--crm-text-strong)' }}>
+                  {selectedContact.name || 'Unnamed Lead'}
+                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditModal(selectedContact)}
+                    style={{
+                      background: 'rgba(79, 109, 245, 0.10)',
+                      border: '1px solid rgba(79, 109, 245, 0.25)',
+                      borderRadius: 8,
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#4f6df5',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Pencil size={11} /> Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDeleteModal(selectedContact)}
+                    style={{
+                      background: 'rgba(244, 107, 114, 0.10)',
+                      border: '1px solid rgba(244, 107, 114, 0.25)',
+                      borderRadius: 8,
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#f46b72',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                    title="Delete lead"
+                  >
+                    <Trash2 size={11} /> Delete
+                  </button>
+                </div>
+              </div>
+
               {selectedContact.company && (
                 <div style={{ fontSize: 13, color: 'var(--crm-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Building2 size={13} /> {selectedContact.company}
@@ -1122,7 +1860,7 @@ export function CrmTab() {
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <span
                 style={{
                   fontSize: 12,
@@ -1150,6 +1888,29 @@ export function CrmTab() {
                 Status: {selectedContact.lead_status || 'new'}
               </span>
             </div>
+
+            {selectedContact.tags && selectedContact.tags.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {selectedContact.tags.map((t, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: 'var(--crm-text-secondary)',
+                      background: 'rgba(130, 145, 190, 0.12)',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Tag size={10} /> {t}
+                  </span>
+                ))}
+              </div>
+            )}
 
             <div
               style={{
@@ -1203,7 +1964,28 @@ export function CrmTab() {
               </div>
             )}
 
-            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => handleOpenEditModal(selectedContact)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  padding: '9px',
+                  borderRadius: 10,
+                  background: 'rgba(79, 109, 245, 0.08)',
+                  border: '1px solid rgba(79, 109, 245, 0.22)',
+                  color: '#4f6df5',
+                  fontSize: 13,
+                  fontWeight: 650,
+                  cursor: 'pointer',
+                }}
+              >
+                <Pencil size={13} /> Edit Lead Information
+              </button>
+
               <Link
                 href="/inbox"
                 style={{
@@ -1226,6 +2008,108 @@ export function CrmTab() {
           </div>
         </div>
       )}
+
+      {/* Delete Lead Confirmation Modal */}
+      {isDeleteModalOpen && deletingContact && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1100,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            className="crm-glass"
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              borderRadius: 18,
+              padding: 24,
+              background: 'rgba(255,255,255,0.98)',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.22)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: 'rgba(244,107,114,0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#f46b72',
+                }}
+              >
+                <Trash2 size={18} />
+              </div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--crm-text)' }}>
+                Delete Lead
+              </h3>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--crm-text-secondary)', lineHeight: 1.5, margin: '0 0 16px' }}>
+              Are you sure you want to delete lead{' '}
+              <strong>&ldquo;{deletingContact.name || deletingContact.phone || deletingContact.email || 'Lead'}&rdquo;</strong>
+              {deletingContact.company ? ` from ${deletingContact.company}` : ''}? This action will permanently remove the contact from your CRM records.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setDeletingContact(null);
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(130,145,190,0.25)',
+                  background: 'white',
+                  color: 'var(--crm-text-secondary)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => void handleConfirmDelete()}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#f46b72',
+                  color: 'white',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  opacity: isDeleting ? 0.7 : 1,
+                }}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Lead'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lead Automation Modal */}
+      <LeadAutomationModal
+        isOpen={isAutomationModalOpen}
+        onClose={() => setIsAutomationModalOpen(false)}
+        existingContacts={contacts}
+        onConfirmCreate={handleConfirmLeadAutomation}
+      />
     </div>
   );
 }

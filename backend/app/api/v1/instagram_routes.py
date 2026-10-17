@@ -123,6 +123,65 @@ async def like_comment(comment_id: str):
     return await _post(f"/{comment_id}/likes", {})
 
 
+# ── Instagram DM Conversations ───────────────────────────────
+@router.get("/instagram/conversations")
+async def get_ig_conversations():
+    ig_id, _ = _get_ig_credentials()
+    raw = await _get(f"/{ig_id}/conversations", {
+        "fields": "id,participants,updated_time,unread_count,snippet",
+        "platform": "instagram",
+        "limit": 25,
+    })
+    convs = []
+    for c in raw.get("data", []):
+        parts = c.get("participants", {}).get("data", [])
+        other = next((p for p in parts if str(p.get("id")) != str(ig_id)), parts[0] if parts else {})
+        convs.append({
+            "id": c["id"],
+            "username": other.get("username", "Unknown"),
+            "user_id": other.get("id", ""),
+            "last_message": c.get("snippet", ""),
+            "timestamp": c.get("updated_time", ""),
+            "unread": c.get("unread_count", 0),
+        })
+    return {"data": convs}
+
+
+@router.get("/instagram/conversations/{conversation_id}/messages")
+async def get_ig_messages(conversation_id: str):
+    _, _ = _get_ig_credentials()
+    ig_id, _ = _get_ig_credentials()
+    raw = await _get(f"/{conversation_id}/messages", {
+        "fields": "id,from,message,created_time,attachments",
+        "limit": 50,
+    })
+    msgs = [{
+        "id": m["id"],
+        "from": m.get("from", {}).get("username", ""),
+        "from_id": m.get("from", {}).get("id", ""),
+        "message": m.get("message", ""),
+        "created_time": m.get("created_time", ""),
+        "is_mine": str(m.get("from", {}).get("id")) == str(ig_id),
+    } for m in raw.get("data", [])]
+    return {"data": msgs}
+
+
+@router.post("/instagram/conversations/{conversation_id}/reply")
+async def reply_ig_dm(conversation_id: str, body: dict):
+    ig_id, _ = _get_ig_credentials()
+    text: str = body.get("text", "")
+    if not text:
+        raise HTTPException(status_code=400, detail="text required")
+    # Extract recipient user_id from body
+    recipient_id: str = body.get("recipient_id", "")
+    if not recipient_id:
+        raise HTTPException(status_code=400, detail="recipient_id required")
+    return await _post(f"/{ig_id}/messages", {
+        "recipient": {"id": recipient_id},
+        "message": {"text": text},
+    })
+
+
 # ── Story replies (DMs from story mentions) ──────────────────
 @router.get("/instagram/story_replies")
 async def get_story_replies():

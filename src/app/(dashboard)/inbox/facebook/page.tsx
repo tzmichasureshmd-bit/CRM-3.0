@@ -174,21 +174,31 @@ export default function FacebookInboxPage() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [connected, setConnected] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setApiError(null);
     try {
       const res = await fetch(`${BACKEND}/api/v1/meta/page`, { headers: getH() });
       if (!res.ok) { setConnected(false); return; }
       setPage(await res.json());
       setConnected(true);
-      const pr = await fetch(`${BACKEND}/api/v1/meta/posts?limit=20`, { headers: getH() });
+
+      const [pr, sr, cr, cvr] = await Promise.all([
+        fetch(`${BACKEND}/api/v1/meta/posts?limit=20`, { headers: getH() }),
+        fetch(`${BACKEND}/api/v1/meta/stories`, { headers: getH() }),
+        fetch(`${BACKEND}/api/v1/meta/comments`, { headers: getH() }),
+        fetch(`${BACKEND}/api/v1/meta/conversations`, { headers: getH() }),
+      ]);
+
       if (pr.ok) { const d = await pr.json(); setPosts(d.data || []); }
-      const sr = await fetch(`${BACKEND}/api/v1/meta/stories`, { headers: getH() });
+      else {
+        const e = await pr.json().catch(() => ({}));
+        setApiError(e.detail || 'Failed to load posts — token may be missing pages_read_engagement permission.');
+      }
       if (sr.ok) { const d = await sr.json(); setStories(d.data || []); }
-      const cr = await fetch(`${BACKEND}/api/v1/meta/comments`, { headers: getH() });
       if (cr.ok) { const d = await cr.json(); setComments(d.data || []); }
-      const cvr = await fetch(`${BACKEND}/api/v1/meta/conversations`, { headers: getH() });
       if (cvr.ok) { const d = await cvr.json(); setConvs(d.data || []); }
     } catch { setConnected(false); }
     finally { setLoading(false); }
@@ -241,6 +251,13 @@ export default function FacebookInboxPage() {
             <div style={{ fontSize: 13, color: '#65676B' }}>Configure your credentials in Settings → Integrations</div>
           </div>
           <Link href="/settings/integrations" style={{ padding: '8px 16px', borderRadius: 6, background: '#1877F2', color: 'white', textDecoration: 'none', fontSize: 14, fontWeight: 600 }}>Connect</Link>
+        </div>
+      )}
+
+      {apiError && (
+        <div style={{ maxWidth: 680, margin: '12px auto 0', padding: '12px 16px', background: '#FFF3CD', borderRadius: 8, border: '1px solid #FFCA2C', fontSize: 13, color: '#664D03' }}>
+          ⚠️ <strong>Permission Error:</strong> {apiError}<br />
+          <span style={{ fontSize: 12 }}>Fix: Go to <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" style={{ color: '#1877F2' }}>Meta Graph API Explorer</a> → regenerate token with <code>pages_read_engagement</code> + <code>pages_read_user_content</code> permissions, then update <code>FACEBOOK_PAGE_ACCESS_TOKEN</code> in backend/.env</span>
         </div>
       )}
 

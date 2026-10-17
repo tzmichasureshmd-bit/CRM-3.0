@@ -371,6 +371,115 @@ export function updateLocalDeal(id: string, patch: Partial<DealRecord>): void {
   writeLocalDeals(current);
 }
 
+export function deleteLocalDeal(id: string): void {
+  const current = readLocalDeals();
+  const next = current.filter(d => d.id !== id);
+  writeLocalDeals(next);
+}
+
+export function deleteLocalContact(id: string): void {
+  const current = readLocalContacts();
+  const next = current.filter(c => c.id !== id);
+  writeLocalContacts(next);
+}
+
+
+// ── Follow-up Persistence ──────────────────────────────────────
+
+export interface FollowUpRecord {
+  id: string;
+  account_id?: string | null;
+  contact_id?: string | null;
+  title: string;
+  notes?: string | null;
+  due_date: string;
+  status: string;
+  created_at?: string;
+}
+
+const FOLLOWUPS_STORAGE_KEY = 'crm3:local-followups';
+
+export function readLocalFollowUps(): FollowUpRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(FOLLOWUPS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is FollowUpRecord =>
+        Boolean(item && typeof item === 'object' && typeof (item as FollowUpRecord).id === 'string')
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function writeLocalFollowUps(items: FollowUpRecord[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FOLLOWUPS_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // Ignore storage quota
+  }
+}
+
+export function upsertLocalFollowUp(item: FollowUpRecord): FollowUpRecord[] {
+  const current = readLocalFollowUps();
+  const next = [item, ...current.filter(f => f.id !== item.id)];
+  writeLocalFollowUps(next);
+  return next;
+}
+
+// ── Automation Audit Log Persistence ───────────────────────────
+
+export interface AutomationLogRecord {
+  id: string;
+  timestamp: string;
+  prompt: string;
+  deal_id?: string;
+  deal_title?: string;
+  deal_value?: number | null;
+  currency?: string | null;
+  stage_name?: string;
+  contact_id?: string | null;
+  contact_name?: string | null;
+  follow_up_title?: string | null;
+  rules_applied?: string[];
+  status: 'completed' | 'warning' | 'failed';
+  message: string;
+}
+
+const AUTOMATION_LOGS_STORAGE_KEY = 'crm3:local-automation-history';
+
+export function readAutomationLogs(): AutomationLogRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(AUTOMATION_LOGS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is AutomationLogRecord =>
+        Boolean(item && typeof item === 'object' && typeof (item as AutomationLogRecord).id === 'string')
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function appendAutomationLog(entry: AutomationLogRecord): AutomationLogRecord[] {
+  if (typeof window === 'undefined') return [];
+  const current = readAutomationLogs();
+  const next = [entry, ...current].slice(0, 50); // retain last 50 logs
+  try {
+    window.localStorage.setItem(AUTOMATION_LOGS_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Ignore quota
+  }
+  return next;
+}
+
 export function mergeRecordsById<T extends { id: string; created_at?: string }>(
   remoteItems: T[],
   localItems: T[]
@@ -397,3 +506,4 @@ export function generateLocalId(): string {
     return v.toString(16);
   });
 }
+

@@ -55,10 +55,7 @@ function AIGeneratorPanel({ onGenerated }: { onGenerated: (content: GeneratedCon
     setLoading(true);
     setResult(null);
     try {
-      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-      const H = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
-      const res = await fetch(`${BACKEND}/api/v1/content/generate`, {
+      const res = await fetch('/api/v3/ai/generate-content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, options: { platform, tone } }),
@@ -287,9 +284,7 @@ export default function ContentStudioPage() {
   const loadDrafts = useCallback(async () => {
     setLoadingDrafts(true);
     try {
-      const BACKEND2 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-      const token2 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-      const res = await fetch(`${BACKEND2}/api/v1/content?status=ai_generated`, { headers: { Authorization: `Bearer ${token2}` } });
+      const res = await fetch('/api/v3/content?status=ai_generated');
       if (res.ok) {
         const d = await res.json() as { data: Partial<ContentItem>[] };
         setDraftContent(d.data ?? []);
@@ -302,9 +297,7 @@ export default function ContentStudioPage() {
   const loadPublished = useCallback(async () => {
     setLoadingPublished(true);
     try {
-      const BACKEND3 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-      const token3 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-      const res = await fetch(`${BACKEND3}/api/v1/content?status=published`, { headers: { Authorization: `Bearer ${token3}` } });
+      const res = await fetch('/api/v3/content?status=published');
       if (res.ok) {
         const d = await res.json() as { data: Partial<ContentItem>[] };
         setPublishedContent(d.data ?? []);
@@ -315,11 +308,9 @@ export default function ContentStudioPage() {
   }, []);
 
   const handlePublish = useCallback(async (id: string) => {
-    const BACKEND4 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-    const token4 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-    const res = await fetch(`${BACKEND4}/api/v1/content/${id}`, {
+    const res = await fetch(`/api/v3/content/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token4}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'published' }),
     });
     if (res.ok) {
@@ -330,13 +321,10 @@ export default function ContentStudioPage() {
   useEffect(() => { void loadDrafts(); void loadPublished(); }, [loadDrafts, loadPublished]);
 
   const handleGenerated = useCallback(async (content: GeneratedContent) => {
-    // Persist to DB
     try {
-      const BACKEND5 = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-      const token5 = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-      const res = await fetch(`${BACKEND5}/api/v1/content`, {
+      const res = await fetch('/api/v3/content', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token5}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: content.headline || 'AI Generated Content',
           caption: content.caption,
@@ -352,7 +340,6 @@ export default function ContentStudioPage() {
       if (res.ok) {
         await loadDrafts();
       } else {
-        // Fallback: add in-memory
         const newItem: Partial<ContentItem> = {
           id: `draft-${Date.now()}`,
           title: content.headline || 'AI Generated Content',
@@ -392,10 +379,7 @@ export default function ContentStudioPage() {
             Create, schedule and track content across all channels
           </p>
         </div>
-        <button
-          onClick={() => setActiveTab('create')}
-          className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
+        <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors">
           <Plus className="h-4 w-4" /> New Content
         </button>
       </div>
@@ -418,7 +402,6 @@ export default function ContentStudioPage() {
         ))}
       </div>
 
-      {/* Tab content */}
       {activeTab === 'create' && (
         <AIGeneratorPanel onGenerated={handleGenerated} />
       )}

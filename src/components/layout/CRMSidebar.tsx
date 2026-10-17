@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home, Brain, Users, UserCircle, Navigation, Target,
   Flame, TrendingUp, CalendarDays, MessageSquare, Smartphone,
-  AtSign, Mail, Sparkles, Megaphone, Rss, Zap,
+  AtSign, Mail, Sparkles, Megaphone, Rss, Zap, GitBranch,
   Bot, BarChart3, Activity, FileBarChart, Settings, Key,
   Shield, CreditCard, Server, ChevronDown, ChevronRight,
 } from 'lucide-react';
@@ -58,6 +58,7 @@ const NAV = [
     id: 'automation', label: 'AUTOMATION',
     items: [
       { href: '/automations', icon: Zap, label: 'Automations' },
+      { href: '/journeys', icon: GitBranch, label: 'Journey Builder' },
       { href: '/agents', icon: Bot, label: 'AI Agents' },
     ],
   },

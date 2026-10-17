@@ -4,16 +4,78 @@ Webhook handlers (Instagram/Facebook/WhatsApp) live in webhooks.py only.
 """
 from fastapi import APIRouter, Request, HTTPException
 from app.core.config import get_settings
+from app.db.supabase import get_supabase
 import httpx
+import logging
+import time
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
-settings = get_settings()
 GRAPH = "https://graph.facebook.com/v19.0"
+
+# Simple TTL cache so we don't hit DB on every single request
+_creds_cache: dict = {}
+_CACHE_TTL = 30  # seconds
+
+
+def _fb_error(res: httpx.Response) -> str:
+    try:
+        err = res.json().get("error", {})
+        return err.get("message", res.text)
+    except Exception:
+        return res.text
+
+
+def _raise_fb_error(res: httpx.Response):
+    msg = _fb_error(res)
+    logger.error("Facebook API error %s: %s", res.status_code, msg)
+    raise HTTPException(status_code=400, detail=msg)
 
 
 def _fb_creds() -> tuple[str, str]:
-    """Load FB credentials from env (DB lookup skipped for now)."""
-    return settings.facebook_page_id, settings.facebook_page_access_token
+    """
+    Load FB credentials — DB (account_settings) takes priority over .env.
+    No account_id filter: picks the first account that has FB configured.
+    This ensures Settings → Integrations always works, even after restart.
+    """
+    global _creds_cache
+    now = time.time()
+
+    if _creds_cache.get("ts", 0) + _CACHE_TTL > now:
+        return _creds_cache.get("page_id", ""), _creds_cache.get("token", "")
+
+    # Try DB first — no account_id filter so it works for any saved account
+    try:
+        supabase = get_supabase()
+        res = supabase.table("account_settings") \
+            .select("key, value") \
+            .in_("key", ["FACEBOOK_PAGE_ID", "FACEBOOK_PAGE_ACCESS_TOKEN"]) \
+            .neq("value", "") \
+            .execute()
+        db = {row["key"]: row["value"] for row in (res.data or []) if row.get("value", "").strip()}
+        logger.info("FB creds from DB keys found: %s", list(db.keys()))
+        if db.get("FACEBOOK_PAGE_ID") and db.get("FACEBOOK_PAGE_ACCESS_TOKEN"):
+            _creds_cache = {
+                "page_id": db["FACEBOOK_PAGE_ID"],
+                "token": db["FACEBOOK_PAGE_ACCESS_TOKEN"],
+                "ts": now,
+            }
+            logger.info("Using FB creds from DB, page_id=%s", _creds_cache["page_id"])
+            return _creds_cache["page_id"], _creds_cache["token"]
+        else:
+            logger.warning("FB creds not found in DB, falling back to .env")
+    except Exception as e:
+        logger.warning("Could not load FB creds from DB, falling back to env: %s", e)
+
+    # Fallback to .env
+    s = get_settings()
+    _creds_cache = {
+        "page_id": s.facebook_page_id,
+        "token": s.facebook_page_access_token,
+        "ts": now,
+    }
+    logger.info("Using FB creds from .env, page_id=%s, token_set=%s", _creds_cache["page_id"], bool(_creds_cache["token"]))
+    return _creds_cache["page_id"], _creds_cache["token"]
 
 
 # ── Facebook Page Info ────────────────────────────────────────
@@ -28,7 +90,7 @@ async def get_fb_page():
             params={"fields": "id,name,category,fan_count,followers_count,about,website,picture,cover", "access_token": token},
         )
         if res.status_code != 200:
-            raise HTTPException(status_code=res.status_code, detail=res.text)
+            _raise_fb_error(res)
         return res.json()
 
 
@@ -48,7 +110,7 @@ async def get_fb_posts(limit: int = 10):
             },
         )
         if res.status_code != 200:
-            raise HTTPException(status_code=res.status_code, detail=res.json().get("error", {}).get("message", res.text))
+            _raise_fb_error(res)
         return res.json()
 
 
@@ -64,7 +126,7 @@ async def get_fb_conversations():
             params={"fields": "id,participants,updated_time,unread_count,snippet", "limit": 25, "access_token": token},
         )
         if res.status_code != 200:
-            raise HTTPException(status_code=res.status_code, detail=res.json().get("error", {}).get("message", res.text))
+            _raise_fb_error(res)
         raw = res.json()
         convs = []
         for c in raw.get("data", []):
@@ -92,7 +154,7 @@ async def get_conversation_messages(conversation_id: str):
             params={"fields": "id,from,message,created_time", "limit": 50, "access_token": token},
         )
         if res.status_code != 200:
-            raise HTTPException(status_code=res.status_code, detail=res.json().get("error", {}).get("message", res.text))
+            _raise_fb_error(res)
         raw = res.json()
         msgs = [{
             "id": m["id"],
@@ -120,9 +182,8 @@ async def get_fb_stories():
             },
         )
         if res.status_code != 200:
-            raise HTTPException(status_code=res.status_code, detail=res.json().get("error", {}).get("message", res.text))
+            _raise_fb_error(res)
         raw = res.json()
-        # Stories are feed items that have a 'story' field but no 'message'
         stories = [i for i in raw.get("data", []) if i.get("story") and not i.get("message")]
         return {"data": stories}
 
@@ -134,16 +195,15 @@ async def get_fb_comments():
     if not page_id or not token:
         raise HTTPException(status_code=400, detail="Facebook not configured.")
     async with httpx.AsyncClient(timeout=15) as client:
-        # Get recent posts first
         posts_res = await client.get(
             f"{GRAPH}/{page_id}/posts",
             params={"fields": "id,message,story,created_time", "limit": 10, "access_token": token},
         )
         if posts_res.status_code != 200:
-            raise HTTPException(status_code=posts_res.status_code, detail=posts_res.json().get("error", {}).get("message", posts_res.text))
+            _raise_fb_error(posts_res)
         posts = posts_res.json().get("data", [])
         all_comments = []
-        for post in posts[:5]:  # limit to 5 posts to avoid rate limits
+        for post in posts[:5]:
             c_res = await client.get(
                 f"{GRAPH}/{post['id']}/comments",
                 params={"fields": "id,from,message,created_time,like_count,can_reply_privately", "limit": 10, "access_token": token},
@@ -165,16 +225,16 @@ async def send_meta_message(request: Request):
     platform: str     = data.get("platform", "")
     recipient_id: str = data.get("recipient_id", "")
     text: str         = data.get("text", "")
+    s = get_settings()
 
     if platform == "whatsapp":
-        url   = f"{GRAPH}/{settings.whatsapp_phone_number_id}/messages"
-        token = settings.whatsapp_access_token
+        url   = f"{GRAPH}/{s.whatsapp_phone_number_id}/messages"
+        token = s.whatsapp_access_token
         body  = {"messaging_product": "whatsapp", "to": recipient_id, "type": "text", "text": {"body": text}}
     elif platform in ("instagram", "facebook"):
-        _, token = _fb_creds()
-        page_id, _ = _fb_creds()
+        page_id, token = _fb_creds()
         if platform == "instagram":
-            page_id = settings.instagram_page_id
+            page_id = s.instagram_page_id
         url  = f"{GRAPH}/{page_id}/messages"
         body = {"recipient": {"id": recipient_id}, "message": {"text": text}}
     else:
@@ -183,6 +243,6 @@ async def send_meta_message(request: Request):
     async with httpx.AsyncClient(timeout=15) as client:
         res = await client.post(url, json=body, headers={"Authorization": f"Bearer {token}"})
         if res.status_code != 200:
-            raise HTTPException(status_code=res.status_code, detail=res.text)
+            _raise_fb_error(res)
 
     return {"status": "sent"}

@@ -6,8 +6,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from app.middleware.auth import get_current_user
 from app.db.supabase import get_supabase
 from app.core.config import get_settings
-import json
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Maps channel id → env key names stored in account_settings
@@ -65,9 +66,15 @@ async def save_integration(channel: str, body: dict, user=Depends(get_current_us
             "value": val,
         }, on_conflict="account_id,key").execute()
 
-    # Hot-reload settings so webhooks use new values immediately
-    _reload_meta_settings(supabase, account_id)
+    # Invalidate meta.py creds cache so new token is used immediately
+    try:
+        from app.api.v1 import meta as meta_module
+        meta_module._creds_cache.clear()
+        logger.info("Cleared meta creds cache after saving %s integration", channel)
+    except Exception as e:
+        logger.warning("Could not clear meta cache: %s", e)
 
+    _reload_meta_settings(supabase, account_id)
     return {"status": "saved"}
 
 
