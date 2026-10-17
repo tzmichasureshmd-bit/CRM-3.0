@@ -60,6 +60,20 @@ async def save_integration(channel: str, body: dict, user=Depends(get_current_us
 
     for key in CHANNEL_KEYS[channel]:
         val = body.get(key, "")
+        # Never overwrite an existing non-empty value with an empty string.
+        # This prevents the Facebook channel save from wiping the token
+        # that was already saved via the Instagram channel (they share
+        # FACEBOOK_PAGE_ACCESS_TOKEN).
+        if not val:
+            existing = supabase.table("account_settings") \
+                .select("value") \
+                .eq("account_id", account_id) \
+                .eq("key", key) \
+                .maybe_single() \
+                .execute()
+            if existing.data and existing.data.get("value", "").strip():
+                logger.info("Skipping empty value for %s — keeping existing", key)
+                continue
         supabase.table("account_settings").upsert({
             "account_id": account_id,
             "key": key,

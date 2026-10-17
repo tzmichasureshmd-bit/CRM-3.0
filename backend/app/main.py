@@ -43,6 +43,7 @@ app.add_middleware(
 )
 
 PREFIX = "/api/v1"
+PREFIX_V3 = "/api/v3"
 
 app.include_router(health.router,                prefix=PREFIX, tags=["Health"])
 app.include_router(auth.router,                  prefix=PREFIX, tags=["Auth"])
@@ -71,6 +72,11 @@ app.include_router(meta.router,                  prefix=PREFIX, tags=["Meta"])
 app.include_router(instagram_routes.router,      prefix=PREFIX, tags=["Instagram"])
 app.include_router(ai_settings.router,           prefix=PREFIX, tags=["AI Settings"])
 app.include_router(integrations.router,          prefix=PREFIX, tags=["Integrations"])
+
+# v3 aliases — frontend calls /api/v3/instagram/* and /api/v3/instagram/settings/*
+# Traefik routes all /api/* directly to this backend, bypassing the Next.js proxy.
+app.include_router(instagram_routes.router,      prefix=PREFIX_V3, tags=["Instagram v3"])
+app.include_router(integrations.router,          prefix=PREFIX_V3, tags=["Integrations v3"])
 
 
 @app.get("/")
