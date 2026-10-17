@@ -3,6 +3,10 @@
     {
       "path": "/api/v3/journeys/scheduler",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/v3/automations/scheduler",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

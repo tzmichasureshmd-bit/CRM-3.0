@@ -144,6 +144,7 @@ export interface Contact {
   lead_score_reason: string | null;
   source: string | null;
   tags: string[] | null;
+  opt_out?: boolean | null;
   created_at: string;
 }
 
@@ -271,12 +272,90 @@ export interface Broadcast {
   sent_count: number | null;
   delivered_count: number | null;
   read_count: number | null;
+  failed_count?: number | null;
   created_at: string;
   scheduled_at: string | null;
+  sent_at?: string | null;
+}
+
+export interface BroadcastRecipientItem {
+  contact_id: string;
+  name: string;
+  destination?: string;
+  reason?: string;
+}
+
+export interface BroadcastRecipientPreview {
+  broadcast_id?: string;
+  broadcast_name?: string;
+  message_preview?: string | null;
+  platform: string;
+  total_contacts: number;
+  eligible_count: number;
+  skipped_opt_out_count: number;
+  skipped_no_address_count: number;
+  eligible: BroadcastRecipientItem[];
+  skipped_opt_out: BroadcastRecipientItem[];
+  skipped_no_address: BroadcastRecipientItem[];
+}
+
+export interface BroadcastExecutionItem {
+  contact_id: string;
+  name: string;
+  destination: string | null;
+  status: 'sent' | 'failed' | 'skipped';
+  reason?: string;
+  error?: string;
+  provider_message_id?: string;
+  timestamp: string;
+}
+
+export interface BroadcastSendSummary {
+  broadcast_id: string;
+  account_id: string;
+  platform: string;
+  status: string;
+  total_recipients: number;
+  eligible_count: number;
+  sent_count: number;
+  failed_count: number;
+  skipped_count: number;
+  completed_at: string;
+  results: BroadcastExecutionItem[];
+}
+
+export interface BroadcastRetryResponse {
+  broadcast_id: string;
+  retried_count: number;
+  newly_sent: number;
+  still_failed: number;
+  message: string;
+  summary?: BroadcastSendSummary;
+}
+
+export interface BroadcastIndividualSendPayload {
+  contact_id: string;
+  platform: string;
+  message: string;
+  broadcast_id?: string;
+  subject?: string;
+}
+
+export interface BroadcastIndividualSendResponse {
+  success: boolean;
+  status: 'sent' | 'failed' | 'skipped';
+  provider_message_id?: string;
+  error?: string;
+  contact_id: string;
+  destination?: string;
+  platform: string;
 }
 
 export const getBroadcasts = (params?: Record<string, string>) =>
   req<{ data: Broadcast[]; total: number }>(`/broadcasts${params ? '?' + new URLSearchParams(params).toString() : ''}`);
+
+export const getBroadcast = (id: string) =>
+  req<Broadcast>(`/broadcasts/${id}`);
 
 export const createBroadcast = (body: Partial<Broadcast>) =>
   req<Broadcast>('/broadcasts', { method: 'POST', body: JSON.stringify(body) });
@@ -286,6 +365,30 @@ export const updateBroadcast = (id: string, body: Partial<Broadcast>) =>
 
 export const deleteBroadcast = (id: string) =>
   req(`/broadcasts/${id}`, { method: 'DELETE' });
+
+export const getBroadcastRecipientsPreview = (broadcastId: string) =>
+  req<BroadcastRecipientPreview>(`/broadcasts/${broadcastId}/recipients-preview`);
+
+export const sendBroadcastAll = (broadcastId: string, options?: { batch_size?: number; delay_ms?: number; selected_contact_ids?: string[] }) =>
+  req<BroadcastSendSummary>(`/broadcasts/${broadcastId}/send-all`, {
+    method: 'POST',
+    body: JSON.stringify(options ?? { batch_size: 20, delay_ms: 50 }),
+  });
+
+export const retryBroadcastFailed = (broadcastId: string, options?: { batch_size?: number; delay_ms?: number }) =>
+  req<BroadcastRetryResponse>(`/broadcasts/${broadcastId}/retry-failed`, {
+    method: 'POST',
+    body: JSON.stringify(options ?? { batch_size: 20, delay_ms: 50 }),
+  });
+
+export const getBroadcastResults = (broadcastId: string) =>
+  req<BroadcastSendSummary>(`/broadcasts/${broadcastId}/results`);
+
+export const sendBroadcastIndividual = (body: BroadcastIndividualSendPayload) =>
+  req<BroadcastIndividualSendResponse>('/broadcasts/send-individual', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 
 // ── APPOINTMENTS ──────────────────────────────────────────────
 export interface Appointment {
@@ -324,6 +427,192 @@ export const updateCampaign = (id: string, body: Record<string, unknown>) =>
 
 export const deleteCampaign = (id: string) =>
   req(`/campaigns/${id}`, { method: 'DELETE' });
+
+export const getMetaCampaigns = (params?: Record<string, string>) =>
+  req<{ data: any[]; total: number; page: number; limit: number }>(`/campaigns/meta${params ? '?' + new URLSearchParams(params).toString() : ''}`);
+
+export const syncMetaCampaigns = (body?: { access_token?: string; ad_account_id?: string }) =>
+  req<{
+    success: boolean;
+    ad_account_id: string;
+    api_version: string;
+    fetched_count: number;
+    created_count: number;
+    updated_count: number;
+    skipped_count: number;
+    failed_count: number;
+    duration_ms: number;
+    last_synced_at: string;
+    records: any[];
+  }>('/campaigns/sync-meta', { method: 'POST', body: JSON.stringify(body ?? {}) });
+
+export const getMetaSyncStatus = () =>
+  req<{
+    ad_account_id: string;
+    app_id: string;
+    api_version: string;
+    token_configured: boolean;
+    last_sync: {
+      status: string;
+      fetched_count: number;
+      created_count: number;
+      updated_count: number;
+      skipped_count: number;
+      failed_count: number;
+      duration_ms: number;
+      error_message: string | null;
+      created_at: string;
+    } | null;
+  }>('/campaigns/meta/sync-status');
+
+export interface MetaCredentialsInfo {
+  ad_account_id: string;
+  app_id: string;
+  api_version: string;
+  has_token: boolean;
+  token_preview: string;
+  is_connected: boolean;
+}
+
+export interface MetaConnectionTestResult {
+  success: boolean;
+  ad_account_id?: string;
+  account_name?: string;
+  account_status?: string;
+  currency?: string;
+  timezone?: string;
+  business_name?: string;
+  message?: string;
+  error?: string;
+  error_code?: number;
+  hint?: string;
+}
+
+export const getMetaCredentials = () =>
+  req<MetaCredentialsInfo>('/campaigns/meta/credentials');
+
+export const saveMetaCredentials = (body: {
+  ad_account_id?: string;
+  app_id?: string;
+  access_token?: string;
+  api_version?: string;
+}) =>
+  req<{
+    success: boolean;
+    message: string;
+    ad_account_id: string;
+    app_id: string;
+    api_version: string;
+    has_token: boolean;
+  }>('/campaigns/meta/credentials', { method: 'POST', body: JSON.stringify(body) });
+
+export const testMetaConnection = (body?: {
+  ad_account_id?: string;
+  access_token?: string;
+  api_version?: string;
+}) =>
+  req<MetaConnectionTestResult>('/campaigns/meta/test-connection', { method: 'POST', body: JSON.stringify(body ?? {}) });
+
+export interface MetaPermissionsInfo {
+  is_valid: boolean;
+  has_ads_read: boolean;
+  has_ads_management: boolean;
+  granted_scopes: string[];
+  missing_scopes: string[];
+  can_manage: boolean;
+  ad_account_id: string;
+  ad_account_name?: string;
+  account_status?: string;
+  app_id: string;
+  api_version: string;
+  message: string;
+}
+
+export interface MetaCampaignCreatePayload {
+  name: string;
+  objective: string;
+  status?: 'PAUSED' | 'ACTIVE';
+  daily_budget?: number;
+  lifetime_budget?: number;
+  special_ad_categories?: string[];
+}
+
+export interface MetaCampaignUpdatePayload {
+  name?: string;
+  status?: 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+  daily_budget?: number;
+  lifetime_budget?: number;
+}
+
+export interface MetaCampaignLiveDetails {
+  id: string;
+  meta_campaign_id?: string;
+  name: string;
+  status: string;
+  crm_status: string;
+  objective: string;
+  daily_budget: number | null;
+  lifetime_budget: number | null;
+  start_time: string | null;
+  stop_time: string | null;
+  created_time: string | null;
+  special_ad_categories: string[];
+  buying_type: string;
+  bid_strategy: string | null;
+  insights: {
+    impressions: number;
+    clicks: number;
+    spend: number;
+    cpc: number;
+    cpm: number;
+    ctr: number;
+  };
+}
+
+export const getMetaPermissions = () =>
+  req<MetaPermissionsInfo>('/campaigns/meta/permissions');
+
+export const createMetaCampaign = (body: MetaCampaignCreatePayload) =>
+  req<{
+    success: boolean;
+    meta_campaign_id: string;
+    name: string;
+    objective: string;
+    status: string;
+    record: any;
+    message: string;
+  }>('/campaigns/meta/create', { method: 'POST', body: JSON.stringify(body) });
+
+export const updateMetaCampaign = (metaCampaignId: string, body: MetaCampaignUpdatePayload) =>
+  req<{
+    success: boolean;
+    meta_campaign_id: string;
+    updated_fields: string[];
+    status: string;
+    message: string;
+  }>(`/campaigns/meta/${metaCampaignId}`, { method: 'PATCH', body: JSON.stringify(body) });
+
+export const pauseMetaCampaign = (metaCampaignId: string) =>
+  req<{ success: boolean; meta_campaign_id: string; status: string; message: string }>(
+    `/campaigns/meta/${metaCampaignId}/pause`,
+    { method: 'POST', body: JSON.stringify({}) }
+  );
+
+export const resumeMetaCampaign = (metaCampaignId: string) =>
+  req<{ success: boolean; meta_campaign_id: string; status: string; message: string }>(
+    `/campaigns/meta/${metaCampaignId}/resume`,
+    { method: 'POST', body: JSON.stringify({}) }
+  );
+
+export const archiveMetaCampaign = (metaCampaignId: string) =>
+  req<{ success: boolean; meta_campaign_id: string; status: string; message: string }>(
+    `/campaigns/meta/${metaCampaignId}/archive`,
+    { method: 'POST', body: JSON.stringify({}) }
+  );
+
+export const getMetaCampaignLiveDetails = (metaCampaignId: string) =>
+  req<MetaCampaignLiveDetails>(`/campaigns/meta/${metaCampaignId}`);
+
 
 // ── AUTOMATIONS ───────────────────────────────────────────────
 export const getAutomations = () =>

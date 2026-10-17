@@ -15,3 +15,6 @@ def get_supabase() -> Client:
 
 def get_db() -> Client:
     return get_supabase()
+
+
+get_supabase_client = get_supabase
