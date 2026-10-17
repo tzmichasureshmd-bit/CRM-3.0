@@ -31,7 +31,7 @@ services:
       - "traefik.http.routers.crm30-api.rule=Host(`crm3.tzmicha.com`) && PathPrefix(`/api`)"
       - "traefik.http.routers.crm30-api.entrypoints=websecure"
       - "traefik.http.routers.crm30-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.crm30-api.loadbalancer.server.port=8001"
+      - "traefik.http.services.crm30-api.loadbalancer.server.port=8000"
 
   ai-service:
     build:
