@@ -26,12 +26,6 @@ services:
     networks:
       - internal
       - traefik-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.crm30-api.rule=Host(`crm3.tzmicha.com`) && PathPrefix(`/api`)"
@@ -52,12 +46,6 @@ services:
     restart: unless-stopped
     networks:
       - internal
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
 
   frontend:
     build:
@@ -82,20 +70,12 @@ services:
     env_file:
       - .env.local
     depends_on:
-      backend:
-        condition: service_healthy
-      ai-service:
-        condition: service_healthy
+      - backend
+      - ai-service
     restart: unless-stopped
     networks:
       - internal
       - traefik-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.crm30-frontend.rule=Host(`crm3.tzmicha.com`)"
