@@ -143,8 +143,8 @@ export function CRMSidebar({ theme: _theme, onToggleTheme: _onToggleTheme }: CRM
   return (
     <aside className="crm-sidebar">
       <div className="crm-sidebar-brand">
-        <div className="crm-brand-icon">
-          <Brain size={18} color="white" strokeWidth={2} />
+        <div className="crm-brand-icon" style={{ background: 'none', padding: 0, overflow: 'hidden' }}>
+          <img src="/logo.png" alt="Tzmicha" style={{ width: 36, height: 36, objectFit: 'contain' }} />
         </div>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--crm-text-strong)', letterSpacing: '-0.01em' }}>

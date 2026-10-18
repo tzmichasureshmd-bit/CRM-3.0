@@ -26,11 +26,18 @@ services:
     networks:
       - internal
       - traefik-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.crm30-api.rule=Host(`crm3.tzmicha.com`) && PathPrefix(`/api`)"
       - "traefik.http.routers.crm30-api.entrypoints=websecure"
       - "traefik.http.routers.crm30-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.crm30-api.priority=10"
       - "traefik.http.services.crm30-api.loadbalancer.server.port=8000"
 
   ai-service:
@@ -45,6 +52,12 @@ services:
     restart: unless-stopped
     networks:
       - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
     build:
@@ -59,26 +72,37 @@ services:
         NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
-        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://crm3.tzmicha.com/api}
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://crm3.tzmicha.com}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://crm3.tzmicha.com}
     environment:
-      - NEXT_PUBLIC_BACKEND_URL=https://crm3.tzmicha.com/api
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NEXT_PUBLIC_BACKEND_URL=https://crm3.tzmicha.com
       - NEXT_PUBLIC_AI_URL=http://ai-service:8001
     env_file:
-      - ./frontend/.env.local
+      - .env.local
     depends_on:
-      - backend
-      - ai-service
+      backend:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - internal
       - traefik-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.crm30-frontend.rule=Host(`crm3.tzmicha.com`)"
       - "traefik.http.routers.crm30-frontend.entrypoints=websecure"
       - "traefik.http.routers.crm30-frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.crm30-frontend.loadbalancer.server.port=3001"
+      - "traefik.http.routers.crm30-frontend.priority=1"
+      - "traefik.http.services.crm30-frontend.loadbalancer.server.port=3000"
 
 networks:
   internal:

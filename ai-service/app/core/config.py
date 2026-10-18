@@ -15,8 +15,8 @@ class AISettings(BaseSettings):
     supabase_url: str = ""
     supabase_service_role_key: str = ""
 
-    redis_url: str = "redis://localhost:6379/1"
-    backend_url: str = "http://localhost:8000"
+    redis_url: str = "redis://redis:6379/1"
+    backend_url: str = "http://backend:8000"
 
     class Config:
         env_file = ".env"

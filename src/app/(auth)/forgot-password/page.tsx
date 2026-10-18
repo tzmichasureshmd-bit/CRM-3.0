@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
       <div className="crm-glass-strong" style={{ width: '100%', maxWidth: 420, padding: '40px 36px', textAlign: 'center' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 36, justifyContent: 'center' }}>
-          <div className="crm-brand-icon"><Zap size={18} color="white" /></div>
+          <div className="crm-brand-icon" style={{ background: 'none', padding: 0, overflow: 'hidden' }}><img src="/logo.png" alt="Tzmicha" style={{ width: 36, height: 36, objectFit: 'contain' }} /></div>
           <div style={{ textAlign: 'left' }}>
             <div style={{ fontSize: 18, fontWeight: 750, color: 'var(--crm-text)', letterSpacing: '-0.02em' }}>TZMICHA CRM</div>
             <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Intelligent Growth OS · v3.0</div>

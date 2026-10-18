@@ -17,10 +17,9 @@ jobs:
         run: |
           echo "${{ secrets.BACKEND_ENV }}" > backend/.env
           echo "${{ secrets.FRONTEND_ENV }}" > .env.local
-          echo "${{ secrets.FRONTEND_ENV }}" > frontend/.env.local
           echo "${{ secrets.AI_SERVICE_ENV }}" > ai-service/.env
 
-      - name: Stop only CRM 3.0 containers
+      - name: Stop existing containers
         run: docker compose down --remove-orphans || true
 
       - name: Build images
@@ -40,11 +39,47 @@ jobs:
       - name: Start containers
         run: docker compose up -d
 
+      - name: Wait for all services to be healthy
+        run: |
+          echo "Waiting for services to start..."
+          sleep 10
+          for i in $(seq 1 24); do
+            echo "--- Health check attempt $i/24 ---"
+            docker compose ps
+            UNHEALTHY=$(docker compose ps --format json | python3 -c "
+          import sys, json
+          data = sys.stdin.read().strip()
+          services = []
+          for line in data.splitlines():
+              try:
+                  s = json.loads(line)
+                  if s.get('Health','') not in ('healthy',''):
+                      services.append(s.get('Service','?') + ':' + s.get('Health','?'))
+              except: pass
+          print(','.join(services))
+          " 2>/dev/null || echo "")
+            ALL_UP=$(docker compose ps | grep -c "Up" || true)
+            echo "Containers up: $ALL_UP"
+            if [ "$ALL_UP" -ge 4 ]; then
+              echo "All containers running!"
+              break
+            fi
+            sleep 5
+          done
+
+      - name: Show service logs
+        run: |
+          echo "=== FRONTEND LOGS ==="
+          docker compose logs frontend --tail=40
+          echo "=== BACKEND LOGS ==="
+          docker compose logs backend --tail=20
+          echo "=== AI-SERVICE LOGS ==="
+          docker compose logs ai-service --tail=20
+
       - name: Verify deployment
         run: |
-          sleep 15
           docker compose ps
-          docker compose ps | grep -E "Up|running" || (docker compose logs --tail=50 && exit 1)
+          docker compose ps | grep -E "Up|running" || (docker compose logs --tail=100 && exit 1)
 
       - name: Cleanup old images
         if: success()

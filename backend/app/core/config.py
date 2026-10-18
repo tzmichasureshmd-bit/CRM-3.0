@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     supabase_anon_key: str
 
     # Redis
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = "redis://redis:6379/0"
 
     # Firebase / Google Auth
     firebase_project_id: str = "tzmicha-crm-3"
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # AI
     openai_api_key: str = ""
     anthropic_api_key: str = ""
-    ai_service_url: str = "http://localhost:8001"
+    ai_service_url: str = "http://ai-service:8001"
 
     # WhatsApp (Meta)
     whatsapp_verify_token: str = ""
@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     encryption_key: str
 
     # CORS
-    allowed_origins: str = "http://localhost:3001"
+    allowed_origins: str = "https://crm3.tzmicha.com,http://localhost:3000"
 
     @property
     def origins_list(self) -> list[str]:
@@ -76,7 +76,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
-        extra = "ignore"
         extra = "ignore"
 
 
