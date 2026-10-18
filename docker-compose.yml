@@ -19,20 +19,14 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./backend/.env
+    ports:
+      - "8005:8000"
     depends_on:
       redis:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - internal
-      - traefik-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.crm30-api.rule=Host(`crm3.tzmicha.com`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.crm30-api.entrypoints=websecure"
-      - "traefik.http.routers.crm30-api.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.crm30-api.priority=10"
-      - "traefik.http.services.crm30-api.loadbalancer.server.port=8000"
 
   ai-service:
     build:
@@ -40,6 +34,8 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./ai-service/.env
+    ports:
+      - "8006:8001"
     depends_on:
       redis:
         condition: service_healthy
@@ -69,26 +65,18 @@ services:
       - NEXT_PUBLIC_AI_URL=http://ai-service:8001
     env_file:
       - .env.local
+    ports:
+      - "3006:3000"
     depends_on:
       - backend
       - ai-service
     restart: unless-stopped
     networks:
       - internal
-      - traefik-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.crm30-frontend.rule=Host(`crm3.tzmicha.com`)"
-      - "traefik.http.routers.crm30-frontend.entrypoints=websecure"
-      - "traefik.http.routers.crm30-frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.crm30-frontend.priority=1"
-      - "traefik.http.services.crm30-frontend.loadbalancer.server.port=3000"
 
 networks:
   internal:
     driver: bridge
-  traefik-net:
-    external: true
 
 volumes:
   redis_data:
