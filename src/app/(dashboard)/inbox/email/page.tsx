@@ -5,7 +5,7 @@ import { Send, RefreshCw, Plus, X, ChevronLeft, AlertCircle, Search, Loader2, St
 // ── Google Colors ─────────────────────────────────────────────
 const G = { blue: '#4285F4', red: '#EA4335', yellow: '#FBBC05', green: '#34A853', gray: '#5F6368', lightGray: '#F1F3F4', border: '#E8EAED', white: '#FFFFFF', dark: '#202124', mid: '#3C4043' };
 
-const BASE = 'http://localhost:8000/api/v1';
+const BASE = `${process.env.NEXT_PUBLIC_BACKEND_URL ?? 'https://crm3.tzmicha.com'}/api/v1`;
 const getH = () => ({ 'Content-Type': 'application/json', Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : ''}` });
 
 interface EmailConv { id: string; last_message_text: string | null; last_message_at: string | null; status: string | null; unread_count: number; contact: { name: string | null; email: string | null } | null; }
