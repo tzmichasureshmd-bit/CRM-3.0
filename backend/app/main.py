@@ -16,9 +16,9 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print(f"🚀 {settings.app_name} starting on port {settings.port}")
+    print(f"[START] {settings.app_name} starting on port {settings.port}")
     yield
-    print("👋 Shutting down")
+    print("[STOP] Shutting down")
 
 
 app = FastAPI(
