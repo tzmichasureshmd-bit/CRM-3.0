@@ -113,7 +113,14 @@ NGINXEOF
       - name: Verify all containers running
         run: |
           docker compose ps
-          docker compose ps | grep -c "Up" | xargs -I{} sh -c 'if [ {} -lt 4 ]; then echo "ERROR: Not all containers up"; docker compose logs --tail=100; exit 1; fi'
+          RUNNING=$(docker compose ps | grep -E "Up|running" | wc -l | tr -d ' ')
+          echo "Running containers: $RUNNING"
+          if [ "$RUNNING" -lt 4 ]; then
+            echo "ERROR: Expected 4 containers running, got $RUNNING"
+            docker compose logs --tail=100
+            exit 1
+          fi
+          echo "All containers are up"
 
       - name: Cleanup old images
         if: success()
