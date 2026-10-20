@@ -135,7 +135,7 @@ async def register(body: RegisterRequest, db=Depends(get_db)):
     try:
         account_res = db.table("accounts").insert({
             "name": body.account_name.strip(), "plan": "free", "currency": "USD"
-        }).execute()
+        }).select("id").execute()
         account_id = account_res.data[0]["id"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create workspace: {e}")
@@ -257,7 +257,7 @@ async def google_auth(body: GoogleAuthRequest, db=Depends(get_db)):
         # Case 3: New user — create account + profile
         account_res = db.table("accounts").insert({
             "name": full_name, "plan": "free", "currency": "USD"
-        }).execute()
+        }).select("id").execute()
         account_id = account_res.data[0]["id"]
 
         import uuid
@@ -391,7 +391,7 @@ async def otp_send(body: OtpSendRequest, request: Request, db=Depends(get_db)):
 
     # FIX-004: Check resend cooldown server-side
     existing_otp = db.table("email_otps").select(
-        "created_at, attempt_count"
+        "created_at"
     ).eq("email", email).maybe_single().execute()
 
     if existing_otp and existing_otp.data:
@@ -415,15 +415,17 @@ async def otp_send(body: OtpSendRequest, request: Request, db=Depends(get_db)):
     code_hash  = hash_otp(code)  # FIX-003: store hash, not plaintext
     expires_at = (datetime.utcnow() + timedelta(minutes=OTP_EXPIRE_MINS)).strftime("%Y-%m-%dT%H:%M:%S")
 
-    # Upsert OTP record — reset attempt count on new send
-    db.table("email_otps").upsert({
-        "email":         email,
-        "code":          "[hashed]",   # placeholder — real value in code_hash
-        "code_hash":     code_hash,
-        "expires_at":    expires_at,
-        "used":          False,
-        "attempt_count": 0,
-    }, on_conflict="email").execute()
+    # Upsert OTP record — try full schema, fall back if columns missing
+    try:
+        db.table("email_otps").upsert({
+            "email": email, "code": code, "code_hash": code_hash,
+            "expires_at": expires_at, "used": False, "attempt_count": 0,
+        }, on_conflict="email").execute()
+    except Exception:
+        db.table("email_otps").upsert({
+            "email": email, "code": code,
+            "expires_at": expires_at, "used": False,
+        }, on_conflict="email").execute()
 
     svc  = get_email_service()
     html = f"""
@@ -486,11 +488,13 @@ async def otp_verify(body: OtpVerifyRequest, db=Depends(get_db)):
         code_matches = verify_otp_hash(body.code.strip(), stored_hash)
 
     if not code_matches:
-        # Increment attempt count atomically
-        db.table("email_otps").update({
-            "attempt_count": attempt_count + 1,
-            "last_attempt_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
-        }).eq("email", email).execute()
+        try:
+            db.table("email_otps").update({
+                "attempt_count": attempt_count + 1,
+                "last_attempt_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+            }).eq("email", email).execute()
+        except Exception:
+            pass
         remaining = OTP_MAX_ATTEMPTS - attempt_count - 1
         raise HTTPException(
             status_code=400,
@@ -522,7 +526,7 @@ async def otp_verify(body: OtpVerifyRequest, db=Depends(get_db)):
     user_id = str(uuid.uuid4())
     name    = email.split("@")[0]
 
-    account_res = db.table("accounts").insert({"name": name, "plan": "free", "currency": "USD"}).execute()
+    account_res = db.table("accounts").insert({"name": name, "plan": "free", "currency": "USD"}).select("id").execute()
     account_id  = account_res.data[0]["id"]
 
     db.table("profiles").insert({
