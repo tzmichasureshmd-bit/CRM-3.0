@@ -107,14 +107,15 @@ async def verify_firebase_token(id_token: str) -> dict:
 def get_profile(db, user_id: str) -> dict:
     res = db.table("profiles").select(
         "user_id,account_id,role,full_name,email,avatar_url,"
-        "totp_secret,totp_enabled,token_version,is_active"
+        "totp_secret,totp_enabled,token_version"
     ).eq("user_id", user_id).maybe_single().execute()
     return (res.data if res else None) or {}
 
 
 def check_account_active(profile: dict) -> None:
-    """FIX-008: Enforce account active status if the field exists."""
-    # is_active defaults to True when the column doesn't exist yet (migration pending)
+    """Enforce account active status when the schema provides the field."""
+    # The current profiles migrations do not define is_active, so missing data
+    # keeps existing accounts enabled until that field is added to the schema.
     is_active = profile.get("is_active", True)
     if is_active is False:
         raise HTTPException(status_code=403, detail="Account is disabled. Contact support.")
@@ -172,7 +173,7 @@ async def login(body: LoginRequest, db=Depends(get_db)):
     email = body.email.lower().strip()
     profile = db.table("profiles").select(
         "user_id,account_id,role,full_name,email,avatar_url,"
-        "password_hash,totp_secret,totp_enabled,token_version,is_active"
+        "password_hash,totp_secret,totp_enabled,token_version"
     ).eq("email", email).maybe_single().execute()
     p = profile.data if profile else None
 
@@ -216,7 +217,7 @@ async def google_auth(body: GoogleAuthRequest, db=Depends(get_db)):
 
     # Case 1: Existing Google UID — return existing profile
     existing_google = db.table("profiles").select(
-        "user_id,account_id,role,token_version,is_active"
+        "user_id,account_id,role,token_version"
     ).eq("google_id", google_id).maybe_single().execute()
 
     if existing_google and existing_google.data:
@@ -236,7 +237,7 @@ async def google_auth(body: GoogleAuthRequest, db=Depends(get_db)):
     # with their password first, then link from account settings.
     if email:
         existing_email = db.table("profiles").select(
-            "user_id,account_id,role,google_id,token_version,is_active"
+            "user_id,account_id,role,google_id,token_version"
         ).eq("email", email).maybe_single().execute()
 
         if existing_email and existing_email.data:
@@ -503,7 +504,7 @@ async def otp_verify(body: OtpVerifyRequest, db=Depends(get_db)):
 
     # Look up existing profile
     existing = db.table("profiles").select(
-        "user_id,account_id,role,full_name,email,avatar_url,token_version,is_active"
+        "user_id,account_id,role,full_name,email,avatar_url,token_version"
     ).eq("email", email).maybe_single().execute()
 
     if existing and existing.data:

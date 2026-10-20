@@ -33,7 +33,7 @@ def get_current_user(
         # Derive account_id and role from DB (never trust token claims)
         profile_res = (
             db.table("profiles")
-            .select("account_id, role, token_version, is_active")
+            .select("account_id, role, token_version")
             .eq("user_id", user_id)
             .maybe_single()
             .execute()
@@ -42,10 +42,6 @@ def get_current_user(
             raise HTTPException(status_code=403, detail="Profile not found")
 
         p = profile_res.data
-
-        # FIX-008: Enforce account active status
-        if p.get("is_active") is False:
-            raise HTTPException(status_code=403, detail="Account is disabled")
 
         # FIX-005: Validate token version — rejects sessions issued before password reset
         token_ver   = payload.get("ver", 1) or 1
