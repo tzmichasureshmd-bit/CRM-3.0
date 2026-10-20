@@ -44,7 +44,7 @@ jobs:
 
       - name: Update nginx config
         run: |
-          sudo tee /etc/nginx/sites-enabled/crm3 > /dev/null << 'NGINXEOF'
+          cat > /tmp/crm3.nginx << 'NGINXEOF'
 server {
     server_name crm3.tzmicha.com;
 
@@ -97,7 +97,8 @@ server {
     return 404;
 }
 NGINXEOF
-          nginx -t && systemctl reload nginx
+          sudo cp /tmp/crm3.nginx /etc/nginx/sites-enabled/crm3
+          nginx -t && sudo systemctl reload nginx
 
       - name: Show all logs
         run: |
