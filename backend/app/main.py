@@ -12,7 +12,7 @@ from app.api.v1 import (
     content, agents, reports, health, webhooks,
     follow_ups, broadcasts, appointments, segments, journeys,
     revenue_intelligence, attribution, copilot, ai_routes, email_routes, meta, instagram_routes,
-    ai_settings, integrations,
+    ai_settings, integrations, notifications, analytics,
 )
 
 settings = get_settings()
@@ -80,6 +80,19 @@ app.include_router(integrations.router,          prefix=PREFIX, tags=["Integrati
 # Traefik routes all /api/* directly to this backend, bypassing the Next.js proxy.
 app.include_router(instagram_routes.router,      prefix=PREFIX_V3, tags=["Instagram v3"])
 app.include_router(integrations.router,          prefix=PREFIX_V3, tags=["Integrations v3"])
+app.include_router(content.router,               prefix=PREFIX_V3, tags=["Content v3"])
+app.include_router(agents.router,                prefix=PREFIX_V3, tags=["AI Agents v3"])
+app.include_router(automations.router,           prefix=PREFIX_V3, tags=["Automations v3"])
+app.include_router(revenue_intelligence.router,  prefix=PREFIX_V3, tags=["Revenue Intelligence v3"])
+app.include_router(reports.router,               prefix=PREFIX_V3, tags=["Reports v3"])
+app.include_router(segments.router,              prefix=PREFIX_V3, tags=["Segments v3"])
+app.include_router(journeys.router,              prefix=PREFIX_V3, tags=["Journeys v3"])
+app.include_router(contacts.router,              prefix=PREFIX_V3, tags=["Contacts v3"])
+app.include_router(conversations.router,         prefix=PREFIX_V3, tags=["Conversations v3"])
+app.include_router(ai_routes.router,             prefix=PREFIX_V3, tags=["AI v3"])
+app.include_router(copilot.router,               prefix=PREFIX_V3, tags=["Copilot v3"])
+app.include_router(notifications.router,         prefix=PREFIX_V3, tags=["Notifications v3"])
+app.include_router(analytics.router,             prefix=PREFIX_V3, tags=["Analytics v3"])
 
 
 @app.get("/")
