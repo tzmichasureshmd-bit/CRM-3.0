@@ -39,9 +39,12 @@ jobs:
       - name: Start containers
         run: docker compose up -d
 
+      - name: Wait for startup
+        run: sleep 25
+
       - name: Update nginx config
         run: |
-          cat > /etc/nginx/sites-enabled/crm3 << 'EOF'
+          sudo tee /etc/nginx/sites-enabled/crm3 > /dev/null << 'NGINXEOF'
 server {
     server_name crm3.tzmicha.com;
 
@@ -93,7 +96,7 @@ server {
     server_name crm3.tzmicha.com;
     return 404;
 }
-EOF
+NGINXEOF
           nginx -t && systemctl reload nginx
 
       - name: Show all logs
