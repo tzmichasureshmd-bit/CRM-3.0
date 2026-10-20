@@ -35,13 +35,13 @@ def get_current_user(
             db.table("profiles")
             .select("account_id, role, token_version")
             .eq("user_id", user_id)
-            .maybe_single()
+            .limit(1)
             .execute()
         )
         if not profile_res or not profile_res.data:
             raise HTTPException(status_code=403, detail="Profile not found")
 
-        p = profile_res.data
+        p = profile_res.data[0]
 
         # FIX-005: Validate token version — rejects sessions issued before password reset
         token_ver   = payload.get("ver", 1) or 1

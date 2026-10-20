@@ -108,8 +108,8 @@ def get_profile(db, user_id: str) -> dict:
     res = db.table("profiles").select(
         "user_id,account_id,role,full_name,email,avatar_url,"
         "totp_secret,totp_enabled,token_version"
-    ).eq("user_id", user_id).maybe_single().execute()
-    return (res.data if res else None) or {}
+    ).eq("user_id", user_id).limit(1).execute()
+    return (res.data[0] if res.data else None) or {}
 
 
 def check_account_active(profile: dict) -> None:
@@ -128,8 +128,8 @@ async def register(body: RegisterRequest, db=Depends(get_db)):
     email = body.email.lower().strip()
 
     # FIX-006: Check duplicate email
-    existing = db.table("profiles").select("user_id").eq("email", email).maybe_single().execute()
-    if existing and existing.data:
+    existing = db.table("profiles").select("user_id").eq("email", email).limit(1).execute()
+    if existing.data:
         raise HTTPException(status_code=409, detail="Email already registered. Please sign in.")
 
     try:
@@ -174,8 +174,8 @@ async def login(body: LoginRequest, db=Depends(get_db)):
     profile = db.table("profiles").select(
         "user_id,account_id,role,full_name,email,avatar_url,"
         "password_hash,totp_secret,totp_enabled,token_version"
-    ).eq("email", email).maybe_single().execute()
-    p = profile.data if profile else None
+    ).eq("email", email).limit(1).execute()
+    p = profile.data[0] if profile.data else None
 
     if not p or not p.get("password_hash"):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -219,10 +219,10 @@ async def google_auth(body: GoogleAuthRequest, db=Depends(get_db)):
         # Case 1: Existing Google UID — return existing profile
         existing_google = db.table("profiles").select(
             "user_id,account_id,role,token_version"
-        ).eq("google_id", google_id).maybe_single().execute()
+        ).eq("google_id", google_id).limit(1).execute()
 
-        if existing_google and existing_google.data:
-            p = existing_google.data
+        if existing_google.data:
+            p = existing_google.data[0]
             check_account_active(p)
             token_version = p.get("token_version", 1) or 1
             return TokenResponse(
@@ -236,10 +236,10 @@ async def google_auth(body: GoogleAuthRequest, db=Depends(get_db)):
         if email:
             existing_email = db.table("profiles").select(
                 "user_id,account_id,role,google_id,token_version"
-            ).eq("email", email).maybe_single().execute()
+            ).eq("email", email).limit(1).execute()
 
-            if existing_email and existing_email.data:
-                ep = existing_email.data
+            if existing_email.data:
+                ep = existing_email.data[0]
                 if ep.get("google_id") and ep["google_id"] != google_id:
                     raise HTTPException(
                         status_code=409,
@@ -392,9 +392,9 @@ async def otp_send(body: OtpSendRequest, request: Request, db=Depends(get_db)):
     # FIX-004: Check resend cooldown server-side
     existing_otp = db.table("email_otps").select(
         "created_at"
-    ).eq("email", email).maybe_single().execute()
+    ).eq("email", email).limit(1).execute()
 
-    if existing_otp and existing_otp.data:
+    if existing_otp.data:
         created_at_str = existing_otp.data.get("created_at", "")
         if created_at_str:
             try:
@@ -459,8 +459,8 @@ async def otp_verify(body: OtpVerifyRequest, db=Depends(get_db)):
     """
     email = body.email.lower().strip()
 
-    row = db.table("email_otps").select("*").eq("email", email).maybe_single().execute()
-    r   = row.data if row else None
+    row = db.table("email_otps").select("*").eq("email", email).limit(1).execute()
+    r   = row.data[0] if row.data else None
 
     if not r:
         raise HTTPException(status_code=400, detail="No reset code found for this email. Request a new code.")
@@ -507,10 +507,10 @@ async def otp_verify(body: OtpVerifyRequest, db=Depends(get_db)):
     # Look up existing profile
     existing = db.table("profiles").select(
         "user_id,account_id,role,full_name,email,avatar_url,token_version"
-    ).eq("email", email).maybe_single().execute()
+    ).eq("email", email).limit(1).execute()
 
-    if existing and existing.data:
-        p = existing.data
+    if existing.data:
+        p = existing.data[0]
         check_account_active(p)
         token_version = p.get("token_version", 1) or 1
         return TokenResponse(
