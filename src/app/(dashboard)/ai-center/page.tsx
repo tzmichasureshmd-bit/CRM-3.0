@@ -17,15 +17,15 @@ const SUGGESTED_QUERIES = [
 
 function DataSourceBadge({ source }: { source?: string }) {
   if (!source) return null;
-  const map: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
-    database: { label: 'CRM Data', icon: <Database className="h-3 w-3" />, cls: 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400' },
-    ai_inference: { label: 'AI Analysis', icon: <Lightbulb className="h-3 w-3" />, cls: 'bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400' },
-    ai_recommendation: { label: 'AI Recommendation', icon: <Sparkles className="h-3 w-3" />, cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400' },
+  const map: Record<string, { label: string; icon: React.ReactNode; bg: string; color: string }> = {
+    database:          { label: 'CRM Data',          icon: <Database size={10} />,  bg: '#dbeafe', color: '#1d4ed8' },
+    ai_inference:      { label: 'AI Analysis',        icon: <Lightbulb size={10} />, bg: '#ede9fe', color: '#6d28d9' },
+    ai_recommendation: { label: 'AI Recommendation',  icon: <Sparkles size={10} />,  bg: '#fef3c7', color: '#92400e' },
   };
   const meta = map[source];
   if (!meta) return null;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${meta.cls}`}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, borderRadius: 20, padding: '2px 8px', fontSize: 10, fontWeight: 700, background: meta.bg, color: meta.color }}>
       {meta.icon} {meta.label}
     </span>
   );
@@ -34,18 +34,25 @@ function DataSourceBadge({ source }: { source?: string }) {
 function MessageBubble({ msg }: { msg: CopilotMessage }) {
   const isUser = msg.role === 'user';
   return (
-    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-        {isUser ? <User className="h-4 w-4" /> : <Brain className="h-4 w-4 text-primary" />}
+    <div style={{ display: 'flex', gap: 10, flexDirection: isUser ? 'row-reverse' : 'row' }}>
+      <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: isUser ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(79,109,245,0.10)' }}>
+        {isUser ? <User size={15} color="white" /> : <Brain size={15} color="#4f6df5" />}
       </div>
-      <div className={`max-w-[80%] space-y-1 ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
-        <div className={`rounded-2xl px-4 py-3 text-sm ${isUser ? 'bg-primary text-primary-foreground rounded-tr-sm' : 'bg-muted text-foreground rounded-tl-sm'}`}>
-          <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+      <div style={{ maxWidth: '78%', display: 'flex', flexDirection: 'column', gap: 4, alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+        <div style={{
+          padding: '10px 14px', borderRadius: isUser ? '18px 4px 18px 18px' : '4px 18px 18px 18px',
+          fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+          background: isUser ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(255,255,255,0.92)',
+          color: isUser ? 'white' : '#101936',
+          boxShadow: isUser ? '0 4px 14px rgba(79,109,245,0.25)' : '0 2px 8px rgba(64,72,120,0.08)',
+          border: isUser ? 'none' : '1px solid rgba(130,145,190,0.18)',
+        }}>
+          {msg.content}
         </div>
         {!isUser && (
-          <div className="flex items-center gap-2 px-1">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 4 }}>
             <DataSourceBadge source={msg.data_source} />
-            <span className="text-[10px] text-muted-foreground">
+            <span style={{ fontSize: 10, color: '#8790aa' }}>
               {new Date(msg.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
@@ -100,25 +107,21 @@ export default function CopilotPage() {
       if (!res.ok) throw new Error('Copilot unavailable');
       const data = await res.json();
 
-      const assistantMsg: CopilotMessage = {
+      setMessages((prev) => [...prev, {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: data.answer,
         data_source: data.data_source,
         confidence: data.confidence,
         created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
+      }]);
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: 'I encountered an error. The CRM continues working normally — please try again.',
-          created_at: new Date().toISOString(),
-        },
-      ]);
+      setMessages((prev) => [...prev, {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: 'I encountered an error. The CRM continues working normally — please try again.',
+        created_at: new Date().toISOString(),
+      }]);
     } finally {
       setLoading(false);
       inputRef.current?.focus();
@@ -133,35 +136,35 @@ export default function CopilotPage() {
   };
 
   return (
-    <div className="flex h-[calc(100dvh-var(--app-header-h)-2rem)] flex-col gap-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 64px - 52px)', borderRadius: 20, overflow: 'hidden', background: 'rgba(255,255,255,0.96)', border: '1px solid rgba(130,145,190,0.18)', boxShadow: '0 8px 32px rgba(64,72,120,0.10)' }}>
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-          <Brain className="h-5 w-5 text-primary" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: '1px solid rgba(130,145,190,0.14)', background: 'rgba(255,255,255,0.98)', flexShrink: 0 }}>
+        <div style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(79,109,245,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Brain size={20} color="#4f6df5" />
         </div>
         <div>
-          <h1 className="text-[15px] font-semibold text-foreground">AI Business Copilot</h1>
-          <p className="text-xs text-muted-foreground">Powered by your real CRM data</p>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#101936' }}>AI Business Copilot</div>
+          <div style={{ fontSize: 11, color: '#8790aa' }}>Powered by your real CRM data</div>
         </div>
-        <div className="ml-auto flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 dark:border-green-900/30 dark:bg-green-950/20">
-          <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-          <span className="text-[11px] font-semibold text-green-700 dark:text-green-400">Online</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, borderRadius: 20, border: '1px solid rgba(40,201,154,0.30)', background: 'rgba(40,201,154,0.08)', padding: '4px 10px' }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#28c99a', display: 'block' }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#28c99a' }}>Online</span>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 16, background: '#f8f9ff' }}>
         {messages.map((msg) => (
           <MessageBubble key={msg.id} msg={msg} />
         ))}
         {loading && (
-          <div className="flex gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-              <Brain className="h-4 w-4 text-primary" />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(79,109,245,0.10)' }}>
+              <Brain size={15} color="#4f6df5" />
             </div>
-            <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm bg-muted px-4 py-3">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Analyzing your CRM data...</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: '4px 18px 18px 18px', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(130,145,190,0.18)', boxShadow: '0 2px 8px rgba(64,72,120,0.08)' }}>
+              <Loader2 size={14} color="#8790aa" style={{ animation: 'spin 1s linear infinite' }} />
+              <span style={{ fontSize: 13, color: '#8790aa' }}>Analyzing your CRM data...</span>
             </div>
           </div>
         )}
@@ -170,15 +173,14 @@ export default function CopilotPage() {
 
       {/* Suggested queries */}
       {messages.length <= 1 && (
-        <div className="border-t border-border px-5 py-3">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">Try asking:</p>
-          <div className="flex flex-wrap gap-2">
+        <div style={{ borderTop: '1px solid rgba(130,145,190,0.14)', padding: '12px 20px', background: 'rgba(255,255,255,0.98)', flexShrink: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#8790aa', marginBottom: 8 }}>Try asking:</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {SUGGESTED_QUERIES.map((q) => (
-              <button
-                key={q}
-                onClick={() => void send(q)}
-                className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-              >
+              <button key={q} onClick={() => void send(q)}
+                style={{ borderRadius: 20, border: '1px solid rgba(130,145,190,0.22)', background: 'rgba(255,255,255,0.80)', padding: '5px 12px', fontSize: 12, fontWeight: 500, color: '#334E68', cursor: 'pointer', transition: 'background 150ms' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(79,109,245,0.08)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.80)')}>
                 {q}
               </button>
             ))}
@@ -187,8 +189,8 @@ export default function CopilotPage() {
       )}
 
       {/* Input */}
-      <div className="border-t border-border px-4 py-3">
-        <div className="flex items-end gap-2">
+      <div style={{ borderTop: '1px solid rgba(130,145,190,0.14)', padding: '12px 16px', background: 'rgba(255,255,255,0.98)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
           <textarea
             ref={inputRef}
             value={input}
@@ -196,22 +198,19 @@ export default function CopilotPage() {
             onKeyDown={handleKeyDown}
             placeholder="Ask anything about your CRM data..."
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 max-h-32"
-            style={{ minHeight: '42px' }}
+            style={{ flex: 1, resize: 'none', borderRadius: 14, border: '1px solid rgba(130,145,190,0.25)', background: '#f8f9ff', padding: '10px 14px', fontSize: 13, color: '#101936', outline: 'none', minHeight: 42, maxHeight: 128, fontFamily: 'inherit', lineHeight: 1.5 }}
           />
-          <button
-            onClick={() => void send(input)}
-            disabled={!input.trim() || loading}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all hover:bg-primary/90 disabled:opacity-40"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          <button onClick={() => void send(input)} disabled={!input.trim() || loading}
+            style={{ width: 42, height: 42, flexShrink: 0, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: (!input.trim() || loading) ? 'not-allowed' : 'pointer', opacity: (!input.trim() || loading) ? 0.45 : 1, transition: 'opacity 150ms' }}>
+            {loading ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} />}
           </button>
         </div>
-        <p className="mt-1.5 text-[10px] text-muted-foreground px-1">
-          <AlertCircle className="inline h-3 w-3 mr-0.5" />
+        <div style={{ marginTop: 6, fontSize: 10, color: '#8790aa', display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 4 }}>
+          <AlertCircle size={10} />
           AI responses are based on your CRM data. Always verify before acting.
-        </p>
+        </div>
       </div>
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }

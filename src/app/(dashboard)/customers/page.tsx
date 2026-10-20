@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import { v3fetch } from '@/lib/auth-client';
 
 // ── Types ────────────────────────────────────────────────────
 interface Contact {
@@ -226,7 +227,7 @@ export default function CustomersPage() {
     if (!selected) return;
     setAnalyzing(true);
     try {
-      const res = await fetch('/api/v3/ai/lead-intelligence', {
+      const res = await v3fetch('/api/v3/ai/lead-intelligence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contactId: selected.id }),

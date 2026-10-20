@@ -1,20 +1,21 @@
-from fastapi import HTTPException, Security
+from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from app.db.supabase import get_supabase
 from app.core.config import get_settings
 
 settings = get_settings()
-bearer = HTTPBearer()
+bearer   = HTTPBearer()
 
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Security(bearer),
 ) -> dict:
-    db = get_supabase()
+    db    = get_supabase()
     token = credentials.credentials
     try:
-        # Supabase JWTs are signed with the JWT secret (found in Supabase dashboard → Settings → API)
+        # CRM JWTs are HS256 tokens issued by FastAPI (NOT Supabase Auth tokens).
+        # The jwt_secret is the CRM application secret, not the Supabase JWT secret.
         payload = jwt.decode(
             token,
             settings.jwt_secret,
@@ -25,10 +26,14 @@ def get_current_user(
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
 
-        # Derive account_id from profiles table (never trust token claims for account_id)
+        # Reject partial TOTP tokens on all protected routes
+        if payload.get("partial"):
+            raise HTTPException(status_code=401, detail="Incomplete authentication")
+
+        # Derive account_id and role from DB (never trust token claims)
         profile_res = (
             db.table("profiles")
-            .select("account_id, role")
+            .select("account_id, role, token_version, is_active")
             .eq("user_id", user_id)
             .maybe_single()
             .execute()
@@ -36,10 +41,22 @@ def get_current_user(
         if not profile_res or not profile_res.data:
             raise HTTPException(status_code=403, detail="Profile not found")
 
+        p = profile_res.data
+
+        # FIX-008: Enforce account active status
+        if p.get("is_active") is False:
+            raise HTTPException(status_code=403, detail="Account is disabled")
+
+        # FIX-005: Validate token version — rejects sessions issued before password reset
+        token_ver   = payload.get("ver", 1) or 1
+        profile_ver = p.get("token_version", 1) or 1
+        if token_ver < profile_ver:
+            raise HTTPException(status_code=401, detail="Session invalidated. Please sign in again.")
+
         return {
-            "user_id": user_id,
-            "account_id": profile_res.data["account_id"],
-            "role": profile_res.data.get("role", "agent"),
+            "user_id":    user_id,
+            "account_id": p["account_id"],
+            "role":       p.get("role", "agent"),
         }
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")

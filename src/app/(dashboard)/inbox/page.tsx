@@ -10,6 +10,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { useInboxRealtime } from '@/hooks/use-inbox-realtime';
 import { ConvAIIntelligencePanel } from '@/components/inbox/ConvAIIntelligencePanel';
+import { v3fetch } from '@/lib/auth-client';
 
 // ── Types ────────────────────────────────────────────────────
 interface Contact {
@@ -558,7 +559,7 @@ export default function InboxPage() {
     setAiError(null);
     setAiReply('');
     try {
-      const res = await fetch('/api/v3/ai/reply-assist', {
+      const res = await v3fetch('/api/v3/ai/reply-assist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversationId: activeConv.id, action }),

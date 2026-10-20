@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app.middleware.auth import get_current_user
 from app.db.supabase import get_supabase
+import json
 
 router = APIRouter()
 
@@ -38,17 +39,25 @@ async def get_ai_keys(current_user: dict = Depends(get_current_user)):
             .eq("account_id", current_user["account_id"]) \
             .eq("key", "ai_keys").maybe_single().execute()
     if res and res.data:
-        return res.data["value"]
+        raw = res.data["value"]
+        # value column is text — parse JSON string back to dict
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except Exception:
+                return {}
+        return raw  # already a dict (legacy jsonb)
     return {}
 
 
 @router.post("/settings/ai-keys")
 async def save_ai_keys(payload: AIKeysConfig, current_user: dict = Depends(get_current_user)):
     db = get_supabase()
+    # Serialize to JSON string because account_settings.value is text
     db.table("account_settings").upsert({
         "account_id": current_user["account_id"],
         "key":        "ai_keys",
-        "value":      payload.model_dump(exclude_none=True),
+        "value":      json.dumps(payload.model_dump(exclude_none=True)),
     }, on_conflict="account_id,key").execute()
     return {"status": "saved"}
 

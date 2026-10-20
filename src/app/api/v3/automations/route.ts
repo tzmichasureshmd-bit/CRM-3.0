@@ -3,18 +3,13 @@
  * GET  /api/v3/automations  — list automations for the account (+ summary)
  * POST /api/v3/automations  — create automation (draft or active)
  *
- * Security: account_id always from session, never from body.
- * Reuses existing automations / automation_steps tables.
+ * Auth: FastAPI JWT verified server-side via verifyRequest().
+ * DB:   Service-role client — account_id always from verified token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 import { ACTION_MAP, TRIGGER_MAP } from '@/lib/ai/automation-catalog';
-
-async function getAccountId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
-  const { data } = await supabase.from('profiles').select('account_id').eq('user_id', userId).single();
-  return (data?.account_id as string) ?? null;
-}
 
 const LIST_COLUMNS = `
   id, name, description, trigger_type, trigger_config,
@@ -68,28 +63,24 @@ function validateSteps(steps: { step_type: string; config: Record<string, unknow
   return null;
 }
 
-// ── GET /api/v3/automations ───────────────────────────────────
 export async function GET(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
     const url = new URL(req.url);
     const status = url.searchParams.get('status');
     const trigger = url.searchParams.get('trigger');
     const search = url.searchParams.get('search');
     const sort = url.searchParams.get('sort') ?? 'created_at';
-    const order = url.searchParams.get('order') === 'asc' ? true : false;
+    const order = url.searchParams.get('order') === 'asc';
     const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '100'), 200);
 
-    let query = supabase
+    let query = db
       .from('automations')
       .select(LIST_COLUMNS)
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .order(sort, { ascending: order })
       .limit(limit);
 
@@ -119,16 +110,12 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ── POST /api/v3/automations ──────────────────────────────────
 export async function POST(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
     const body = await req.json() as {
       name?: string;
       description?: string | null;
@@ -152,11 +139,11 @@ export async function POST(req: NextRequest) {
     const activate = body.activate === true || body.status === 'active';
     const status = activate ? 'active' : (body.status === 'paused' ? 'paused' : 'draft');
 
-    const { data: automation, error: autoErr } = await supabase
+    const { data: automation, error: autoErr } = await db
       .from('automations')
       .insert({
-        account_id: accountId,
-        created_by: user.id,
+        account_id: user.account_id,
+        created_by: user.user_id,
         name: body.name.trim(),
         description: body.description ?? null,
         trigger_type: body.trigger_type,
@@ -178,9 +165,9 @@ export async function POST(req: NextRequest) {
 
     if (steps.length > 0) {
       const rows = steps.map(s => ({ automation_id: automation.id, step_type: s.step_type, config: s.config, position: s.position }));
-      const { error: stepsErr } = await supabase.from('automation_steps').insert(rows);
+      const { error: stepsErr } = await db.from('automation_steps').insert(rows);
       if (stepsErr) {
-        await supabase.from('automations').delete().eq('id', automation.id);
+        await db.from('automations').delete().eq('id', automation.id);
         return NextResponse.json({ error: `Failed to save steps: ${stepsErr.message}` }, { status: 500 });
       }
     }

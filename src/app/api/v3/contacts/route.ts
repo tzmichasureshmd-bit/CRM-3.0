@@ -2,33 +2,28 @@
  * CRM 3.0 — Contacts API
  * GET  /api/v3/contacts  — list contacts for account
  * POST /api/v3/contacts  — create a new contact
+ *
+ * Auth: FastAPI JWT verified server-side via verifyRequest().
+ * DB:   Service-role client — account_id always from verified token, never from body.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-
-async function getAccountId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase.from('profiles').select('account_id').eq('user_id', userId).single();
-  return (data?.account_id as string) ?? null;
-}
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 export async function GET(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'No account' }, { status: 403 });
-
     const url = new URL(req.url);
     const search = url.searchParams.get('search') ?? '';
     const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '100'), 200);
 
-    let query = supabase
+    let query = db
       .from('contacts')
       .select('*', { count: 'exact' })
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -44,14 +39,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'No account' }, { status: 403 });
-
     const body = await req.json() as {
       name?: string;
       phone?: string;
@@ -67,10 +59,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'At least one of name, phone, or email is required' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('contacts')
       .insert({
-        account_id: accountId,
+        account_id: user.account_id,
         name: body.name?.trim() ?? null,
         phone: body.phone?.trim() ?? null,
         email: body.email?.trim() ?? null,

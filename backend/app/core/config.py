@@ -5,7 +5,7 @@ from functools import lru_cache
 class Settings(BaseSettings):
     app_name: str = "Tzmicha CRM 3.0"
     app_env: str = "development"
-    debug_mode: bool = True
+    debug_mode: bool = False  # FIX-014: default False; set DEBUG_MODE=true in .env for local dev
     port: int = 8000
 
     # Database

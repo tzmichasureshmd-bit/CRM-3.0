@@ -2,32 +2,26 @@
  * CRM 3.0 — Follow-ups API
  * GET  /api/v3/follow-ups  — list follow-ups for account
  * POST /api/v3/follow-ups  — create a new follow-up
+ *
+ * Auth: FastAPI JWT verified server-side via verifyRequest().
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-
-async function getAccountId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase.from('profiles').select('account_id').eq('user_id', userId).single();
-  return (data?.account_id as string) ?? null;
-}
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 export async function GET(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'No account' }, { status: 403 });
-
     const url = new URL(req.url);
     const status = url.searchParams.get('status') ?? 'pending';
 
-    let query = supabase
+    let query = db
       .from('follow_ups')
       .select('*, contacts(name)')
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .order('due_date', { ascending: true })
       .limit(100);
 
@@ -43,14 +37,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'No account' }, { status: 403 });
-
     const body = await req.json() as {
       title?: string;
       due_date?: string;
@@ -62,11 +53,11 @@ export async function POST(req: NextRequest) {
     if (!body.title?.trim()) return NextResponse.json({ error: 'title is required' }, { status: 400 });
     if (!body.due_date) return NextResponse.json({ error: 'due_date is required' }, { status: 400 });
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('follow_ups')
       .insert({
-        account_id: accountId,
-        user_id: user.id,
+        account_id: user.account_id,
+        user_id: user.user_id,
         title: body.title.trim(),
         due_date: body.due_date,
         contact_id: body.contact_id ?? null,

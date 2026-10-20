@@ -1,0 +1,36 @@
+appId: com.tzmicha.crm
+productName: Tzmicha CRM
+copyright: Copyright (c) 2026 Tzmicha
+
+directories:
+  output: dist/native/windows
+  buildResources: build
+
+files:
+  - electron/**/*
+  - package.json
+
+asar: true
+
+# The release APK/EXE version always follows package.json ("wacrm" 0.8.0),
+# so Android (versionName 0.8.0) and Windows match on every release.
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.png
+  executableName: TzmichaCRM
+  legalTrademarks: Tzmicha
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Tzmicha-CRM-Setup.${ext}
+  shortcutName: Tzmicha CRM
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: true
+
+publish: null

@@ -16,12 +16,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!token) {
       window.location.replace('/login');
     } else {
+      // Restore persisted theme
+      const saved = localStorage.getItem('crm_theme') as 'light' | 'dark' | null;
+      if (saved === 'dark') setTheme('dark');
       setReady(true);
     }
   }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('crm_theme', theme);
   }, [theme]);
 
   if (!mounted || !ready) return (

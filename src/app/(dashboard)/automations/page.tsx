@@ -6,6 +6,7 @@ import {
   AlertCircle, X, History, BarChart3, Loader2, Inbox, LayoutTemplate,
 } from 'lucide-react';
 import { TRIGGER_MAP } from '@/lib/ai/automation-catalog';
+import { v3fetch } from '@/lib/auth-client';
 import {
   WORKFLOW_TEMPLATES, evaluateCompatibility, buildTemplateSteps, DEFAULT_CAPABILITIES,
   type WorkflowTemplate, type TemplateCompatibility, type TemplateCapabilities,
@@ -46,7 +47,7 @@ export default function AutomationsPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch('/api/v3/automations');
+      const res = await v3fetch('/api/v3/automations');
       const data = await res.json() as { automations?: Automation[]; summary?: AutomationSummary; error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Failed to load automations');
       setAutomations(data.automations ?? []);
@@ -59,9 +60,9 @@ export default function AutomationsPage() {
   const loadAgents = useCallback(async () => {
     try {
       const [aRes, tRes, cRes] = await Promise.all([
-        fetch('/api/v3/agents'),
-        fetch('/api/v3/agents/tools'),
-        fetch('/api/v3/automations/templates'),
+        v3fetch('/api/v3/agents'),
+        v3fetch('/api/v3/agents/tools'),
+        v3fetch('/api/v3/automations/templates'),
       ]);
       if (aRes.ok) {
         const d = await aRes.json() as { agents?: AgentLite[] };
@@ -113,7 +114,7 @@ export default function AutomationsPage() {
     setRowBusy(a.id);
     try {
       const next = a.status === 'active' ? 'paused' : 'active';
-      const res = await fetch(`/api/v3/automations/${a.id}`, {
+      const res = await v3fetch(`/api/v3/automations/${a.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: next }),
       });
@@ -127,7 +128,7 @@ export default function AutomationsPage() {
     if (!confirm(`Delete "${a.name}"? This cannot be undone.`)) return;
     setRowBusy(a.id);
     try {
-      const res = await fetch(`/api/v3/automations/${a.id}`, { method: 'DELETE' });
+      const res = await v3fetch(`/api/v3/automations/${a.id}`, { method: 'DELETE' });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed'); }
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : 'Failed'); }
@@ -138,8 +139,6 @@ export default function AutomationsPage() {
     setEditing(null); setShowBuilder(true);
   }
 
-  // Install a template: validate → create a real editable DRAFT (never active)
-  // via the existing backend → open the existing builder for customisation.
   async function installTemplate(t: WorkflowTemplate) {
     const compat = compatFor(t);
     if (compat.status === 'blocked') {
@@ -149,7 +148,7 @@ export default function AutomationsPage() {
     setInstalling(t.id); setError(null);
     try {
       const steps = buildTemplateSteps(t, compat.agent);
-      const res = await fetch('/api/v3/automations', {
+      const res = await v3fetch('/api/v3/automations', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: t.name,

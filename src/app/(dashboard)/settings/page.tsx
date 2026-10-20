@@ -1,6 +1,6 @@
 'use client';
 
-import { User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight, Brain } from 'lucide-react';
+import { User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight, Brain, FileText, Lock } from 'lucide-react';
 import Link from 'next/link';
 
 const SECTIONS = [
@@ -33,6 +33,13 @@ const SECTIONS = [
     items: [
       { icon: <CreditCard size={16} />, label: 'Billing', desc: 'Plan, usage, invoices', color: '#f46b72', href: '/settings/billing' },
       { icon: <Server size={16} />, label: 'Platform Health', desc: 'System status, diagnostics', color: '#4f6df5', href: '/settings/health' },
+    ],
+  },
+  {
+    title: 'Legal',
+    items: [
+      { icon: <FileText size={16} />, label: 'Terms & Conditions', desc: 'Service terms and usage policy', color: '#5d6682', href: '/terms' },
+      { icon: <Lock size={16} />, label: 'Privacy Policy', desc: 'How we collect and use your data', color: '#5d6682', href: '/privacy' },
     ],
   },
 ];

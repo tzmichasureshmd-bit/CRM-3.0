@@ -36,10 +36,13 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # FIX-013: Use configured origin list instead of wildcard.
+    # In production, set ALLOWED_ORIGINS env var to comma-separated list.
+    # Default includes localhost for development.
+    allow_origins=settings.origins_list,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
 
 PREFIX = "/api/v1"

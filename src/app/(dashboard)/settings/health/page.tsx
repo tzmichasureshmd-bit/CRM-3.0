@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ChevronLeft, RefreshCw, CheckCircle2, XCircle, AlertCircle, Clock } from 'lucide-react';
 import Link from 'next/link';
+import { v3fetch } from '@/lib/auth-client';
 
 interface HealthCheck {
   id: string;
@@ -104,7 +105,7 @@ export default function HealthPage() {
     // 3. OpenAI
     try {
       const t0 = Date.now();
-      const res = await fetch('/api/v3/ai/recommendations');
+      const res = await v3fetch('/api/v3/ai/recommendations');
       const latency = Date.now() - t0;
       results.push({
         id: 'openai', label: 'OpenAI API', description: 'AI features — lead scoring, content, reply assist',

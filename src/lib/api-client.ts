@@ -21,6 +21,7 @@ export function setToken(token: string): void {
 export function clearToken(): void {
   localStorage.removeItem('crm_token');
   localStorage.removeItem('crm_user');
+  localStorage.removeItem('crm_partial_token'); // FIX-009: clear partial token on logout
 }
 
 export function getStoredUser(): { user_id: string; account_id: string; role: string } | null {
@@ -31,21 +32,10 @@ export function getStoredUser(): { user_id: string; account_id: string; role: st
   } catch { return null; }
 }
 
-// Refresh token from Supabase session if localStorage token is missing/expired
+// Returns the stored CRM JWT. No Supabase fallback — a missing token means
+// the user is not logged in and must go through the CRM login flow.
 async function getValidToken(): Promise<string | null> {
-  const stored = getToken();
-  if (stored) return stored;
-  // Fallback: get fresh token from Supabase session
-  try {
-    const { createClient } = await import('@/lib/supabase/client');
-    const supabase = createClient();
-    const { data } = await supabase.auth.getSession();
-    if (data.session?.access_token) {
-      setToken(data.session.access_token);
-      return data.session.access_token;
-    }
-  } catch { /* */ }
-  return null;
+  return getToken();
 }
 
 // ── Core fetch wrapper ────────────────────────────────────────

@@ -1,21 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 export async function GET(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
-    if (!profile?.account_id) return NextResponse.json({ error: 'No account' }, { status: 400 });
-
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get('status');
+    const status   = searchParams.get('status');
     const platform = searchParams.get('platform');
 
-    let q = supabase.from('crm3_content').select('*').eq('account_id', profile.account_id).order('created_at', { ascending: false });
-    if (status) q = q.eq('status', status);
+    let q = db.from('crm3_content').select('*').eq('account_id', user.account_id).order('created_at', { ascending: false });
+    if (status)   q = q.eq('status', status);
     if (platform) q = q.eq('platform', platform);
 
     const { data, error } = await q;
@@ -28,19 +25,16 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
-    if (!profile?.account_id) return NextResponse.json({ error: 'No account' }, { status: 400 });
-
     const body = await req.json();
-    const { data, error } = await supabase.from('crm3_content').insert({
+    const { data, error } = await db.from('crm3_content').insert({
       ...body,
-      account_id: profile.account_id,
-      user_id: user.id,
+      account_id: user.account_id,
+      user_id: user.user_id,
       status: body.status ?? 'draft',
     }).select().single();
 

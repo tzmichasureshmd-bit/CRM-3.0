@@ -1,0 +1,144 @@
+'use client';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { DollarSign, Target, Users, Clock, BarChart3, Brain } from 'lucide-react';
+import { KPIWidget } from '@/components/dashboard/KPIWidget';
+import { RevenueIntelligence } from '@/components/dashboard/RevenueIntelligence';
+import { AIInsights } from '@/components/dashboard/AIInsights';
+import { LeadSources } from '@/components/dashboard/LeadSources';
+import { AttentionSection } from '@/components/dashboard/AttentionSection';
+import { RecentConversations } from '@/components/dashboard/RecentConversations';
+import { PipelineOverview } from '@/components/dashboard/PipelineOverview';
+import { AICopilot } from '@/components/dashboard/AICopilot';
+import { createClient } from '@/lib/supabase/client';
+
+interface DashboardKPIs {
+  revenue: number;
+  pipeline: number;
+  hotLeads: number;
+  pendingFollowups: number;
+  conversionRate: number;
+  currency: string;
+}
+
+function fmt(v: number, currency = 'USD') {
+  const sym = currency === 'INR' ? '₹' : '$';
+  if (v >= 100000) return `${sym}${(v / 100000).toFixed(1)}L`;
+  if (v >= 1000)   return `${sym}${(v / 1000).toFixed(0)}K`;
+  return `${sym}${v}`;
+}
+
+export default function CommandCenterPage() {
+  const [now, setNow]   = useState<Date | null>(null);
+  const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
+  const supabase = createClient();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const loadKPIs = useCallback(async () => {
+    const [dealsRes, contactsRes, followupsRes] = await Promise.all([
+      supabase.from('deals').select('status,value,currency').limit(500),
+      supabase.from('contacts').select('lead_score_tier').limit(500),
+      supabase.from('follow_ups').select('status,due_date').limit(200),
+    ]);
+
+    const deals     = (dealsRes.data    ?? []) as { status: string; value: number | null; currency?: string }[];
+    const contacts  = (contactsRes.data ?? []) as { lead_score_tier: string | null }[];
+    const followups = (followupsRes.data ?? []) as { status: string; due_date: string }[];
+
+    const won      = deals.filter(d => d.status === 'won');
+    const open     = deals.filter(d => d.status === 'open');
+    const revenue  = won.reduce((s, d) => s + (d.value ?? 0), 0);
+    const pipeline = open.reduce((s, d) => s + (d.value ?? 0), 0);
+    const currency = deals[0]?.currency ?? 'USD';
+    const hotLeads = contacts.filter(c => c.lead_score_tier === 'hot').length;
+    const pending  = followups.filter(f =>
+      f.status === 'pending' && new Date(f.due_date) < new Date()
+    ).length;
+    const convRate = (open.length + won.length) > 0
+      ? Math.round((won.length / (open.length + won.length)) * 100)
+      : 0;
+
+    setKpis({ revenue, pipeline, hotLeads, pendingFollowups: pending, conversionRate: convRate, currency });
+  }, []);
+
+  useEffect(() => { void loadKPIs(); }, [loadKPIs]);
+
+  // Realtime: re-fetch KPIs when deals / contacts / follow_ups change
+  useEffect(() => {
+    const ch = supabase
+      .channel('dashboard-kpi-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' },        () => { void loadKPIs(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' },     () => { void loadKPIs(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' },   () => { void loadKPIs(); })
+      .subscribe();
+    channelRef.current = ch;
+    return () => { void supabase.removeChannel(ch); };
+  }, [loadKPIs]);
+
+  const greeting = now
+    ? (now.getHours() < 12 ? 'Good Morning' : now.getHours() < 17 ? 'Good Afternoon' : 'Good Evening')
+    : '';
+  const dateStr = now?.toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) ?? '';
+  const timeStr = now?.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) ?? '';
+  const k = kpis;
+
+  return (
+    <div>
+      {/* Page header */}
+      <div className="crm-page-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 52, height: 52, borderRadius: 16, background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 24px rgba(79,109,245,0.30)', flexShrink: 0 }}>
+            <Brain size={24} color="white" strokeWidth={1.8} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 26, fontWeight: 750, color: 'var(--crm-text-strong)', margin: 0, letterSpacing: '-0.02em' }}>
+              {greeting} 👋
+            </h1>
+            <p style={{ margin: '3px 0 0', fontSize: 13.5, color: 'var(--crm-text-secondary)' }}>
+              Here&apos;s what needs your attention today.
+            </p>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{dateStr}</div>
+          <div style={{ fontSize: 22, fontWeight: 750, color: 'var(--crm-text-strong)', letterSpacing: '-0.02em' }}>{timeStr}</div>
+        </div>
+      </div>
+
+      {/* KPI cards — real Supabase data */}
+      <div className="crm-kpi-grid">
+        <KPIWidget title="Revenue" value={k ? fmt(k.revenue, k.currency) : '—'} change="" trend="up" accent="cyan"
+          icon={<DollarSign size={20} strokeWidth={2} />} />
+        <KPIWidget title="Pipeline" value={k ? fmt(k.pipeline, k.currency) : '—'} change="" trend="up" accent="blue"
+          icon={<Target size={20} strokeWidth={2} />} />
+        <KPIWidget title="Hot Leads" value={k ? String(k.hotLeads) : '—'} change="" trend="up" accent="violet"
+          icon={<Users size={20} strokeWidth={2} />} />
+        <KPIWidget title="Overdue Follow-ups" value={k ? String(k.pendingFollowups) : '—'} change="" trend="down" accent="peach"
+          icon={<Clock size={20} strokeWidth={2} />} />
+        <KPIWidget title="Win Rate" value={k ? `${k.conversionRate}%` : '—'} change="" trend="up" accent="indigo"
+          icon={<BarChart3 size={20} strokeWidth={2} />} />
+      </div>
+
+      {/* Dashboard grid */}
+      <div className="crm-dashboard-grid">
+        <RevenueIntelligence />
+        <AIInsights />
+        <LeadSources />
+      </div>
+
+      <AttentionSection />
+
+      <div className="crm-bottom-grid">
+        <RecentConversations />
+        <PipelineOverview />
+        <AICopilot />
+      </div>
+    </div>
+  );
+}

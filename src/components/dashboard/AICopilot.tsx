@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import { GlassPanel } from '@/components/ui/GlassPanel';
+import { v3fetch } from '@/lib/auth-client';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -33,7 +34,7 @@ export function AICopilot() {
     setMessages(prev => [...prev, { role: 'user', text: query }]);
     setLoading(true);
     try {
-      const res = await fetch('/api/v3/copilot', {
+      const res = await v3fetch('/api/v3/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bot,
@@ -16,34 +16,44 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Filter,
   Check,
   X,
   AlertTriangle,
-  ChevronDown,
-  ChevronRight,
   TrendingUp,
   Clock,
   Sparkles,
   Layers,
-  Users,
   MessageSquare,
   DollarSign,
   Shield,
-  FileText,
   Sliders,
-  ExternalLink,
-  Info,
+  Loader2,
+  ArrowRight,
 } from "lucide-react";
 import type {
   AIAgent,
   AgentDepartment,
   AgentRun,
   AgentMetrics,
-  AgentRunAction,
 } from "@/types/crm3";
 import { TOOLS_METADATA } from "@/lib/agents/engine";
 import { toast } from "sonner";
+import { getStoredUser } from "@/lib/api-client";
+import {
+  WORKFLOW_TEMPLATES,
+  evaluateCompatibility,
+  buildTemplateSteps,
+  DEFAULT_CAPABILITIES,
+  type WorkflowTemplate,
+  type TemplateCompatibility,
+  type TemplateCapabilities,
+} from "@/lib/ai/automation-templates";
+import { AgentShowcase } from "@/components/automations/AgentShowcase";
+import { TemplateGallery } from "@/components/automations/TemplateGallery";
+import { TemplatePreview } from "@/components/automations/TemplatePreview";
+import { PermissionsPanel } from "@/components/automations/PermissionsPanel";
+import { AutomationBuilder } from "@/components/automations/Builder";
+import type { AgentLite, Automation } from "@/components/automations/types";
 
 /* ── Department Styles & Icons ──────────────────────────────── */
 const DEPARTMENTS: {
@@ -51,7 +61,7 @@ const DEPARTMENTS: {
   label: string;
   color: string;
   bg: string;
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+  icon: React.ComponentType<{ size?: number; color?: string; style?: React.CSSProperties }>;
 }[] = [
   { id: "all", label: "All Departments", color: "#4F6EF7", bg: "rgba(79,110,247,0.12)", icon: Layers },
   { id: "sales", label: "Sales", color: "#10B981", bg: "rgba(16,185,129,0.12)", icon: TrendingUp },
@@ -74,6 +84,36 @@ function getDeptMeta(dept?: string) {
   );
 }
 
+function hbtn(variant: "primary" | "ghost"): React.CSSProperties {
+  const base: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "9px 15px",
+    borderRadius: 11,
+    fontSize: 13,
+    fontWeight: 650,
+    cursor: "pointer",
+    transition: "all 150ms ease",
+    userSelect: "none",
+  };
+  if (variant === "primary") {
+    return {
+      ...base,
+      background: "linear-gradient(135deg, #4f6df5, #8b5cf6)",
+      color: "white",
+      boxShadow: "0 6px 18px rgba(79,109,245,0.28)",
+      border: "none",
+    };
+  }
+  return {
+    ...base,
+    background: "rgba(255,255,255,0.65)",
+    border: "1px solid rgba(130,145,190,0.28)",
+    color: "var(--crm-text-secondary)",
+  };
+}
+
 /* ── KPI Metric Card ────────────────────────────────────────── */
 function MetricCard({
   label,
@@ -87,40 +127,69 @@ function MetricCard({
   label: string;
   value: string | number;
   sub?: string;
-  icon: any;
+  icon: React.ComponentType<{ size?: number; color?: string }>;
   color: string;
   bg: string;
   highlight?: boolean;
 }) {
   return (
     <div
-      className={`glass rounded-2xl p-4 transition-all duration-200 ${
-        highlight ? "ring-2 ring-amber-500/50" : ""
-      }`}
+      className="crm-glass"
       style={{
+        padding: "14px 16px",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        borderRadius: 16,
+        border: highlight ? "1.5px solid rgba(245,158,11,0.5)" : undefined,
         background: highlight ? "rgba(245,158,11,0.06)" : undefined,
       }}
     >
-      <div className="flex items-center justify-between mb-2">
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded-xl"
-          style={{ background: bg }}
-        >
-          <Icon className="h-4.5 w-4.5" style={{ color }} />
+      <div
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 11,
+          background: bg || `${color}18`,
+          color,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Icon size={18} color={color} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+          <div style={{ fontSize: 20, fontWeight: 780, color: "var(--crm-text)", lineHeight: 1.1 }}>
+            {value}
+          </div>
+          {highlight && (
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 800,
+                color: "#f59e0b",
+                background: "rgba(245,158,11,0.14)",
+                padding: "2px 6px",
+                borderRadius: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              Action
+            </span>
+          )}
         </div>
-        {highlight && (
-          <span className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-amber-500 bg-amber-500/10 animate-pulse">
-            Action Needed
-          </span>
+        <div style={{ fontSize: 11, color: "var(--crm-text-muted)", fontWeight: 600, marginTop: 2 }}>
+          {label}
+        </div>
+        {sub && (
+          <div style={{ fontSize: 10, color: "var(--crm-text-muted)", opacity: 0.75, marginTop: 1 }}>
+            {sub}
+          </div>
         )}
       </div>
-      <p className="text-2xl font-bold tabular-nums" style={{ color: "var(--crm-foreground)" }}>
-        {value}
-      </p>
-      <p className="text-xs font-medium" style={{ color: "var(--crm-muted-fg)" }}>
-        {label}
-      </p>
-      {sub && <p className="mt-0.5 text-[10px] opacity-70" style={{ color: "var(--crm-muted-fg)" }}>{sub}</p>}
     </div>
   );
 }
@@ -142,6 +211,17 @@ export default function AIAgentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"directory" | "history" | "tools">("directory");
 
+  // Capabilities & tools for templates compatibility
+  const [tools, setTools] = useState<string[]>([]);
+  const [toolsCount, setToolsCount] = useState<number>(0);
+  const [capabilities, setCapabilities] = useState<TemplateCapabilities>(DEFAULT_CAPABILITIES);
+
+  // Templates & builder state
+  const [preview, setPreview] = useState<WorkflowTemplate | null>(null);
+  const [installing, setInstalling] = useState<string | null>(null);
+  const [editingAutomation, setEditingAutomation] = useState<{ automation: Automation } | null>(null);
+  const [showBuilder, setShowBuilder] = useState(false);
+
   // Modals state
   const [selectedAgentForRun, setSelectedAgentForRun] = useState<AIAgent | null>(null);
   const [selectedAgentForConfig, setSelectedAgentForConfig] = useState<AIAgent | null>(null);
@@ -152,9 +232,13 @@ export default function AIAgentsPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const user = getStoredUser();
+      const accountParam = user?.account_id ? `?account_id=${encodeURIComponent(user.account_id)}` : "";
+      const headers: Record<string, string> = user?.account_id ? { "x-account-id": user.account_id } : {};
+
       const [agentsRes, runsRes] = await Promise.all([
-        fetch("/api/agents"),
-        fetch("/api/agents/runs"),
+        fetch(`/api/agents${accountParam}`, { headers }),
+        fetch(`/api/agents/runs${accountParam}`, { headers }),
       ]);
 
       if (agentsRes.ok) {
@@ -169,15 +253,99 @@ export default function AIAgentsPage() {
       }
     } catch (err) {
       console.error("Failed to load AI Agents data:", err);
-      toast.error("Error loading agent data. Checking offline mode.");
+      toast.error("Error loading agent data.");
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Fetch capabilities & tools for workflow template compatibility
+  const loadCapabilities = useCallback(async () => {
+    try {
+      const [tRes, cRes] = await Promise.all([
+        fetch("/api/v3/agents/tools"),
+        fetch("/api/v3/automations/templates"),
+      ]);
+      if (tRes.ok) {
+        const d = (await tRes.json()) as { tools?: { name?: string }[] };
+        const names = (d.tools ?? []).map((x) => x.name).filter((n): n is string => !!n);
+        setTools(names);
+        setToolsCount(names.length);
+      }
+      if (cRes.ok) {
+        const d = (await cRes.json()) as { capabilities?: TemplateCapabilities };
+        if (d.capabilities) setCapabilities(d.capabilities);
+      }
+    } catch {
+      /* Optional context for templates */
+    }
+  }, []);
+
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    void loadData();
+    void loadCapabilities();
+  }, [loadData, loadCapabilities]);
+
+  // Convert agents to AgentLite array for AgentShowcase & TemplateGallery compatibility
+  const fleetAgents = useMemo<AgentLite[]>(() => {
+    return agents.map((a) => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      description: a.description || null,
+      status: a.status || "idle",
+      enabled: !!a.enabled,
+      allowed_tools: a.allowed_tools || [],
+      requires_approval: !!a.requires_approval,
+      max_actions_per_run: a.max_actions_per_run || 10,
+      execution_count: a.execution_count || 0,
+      success_count: a.success_count || 0,
+      failure_count: a.failure_count || 0,
+      last_run_at: a.last_run_at || null,
+    }));
+  }, [agents]);
+
+  const compatFor = useCallback(
+    (t: WorkflowTemplate): TemplateCompatibility =>
+      evaluateCompatibility(t, { agents: fleetAgents, tools, capabilities }),
+    [fleetAgents, tools, capabilities]
+  );
+
+  // Install workflow template from AI Agents page
+  async function installTemplate(t: WorkflowTemplate) {
+    const compat = compatFor(t);
+    if (compat.status === "blocked") {
+      toast.error(compat.blockingReasons.join(" ") || "This template is not compatible with your account yet.");
+      return;
+    }
+    setInstalling(t.id);
+    try {
+      const steps = buildTemplateSteps(t, compat.agent);
+      const res = await fetch("/api/v3/automations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: t.name,
+          description: t.description,
+          trigger_type: t.triggerType,
+          trigger_config: t.triggerConfig,
+          ai_enabled: t.aiEnabled,
+          steps,
+          activate: false,
+        }),
+      });
+      const data = (await res.json()) as { automation?: Automation; error?: string };
+      if (!res.ok || !data.automation) throw new Error(data.error ?? "Failed to create draft");
+      setPreview(null);
+      toast.success(`Draft automation "${t.name}" created! View in Automations.`);
+      setEditingAutomation({ automation: data.automation });
+      setShowBuilder(true);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to install template");
+    } finally {
+      setInstalling(null);
+    }
+  }
 
   // Toggle enable/disable status
   const handleToggleAgent = async (agent: AIAgent, e: React.MouseEvent) => {
@@ -193,14 +361,17 @@ export default function AIAgentsPage() {
     );
 
     try {
+      const user = getStoredUser();
       const res = await fetch(`/api/agents/${agent.id}/toggle`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
+        },
         body: JSON.stringify({ enabled: nextState }),
       });
 
       if (!res.ok) throw new Error("Toggle request failed");
-      const resData = await res.json();
 
       toast.success(
         nextState
@@ -224,9 +395,13 @@ export default function AIAgentsPage() {
   const handleExecuteAgent = async (agent: AIAgent, customContext: Record<string, any> = {}) => {
     setRunningAction(agent.id);
     try {
+      const user = getStoredUser();
       const res = await fetch(`/api/agents/${agent.id}/run`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
+        },
         body: JSON.stringify({ context: customContext }),
       });
 
@@ -244,7 +419,6 @@ export default function AIAgentsPage() {
         toast.success(`Agent "${agent.name}" executed successfully!`, { duration: 4000 });
       }
 
-      // Refresh data
       await loadData();
       setSelectedAgentForRun(null);
     } catch (err: any) {
@@ -258,9 +432,13 @@ export default function AIAgentsPage() {
   const handleApproveRun = async (runId: string) => {
     setRunningAction(runId);
     try {
+      const user = getStoredUser();
       const res = await fetch(`/api/agents/runs/${runId}/approve`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
+        },
       });
 
       if (!res.ok) {
@@ -281,9 +459,13 @@ export default function AIAgentsPage() {
   const handleRejectRun = async (runId: string) => {
     setRunningAction(runId);
     try {
+      const user = getStoredUser();
       const res = await fetch(`/api/agents/runs/${runId}/reject`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
+        },
       });
 
       if (!res.ok) {
@@ -327,56 +509,91 @@ export default function AIAgentsPage() {
   }, [agents]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* ── Top Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3.5">
+    <div style={{ padding: "24px 28px", maxWidth: 1240, margin: "0 auto" }}>
+      {/* ── TOP HEADER: AI Department Agents ── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 14,
+          marginBottom: 22,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-md"
-            style={{ background: "linear-gradient(135deg, #4F6EF7, #7C3AED)" }}
+            style={{
+              width: 46,
+              height: 46,
+              borderRadius: 14,
+              background: "linear-gradient(135deg, #4f6df5, #8b5cf6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 8px 22px rgba(79,109,245,0.35)",
+              flexShrink: 0,
+            }}
           >
-            <Bot className="h-6 w-6 text-white" />
+            <Bot size={24} color="white" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--crm-foreground)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: 22,
+                  fontWeight: 780,
+                  color: "var(--crm-text)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
                 AI Department Agents
               </h1>
-              <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white bg-blue-600">
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: "#fff",
+                  background: "var(--crm-primary)",
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  letterSpacing: "0.04em",
+                }}
+              >
                 CRM 3.0
               </span>
             </div>
-            <p className="text-xs sm:text-sm" style={{ color: "var(--crm-muted-fg)" }}>
+            <p style={{ margin: "3px 0 0", fontSize: 13, color: "var(--crm-text-muted)" }}>
               Autonomous CRM intelligence, department specialists, and controlled action workflows
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
-            onClick={() => loadData()}
+            onClick={() => void loadData()}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold glass glass-hover transition-all"
-            style={{ color: "var(--crm-foreground)" }}
-            title="Refresh Agents & Executions"
+            style={hbtn("ghost")}
+            title="Refresh agents and executions"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
           </button>
-
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-md transition-all hover:opacity-95"
-            style={{ background: "linear-gradient(135deg, #4F6EF7, #7C3AED)" }}
-          >
-            <Plus className="h-4 w-4" />
-            New Custom Agent
+          <button onClick={() => setIsCreateOpen(true)} style={hbtn("primary")}>
+            <Plus size={15} /> New Custom Agent
           </button>
         </div>
       </div>
 
-      {/* ── Metric Summary Bar (Reflecting Real Data) ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {/* ── METRIC SUMMARY BAR (5 Cards) ── */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 12,
+          marginBottom: 20,
+        }}
+      >
         <MetricCard
           label="Total Agents"
           value={metrics.total_agents}
@@ -388,7 +605,7 @@ export default function AIAgentsPage() {
         <MetricCard
           label="Active & Enabled"
           value={metrics.enabled_agents}
-          sub={`${metrics.total_agents - metrics.enabled_agents} paused`}
+          sub={`${Math.max(0, metrics.total_agents - metrics.enabled_agents)} paused`}
           icon={Zap}
           color="#10B981"
           bg="rgba(16,185,129,0.12)"
@@ -420,41 +637,70 @@ export default function AIAgentsPage() {
         />
       </div>
 
-      {/* ── View Navigation Tabs (Directory vs History vs Tools) ── */}
-      <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--crm-glass-border-soft)" }}>
-        <div className="flex items-center gap-2">
+      {/* ── TABS NAVIGATION BAR ── */}
+      <div
+        className="crm-glass"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 14px",
+          borderRadius: 14,
+          marginBottom: 18,
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <button
             onClick={() => setActiveTab("directory")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
-              activeTab === "directory"
-                ? "bg-white/20 shadow-sm font-bold"
-                : "hover:bg-white/10 opacity-70"
-            }`}
             style={{
-              color: activeTab === "directory" ? "var(--brand-primary)" : "var(--crm-foreground)",
-              border: activeTab === "directory" ? "1px solid var(--crm-glass-border)" : "1px solid transparent",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 14px",
+              borderRadius: 10,
+              fontSize: 12.5,
+              fontWeight: 700,
+              background: activeTab === "directory" ? "rgba(79,109,245,0.14)" : "transparent",
+              color: activeTab === "directory" ? "var(--crm-primary)" : "var(--crm-text-secondary)",
+              border: activeTab === "directory" ? "1px solid rgba(79,109,245,0.25)" : "1px solid transparent",
+              cursor: "pointer",
             }}
           >
-            <Bot className="h-4 w-4" />
+            <Bot size={15} />
             Agent Directory ({agents.length})
           </button>
 
           <button
             onClick={() => setActiveTab("history")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
-              activeTab === "history"
-                ? "bg-white/20 shadow-sm font-bold"
-                : "hover:bg-white/10 opacity-70"
-            }`}
             style={{
-              color: activeTab === "history" ? "var(--brand-primary)" : "var(--crm-foreground)",
-              border: activeTab === "history" ? "1px solid var(--crm-glass-border)" : "1px solid transparent",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 14px",
+              borderRadius: 10,
+              fontSize: 12.5,
+              fontWeight: 700,
+              background: activeTab === "history" ? "rgba(79,109,245,0.14)" : "transparent",
+              color: activeTab === "history" ? "var(--crm-primary)" : "var(--crm-text-secondary)",
+              border: activeTab === "history" ? "1px solid rgba(79,109,245,0.25)" : "1px solid transparent",
+              cursor: "pointer",
             }}
           >
-            <History className="h-4 w-4" />
+            <History size={15} />
             Execution History ({runs.length})
             {metrics.pending_approvals > 0 && (
-              <span className="rounded-full px-1.5 py-0.2 text-[10px] font-bold bg-amber-500 text-white">
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: "#fff",
+                  background: "#f59e0b",
+                  padding: "1px 6px",
+                  borderRadius: 6,
+                }}
+              >
                 {metrics.pending_approvals}
               </span>
             )}
@@ -462,34 +708,47 @@ export default function AIAgentsPage() {
 
           <button
             onClick={() => setActiveTab("tools")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
-              activeTab === "tools"
-                ? "bg-white/20 shadow-sm font-bold"
-                : "hover:bg-white/10 opacity-70"
-            }`}
             style={{
-              color: activeTab === "tools" ? "var(--brand-primary)" : "var(--crm-foreground)",
-              border: activeTab === "tools" ? "1px solid var(--crm-glass-border)" : "1px solid transparent",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "8px 14px",
+              borderRadius: 10,
+              fontSize: 12.5,
+              fontWeight: 700,
+              background: activeTab === "tools" ? "rgba(79,109,245,0.14)" : "transparent",
+              color: activeTab === "tools" ? "var(--crm-primary)" : "var(--crm-text-secondary)",
+              border: activeTab === "tools" ? "1px solid rgba(79,109,245,0.25)" : "1px solid transparent",
+              cursor: "pointer",
             }}
           >
-            <Sliders className="h-4 w-4" />
+            <Sliders size={15} />
             Tools & Permissions
           </button>
         </div>
 
         {activeTab === "directory" && (
-          <div className="relative hidden sm:block w-64">
-            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+          <div style={{ position: "relative", flex: "1 1 200px", maxWidth: 280 }}>
+            <Search
+              size={14}
+              color="var(--crm-text-muted)"
+              style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }}
+            />
             <input
               type="text"
               placeholder="Search agents or tools..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl pl-9 pr-4 py-1.5 text-xs outline-none transition-all"
               style={{
-                background: "var(--crm-glass-bg)",
-                border: "1px solid var(--crm-glass-border)",
-                color: "var(--crm-foreground)",
+                width: "100%",
+                padding: "8px 12px 8px 34px",
+                borderRadius: 10,
+                border: "1px solid rgba(130,145,190,0.25)",
+                background: "rgba(255,255,255,0.6)",
+                fontSize: 12.5,
+                color: "var(--crm-text)",
+                outline: "none",
+                boxSizing: "border-box",
               }}
             />
           </div>
@@ -498,9 +757,9 @@ export default function AIAgentsPage() {
 
       {/* ── TAB 1: AGENT DIRECTORY ── */}
       {activeTab === "directory" && (
-        <div className="space-y-5">
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Department Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "thin" }}>
             {DEPARTMENTS.map((dept) => {
               const active = selectedDept === dept.id;
               const count = deptCounts[dept.id] || 0;
@@ -509,22 +768,33 @@ export default function AIAgentsPage() {
                 <button
                   key={dept.id}
                   onClick={() => setSelectedDept(dept.id)}
-                  className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all ${
-                    active ? "shadow-sm font-semibold" : "opacity-75 hover:opacity-100"
-                  }`}
                   style={{
-                    background: active ? dept.bg : "var(--crm-glass-bg)",
-                    border: active ? `1.5px solid ${dept.color}` : "1px solid var(--crm-glass-border-soft)",
-                    color: active ? dept.color : "var(--crm-foreground)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 7,
+                    padding: "7px 13px",
+                    borderRadius: 10,
+                    fontSize: 12,
+                    fontWeight: active ? 750 : 600,
+                    background: active ? dept.bg : "rgba(255,255,255,0.55)",
+                    border: active ? `1.5px solid ${dept.color}` : "1px solid rgba(130,145,190,0.22)",
+                    color: active ? dept.color : "var(--crm-text-secondary)",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    transition: "all 150ms ease",
                   }}
                 >
-                  <Icon className="h-3.5 w-3.5" style={{ color: dept.color }} />
-                  {dept.label}
+                  <Icon size={14} color={dept.color} />
+                  <span>{dept.label}</span>
                   <span
-                    className="rounded-full px-1.5 py-0.2 text-[10px]"
                     style={{
-                      background: active ? dept.color : "rgba(0,0,0,0.08)",
-                      color: active ? "#fff" : "var(--crm-muted-fg)",
+                      fontSize: 10,
+                      fontWeight: 750,
+                      padding: "1px 6px",
+                      borderRadius: 6,
+                      background: active ? dept.color : "rgba(130,145,190,0.16)",
+                      color: active ? "#fff" : "var(--crm-text-muted)",
                     }}
                   >
                     {count}
@@ -536,26 +806,57 @@ export default function AIAgentsPage() {
 
           {/* Agents Grid */}
           {filteredAgents.length === 0 ? (
-            <div className="glass rounded-2xl p-12 text-center">
-              <Bot className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              <h3 className="text-base font-semibold" style={{ color: "var(--crm-foreground)" }}>
-                No AI Agents Found
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                No agents match the selected department or search filter. Create a new custom agent or reset filters.
-              </p>
+            <div
+              className="crm-glass"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 12,
+                padding: "54px 20px",
+                textAlign: "center",
+                borderRadius: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 16,
+                  background: "rgba(79,109,245,0.12)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Bot size={26} color="var(--crm-primary)" />
+              </div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 750, color: "var(--crm-text)" }}>
+                  No AI Agents Found
+                </div>
+                <div style={{ fontSize: 13, color: "var(--crm-text-muted)", marginTop: 4, maxWidth: 380 }}>
+                  No agents match your department or search filter. Create a new custom agent or reset filters.
+                </div>
+              </div>
               <button
                 onClick={() => {
                   setSelectedDept("all");
                   setSearchQuery("");
                 }}
-                className="mt-4 rounded-xl px-4 py-2 text-xs font-semibold text-blue-600 bg-blue-500/10 hover:bg-blue-500/20"
+                style={hbtn("ghost")}
               >
                 Reset Filters
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                gap: 16,
+              }}
+            >
               {filteredAgents.map((agent) => {
                 const deptMeta = getDeptMeta(agent.department);
                 const DeptIcon = deptMeta.icon;
@@ -567,94 +868,221 @@ export default function AIAgentsPage() {
                     layout
                     initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="glass glass-hover rounded-2xl p-5 flex flex-col justify-between transition-all"
+                    className="crm-glass"
                     style={{
+                      borderRadius: 16,
+                      padding: "18px 20px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
                       borderTop: `3px solid ${deptMeta.color}`,
                     }}
                   >
                     {/* Header Row */}
                     <div>
-                      <div className="flex items-center justify-between mb-3">
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 12,
+                        }}
+                      >
                         {/* Department Badge */}
                         <div
-                          className="flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-                          style={{ background: deptMeta.bg, color: deptMeta.color }}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "4px 10px",
+                            borderRadius: 8,
+                            fontSize: 11,
+                            fontWeight: 750,
+                            background: deptMeta.bg,
+                            color: deptMeta.color,
+                          }}
                         >
-                          <DeptIcon className="h-3 w-3" />
+                          <DeptIcon size={12} color={deptMeta.color} />
                           <span>{deptMeta.label}</span>
                         </div>
 
-                        {/* Functional Enable/Disable Toggle Switch */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-medium" style={{ color: agent.enabled ? "var(--crm-foreground)" : "var(--crm-muted-fg)" }}>
-                            {agent.enabled ? "Enabled" : "Disabled"}
+                        {/* Enable/Disable Toggle */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: agent.enabled ? "var(--crm-text)" : "var(--crm-text-muted)",
+                            }}
+                          >
+                            {agent.enabled ? "Active" : "Paused"}
                           </span>
                           <button
                             type="button"
-                            onClick={(e) => handleToggleAgent(agent, e)}
-                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
-                              agent.enabled ? "bg-emerald-500" : "bg-neutral-300 dark:bg-neutral-700"
-                            }`}
-                            aria-label={`Toggle ${agent.name}`}
+                            onClick={(e) => void handleToggleAgent(agent, e)}
+                            style={{
+                              width: 36,
+                              height: 20,
+                              borderRadius: 10,
+                              padding: 2,
+                              background: agent.enabled ? "#10b981" : "rgba(130,145,190,0.35)",
+                              border: "none",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              transition: "background 150ms ease",
+                            }}
                             title={agent.enabled ? "Click to disable agent" : "Click to enable agent"}
                           >
                             <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ${
-                                agent.enabled ? "translate-x-4.5" : "translate-x-0.5"
-                              }`}
+                              style={{
+                                width: 16,
+                                height: 16,
+                                borderRadius: "50%",
+                                background: "#fff",
+                                transform: agent.enabled ? "translateX(16px)" : "translateX(0px)",
+                                transition: "transform 150ms ease",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+                              }}
                             />
                           </button>
                         </div>
                       </div>
 
-                      {/* Name & Type */}
-                      <div className="mb-2">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-bold leading-snug" style={{ color: "var(--crm-foreground)" }}>
-                            {agent.name}
-                          </h3>
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className="text-[10px] font-mono rounded px-1.5 py-0.5 bg-black/5 dark:bg-white/10" style={{ color: "var(--crm-muted-fg)" }}>
+                      {/* Name & Badges */}
+                      <div style={{ marginBottom: 10 }}>
+                        <h3
+                          style={{
+                            margin: 0,
+                            fontSize: 15,
+                            fontWeight: 780,
+                            color: "var(--crm-text)",
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          {agent.name}
+                        </h3>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontFamily: "monospace",
+                              padding: "2px 7px",
+                              borderRadius: 6,
+                              background: "rgba(130,145,190,0.12)",
+                              color: "var(--crm-text-secondary)",
+                              fontWeight: 600,
+                            }}
+                          >
                             {agent.type}
                           </span>
-                          <span className="text-[10px] rounded px-1.5 py-0.5 bg-blue-500/10 text-blue-500 font-medium">
+                          <span
+                            style={{
+                              fontSize: 10,
+                              padding: "2px 7px",
+                              borderRadius: 6,
+                              background: "rgba(79,109,245,0.12)",
+                              color: "var(--crm-primary)",
+                              fontWeight: 650,
+                            }}
+                          >
                             {agent.model || "gpt-4o-mini"}
                           </span>
                           {agent.requires_approval ? (
-                            <span className="flex items-center gap-0.5 text-[10px] rounded px-1.5 py-0.5 bg-amber-500/10 text-amber-500 font-medium" title="Sensitive write actions require manual human approval">
-                              <ShieldAlert className="h-2.5 w-2.5" /> Approval Gate
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                padding: "2px 7px",
+                                borderRadius: 6,
+                                background: "rgba(245,158,11,0.12)",
+                                color: "#f59e0b",
+                              }}
+                              title="Sensitive modifications require manual human approval"
+                            >
+                              <ShieldAlert size={11} /> Approval Gate
                             </span>
                           ) : (
-                            <span className="flex items-center gap-0.5 text-[10px] rounded px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 font-medium" title="Runs autonomously within authorized tools">
-                              <Zap className="h-2.5 w-2.5" /> Autonomous
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 4,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                padding: "2px 7px",
+                                borderRadius: 6,
+                                background: "rgba(16,185,129,0.12)",
+                                color: "#10b981",
+                              }}
+                              title="Runs autonomously within authorized tools"
+                            >
+                              <Zap size={11} /> Autonomous
                             </span>
                           )}
                         </div>
                       </div>
 
                       {/* Description */}
-                      <p className="text-xs line-clamp-2 mb-3 leading-relaxed" style={{ color: "var(--crm-muted-fg)" }}>
+                      <p
+                        style={{
+                          fontSize: 12.5,
+                          color: "var(--crm-text-muted)",
+                          lineHeight: 1.45,
+                          marginBottom: 14,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
                         {agent.description || "Specialized autonomous agent tailored for CRM record workflows."}
                       </p>
 
-                      {/* Allowed Tools Chips */}
-                      <div className="mb-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5 opacity-70" style={{ color: "var(--crm-muted-fg)" }}>
+                      {/* Authorized Tools */}
+                      <div style={{ marginBottom: 16 }}>
+                        <div
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.06em",
+                            color: "var(--crm-text-muted)",
+                            marginBottom: 6,
+                          }}
+                        >
                           Authorized Tools ({agent.allowed_tools?.length || 0})
-                        </p>
-                        <div className="flex flex-wrap gap-1 max-h-16 overflow-hidden">
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                           {(agent.allowed_tools || []).slice(0, 4).map((tool) => (
                             <span
                               key={tool}
-                              className="rounded-md px-2 py-0.5 text-[10px] font-mono bg-white/20 dark:bg-white/5 border border-white/20"
-                              style={{ color: "var(--crm-foreground)" }}
+                              style={{
+                                fontSize: 10.5,
+                                fontFamily: "monospace",
+                                padding: "3px 8px",
+                                borderRadius: 6,
+                                background: "rgba(255,255,255,0.65)",
+                                border: "1px solid rgba(130,145,190,0.24)",
+                                color: "var(--crm-text)",
+                              }}
                             >
                               {tool}
                             </span>
                           ))}
                           {(agent.allowed_tools || []).length > 4 && (
-                            <span className="rounded-md px-1.5 py-0.5 text-[10px] text-muted-foreground bg-black/5">
+                            <span
+                              style={{
+                                fontSize: 10,
+                                padding: "3px 6px",
+                                borderRadius: 6,
+                                background: "rgba(130,145,190,0.15)",
+                                color: "var(--crm-text-muted)",
+                              }}
+                            >
                               +{(agent.allowed_tools || []).length - 4} more
                             </span>
                           )}
@@ -663,10 +1091,24 @@ export default function AIAgentsPage() {
                     </div>
 
                     {/* Footer / Stats & Actions */}
-                    <div className="border-t pt-3" style={{ borderColor: "var(--crm-glass-border-soft)" }}>
-                      <div className="flex items-center justify-between text-[11px] mb-3" style={{ color: "var(--crm-muted-fg)" }}>
-                        <span className="flex items-center gap-1">
-                          <Activity className="h-3 w-3" />
+                    <div
+                      style={{
+                        borderTop: "1px solid var(--crm-border-soft)",
+                        paddingTop: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          fontSize: 11.5,
+                          color: "var(--crm-text-muted)",
+                          marginBottom: 12,
+                        }}
+                      >
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                          <Activity size={13} />
                           {agent.execution_count || 0} runs
                         </span>
                         <span>
@@ -676,43 +1118,45 @@ export default function AIAgentsPage() {
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <button
+                          type="button"
                           onClick={() => setSelectedAgentForRun(agent)}
                           disabled={!agent.enabled || isRunning}
-                          className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold text-white transition-all ${
-                            !agent.enabled
-                              ? "opacity-40 cursor-not-allowed bg-gray-400"
-                              : "hover:opacity-90 active:scale-98"
-                          }`}
                           style={{
-                            background: agent.enabled
-                              ? "linear-gradient(135deg, #4F6EF7, #7C3AED)"
-                              : undefined,
+                            ...hbtn("primary"),
+                            flex: 1,
+                            justifyContent: "center",
+                            opacity: !agent.enabled ? 0.45 : isRunning ? 0.8 : 1,
+                            cursor: !agent.enabled ? "not-allowed" : "pointer",
                           }}
                         >
-                          <Play className={`h-3.5 w-3.5 ${isRunning ? "animate-spin" : ""}`} />
+                          <Play size={13} className={isRunning ? "animate-spin" : ""} />
                           {isRunning ? "Running..." : "Run Agent"}
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => setSelectedAgentForConfig(agent)}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl glass glass-hover transition-colors"
-                          style={{ color: "var(--crm-muted-fg)" }}
-                          title="Configure Agent instructions & permissions"
+                          style={{
+                            ...hbtn("ghost"),
+                            padding: "9px 11px",
+                          }}
+                          title="Configure agent prompt & permissions"
                         >
-                          <Settings2 className="h-4 w-4" />
+                          <Settings2 size={15} />
                         </button>
 
                         <button
-                          onClick={() => {
-                            setActiveTab("history");
+                          type="button"
+                          onClick={() => setActiveTab("history")}
+                          style={{
+                            ...hbtn("ghost"),
+                            padding: "9px 11px",
                           }}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl glass glass-hover transition-colors"
-                          style={{ color: "var(--crm-muted-fg)" }}
                           title="View Execution History"
                         >
-                          <History className="h-4 w-4" />
+                          <History size={15} />
                         </button>
                       </div>
                     </div>
@@ -726,146 +1170,211 @@ export default function AIAgentsPage() {
 
       {/* ── TAB 2: EXECUTION HISTORY ── */}
       {activeTab === "history" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
             <div>
-              <h2 className="text-base font-bold" style={{ color: "var(--crm-foreground)" }}>
+              <h2 style={{ margin: 0, fontSize: 16, fontWeight: 750, color: "var(--crm-text)" }}>
                 Execution Audit Trail & Approvals
               </h2>
-              <p className="text-xs" style={{ color: "var(--crm-muted-fg)" }}>
+              <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "var(--crm-text-muted)" }}>
                 Real-time log of tool calls, inputs, outputs, tokens used, and human approval gates
               </p>
             </div>
             <button
-              onClick={() => loadData()}
-              className="flex items-center gap-1 text-xs text-blue-500 hover:underline"
+              onClick={() => void loadData()}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                fontSize: 12,
+                fontWeight: 650,
+                color: "var(--crm-primary)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+              }}
             >
-              <RefreshCw className="h-3 w-3" /> Refresh Logs
+              <RefreshCw size={13} /> Refresh Logs
             </button>
           </div>
 
           {runs.length === 0 ? (
-            <div className="glass rounded-2xl p-12 text-center">
-              <History className="h-10 w-10 mx-auto mb-3 opacity-40" />
-              <h3 className="text-base font-semibold" style={{ color: "var(--crm-foreground)" }}>
-                No Executions Recorded Yet
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                Trigger an agent from the directory to see real tool execution steps, timestamps, and results.
-              </p>
+            <div
+              className="crm-glass"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 12,
+                padding: "54px 20px",
+                textAlign: "center",
+                borderRadius: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 16,
+                  background: "rgba(139,92,246,0.12)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <History size={26} color="#8b5cf6" />
+              </div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 750, color: "var(--crm-text)" }}>
+                  No Executions Recorded Yet
+                </div>
+                <div style={{ fontSize: 13, color: "var(--crm-text-muted)", marginTop: 4, maxWidth: 380 }}>
+                  Trigger an agent from the directory to see real tool execution steps, timestamps, and results.
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {runs.map((run) => {
                 const isPending = run.status === "awaiting_approval";
                 const isCompleted = run.status === "completed";
-                const isFailed = run.status === "failed";
                 const isProcessing = runningAction === run.id;
 
                 return (
                   <div
                     key={run.id}
-                    className="glass rounded-2xl p-5 space-y-3 transition-all"
+                    className="crm-glass"
                     style={{
+                      borderRadius: 16,
+                      padding: "16px 20px",
                       borderLeft: isPending
-                        ? "4px solid #F59E0B"
+                        ? "4px solid #f59e0b"
                         : isCompleted
-                        ? "4px solid #10B981"
-                        : "4px solid #EF4444",
+                        ? "4px solid #10b981"
+                        : "4px solid #f46b72",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
                     }}
                   >
                     {/* Header Row */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div
-                          className="flex h-8 w-8 items-center justify-center rounded-xl"
                           style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 10,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                             background: isPending
                               ? "rgba(245,158,11,0.15)"
                               : isCompleted
                               ? "rgba(16,185,129,0.15)"
-                              : "rgba(239,68,68,0.15)",
+                              : "rgba(244,107,114,0.15)",
                           }}
                         >
                           {isPending ? (
-                            <ShieldAlert className="h-4 w-4 text-amber-500" />
+                            <ShieldAlert size={16} color="#f59e0b" />
                           ) : isCompleted ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                            <CheckCircle2 size={16} color="#10b981" />
                           ) : (
-                            <XCircle className="h-4 w-4 text-rose-500" />
+                            <XCircle size={16} color="#f46b72" />
                           )}
                         </div>
 
                         <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold" style={{ color: "var(--crm-foreground)" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 14, fontWeight: 750, color: "var(--crm-text)" }}>
                               {run.agent_name || "AI Agent"}
                             </span>
                             <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                                isPending
-                                  ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 animate-pulse"
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                textTransform: "uppercase",
+                                padding: "2px 7px",
+                                borderRadius: 6,
+                                background: isPending
+                                  ? "rgba(245,158,11,0.15)"
                                   : isCompleted
-                                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                                  : "bg-rose-500/15 text-rose-600 dark:text-rose-400"
-                              }`}
+                                  ? "rgba(16,185,129,0.15)"
+                                  : "rgba(244,107,114,0.15)",
+                                color: isPending ? "#f59e0b" : isCompleted ? "#10b981" : "#f46b72",
+                              }}
                             >
                               {run.status.replace("_", " ")}
                             </span>
                           </div>
-                          <p className="text-[11px]" style={{ color: "var(--crm-muted-fg)" }}>
+                          <div style={{ fontSize: 11, color: "var(--crm-text-muted)", marginTop: 2 }}>
                             Triggered by {run.triggered_by} • {new Date(run.started_at).toLocaleString()}
-                          </p>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Performance & Token Tags */}
-                      <div className="flex items-center gap-3 text-xs" style={{ color: "var(--crm-muted-fg)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 11.5, color: "var(--crm-text-muted)" }}>
                         {run.duration_ms && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {run.duration_ms}ms
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <Clock size={13} /> {run.duration_ms}ms
                           </span>
                         )}
                         {run.tokens_used > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" />
-                            {run.tokens_used} tokens
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <Sparkles size={13} /> {run.tokens_used} tokens
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Actions Taken Breakdown */}
+                    {/* Actions Taken */}
                     {run.actions_taken && run.actions_taken.length > 0 && (
-                      <div className="rounded-xl p-3 bg-black/5 dark:bg-white/5 space-y-1.5">
-                        <p className="text-[11px] font-semibold" style={{ color: "var(--crm-foreground)" }}>
+                      <div
+                        style={{
+                          padding: "10px 14px",
+                          borderRadius: 12,
+                          background: "rgba(0,0,0,0.03)",
+                          border: "1px solid var(--crm-border-soft)",
+                        }}
+                      >
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--crm-text)", marginBottom: 6 }}>
                           Actions Logged ({run.actions_taken.length}):
-                        </p>
-                        <div className="space-y-1">
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                           {run.actions_taken.map((act, i) => (
                             <div
                               key={i}
-                              className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-white/40 dark:bg-white/5"
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "5px 10px",
+                                borderRadius: 8,
+                                background: "rgba(255,255,255,0.6)",
+                                fontSize: 11.5,
+                              }}
                             >
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ fontFamily: "monospace", fontWeight: 700, color: "var(--crm-primary)" }}>
                                   {act.tool}
                                 </span>
                                 {act.requires_approval && (
-                                  <span className="text-[10px] text-amber-500 font-medium">
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: "#f59e0b" }}>
                                     [Sensitive Action]
                                   </span>
                                 )}
                               </div>
                               <span
-                                className={`text-[10px] font-medium ${
-                                  act.status === "success"
-                                    ? "text-emerald-500"
-                                    : act.status === "pending_approval"
-                                    ? "text-amber-500 font-semibold"
-                                    : "text-rose-500"
-                                }`}
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: 650,
+                                  color:
+                                    act.status === "success"
+                                      ? "#10b981"
+                                      : act.status === "pending_approval"
+                                      ? "#f59e0b"
+                                      : "#f46b72",
+                                }}
                               >
                                 {act.status}
                               </span>
@@ -877,41 +1386,78 @@ export default function AIAgentsPage() {
 
                     {/* Result Summary */}
                     {run.result_summary && (
-                      <div className="text-xs leading-relaxed p-3 rounded-xl bg-white/20 dark:bg-white/5 border border-white/10 whitespace-pre-wrap font-sans">
+                      <div
+                        style={{
+                          fontSize: 12,
+                          lineHeight: 1.5,
+                          padding: "10px 14px",
+                          borderRadius: 12,
+                          background: "rgba(255,255,255,0.5)",
+                          border: "1px solid var(--crm-border-soft)",
+                          color: "var(--crm-text)",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      >
                         {run.result_summary}
                       </div>
                     )}
 
-                    {/* Error Message if failed */}
+                    {/* Error Message */}
                     {run.error_message && (
-                      <div className="text-xs p-3 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                      <div
+                        style={{
+                          fontSize: 12,
+                          padding: "10px 14px",
+                          borderRadius: 12,
+                          background: "rgba(244,107,114,0.08)",
+                          border: "1px solid rgba(244,107,114,0.25)",
+                          color: "#f46b72",
+                        }}
+                      >
                         {run.error_message}
                       </div>
                     )}
 
                     {/* Approval Action Bar */}
                     {isPending && (
-                      <div className="flex items-center justify-between pt-2 border-t border-amber-500/20">
-                        <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">
-                          <AlertTriangle className="h-4 w-4" />
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          paddingTop: 10,
+                          borderTop: "1px solid rgba(245,158,11,0.25)",
+                          flexWrap: "wrap",
+                          gap: 10,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "#f59e0b", fontWeight: 650 }}>
+                          <AlertTriangle size={15} />
                           <span>This execution requires your explicit authorization before modifying CRM data.</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div style={{ display: "flex", gap: 8 }}>
                           <button
-                            onClick={() => handleRejectRun(run.id)}
+                            type="button"
+                            onClick={() => void handleRejectRun(run.id)}
                             disabled={isProcessing}
-                            className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-500/10 hover:bg-rose-500/20 transition-all"
+                            style={{
+                              ...hbtn("ghost"),
+                              color: "#f46b72",
+                              borderColor: "rgba(244,107,114,0.3)",
+                            }}
                           >
-                            <X className="h-3.5 w-3.5" />
-                            Reject
+                            <X size={14} /> Reject
                           </button>
                           <button
-                            onClick={() => handleApproveRun(run.id)}
+                            type="button"
+                            onClick={() => void handleApproveRun(run.id)}
                             disabled={isProcessing}
-                            className="flex items-center gap-1 rounded-xl px-4 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition-all"
+                            style={{
+                              ...hbtn("primary"),
+                              background: "linear-gradient(135deg, #10b981, #059669)",
+                            }}
                           >
-                            <Check className="h-3.5 w-3.5" />
-                            {isProcessing ? "Executing..." : "Approve & Execute"}
+                            <Check size={14} /> {isProcessing ? "Executing..." : "Approve & Execute"}
                           </button>
                         </div>
                       </div>
@@ -926,54 +1472,102 @@ export default function AIAgentsPage() {
 
       {/* ── TAB 3: TOOLS & SECURITY PERMISSIONS ── */}
       {activeTab === "tools" && (
-        <div className="space-y-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <h2 className="text-base font-bold" style={{ color: "var(--crm-foreground)" }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 750, color: "var(--crm-text)" }}>
               Authorized Tools & Governance Matrix
             </h2>
-            <p className="text-xs" style={{ color: "var(--crm-muted-fg)" }}>
+            <p style={{ margin: "3px 0 0", fontSize: 12.5, color: "var(--crm-text-muted)" }}>
               Agents only invoke explicitly permitted tools with account-level isolation and optional human approval gates
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+              gap: 12,
+            }}
+          >
             {Object.values(TOOLS_METADATA).map((tool) => (
-              <div key={tool.name} className="glass rounded-2xl p-4 flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">
+              <div
+                key={tool.name}
+                className="crm-glass"
+                style={{
+                  borderRadius: 14,
+                  padding: "14px 16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: 10,
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontFamily: "monospace", fontSize: 12.5, fontWeight: 750, color: "var(--crm-primary)" }}>
                       {tool.name}
                     </span>
                     <span
-                      className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
-                        tool.category === "crm_read"
-                          ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
-                          : "bg-purple-500/10 text-purple-600 dark:text-purple-400"
-                      }`}
+                      style={{
+                        fontSize: 9.5,
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        padding: "2px 7px",
+                        borderRadius: 6,
+                        background:
+                          tool.category === "crm_read"
+                            ? "rgba(6,182,212,0.12)"
+                            : "rgba(139,92,246,0.12)",
+                        color: tool.category === "crm_read" ? "#06b6d4" : "#8b5cf6",
+                      }}
                     >
                       {tool.category.replace("_", " ")}
                     </span>
                     {tool.approval === "requires_approval" ? (
-                      <span className="rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-500/10 text-amber-600">
+                      <span
+                        style={{
+                          fontSize: 9.5,
+                          fontWeight: 800,
+                          padding: "2px 7px",
+                          borderRadius: 6,
+                          background: "rgba(245,158,11,0.12)",
+                          color: "#f59e0b",
+                        }}
+                      >
                         Requires Approval
                       </span>
                     ) : (
-                      <span className="rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-500/10 text-emerald-600">
+                      <span
+                        style={{
+                          fontSize: 9.5,
+                          fontWeight: 800,
+                          padding: "2px 7px",
+                          borderRadius: 6,
+                          background: "rgba(16,185,129,0.12)",
+                          color: "#10b981",
+                        }}
+                      >
                         Auto-Execute
                       </span>
                     )}
                   </div>
-                  <p className="text-xs" style={{ color: "var(--crm-muted-fg)" }}>
+                  <p style={{ margin: 0, fontSize: 12, color: "var(--crm-text-muted)", lineHeight: 1.4 }}>
                     {tool.description}
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-1 shrink-0">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, paddingTop: 6, borderTop: "1px solid var(--crm-border-soft)" }}>
                   {tool.departmentHint.map((dept) => (
                     <span
                       key={dept}
-                      className="rounded-md px-1.5 py-0.5 text-[9px] font-medium bg-black/5 dark:bg-white/10"
-                      style={{ color: "var(--crm-muted-fg)" }}
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 650,
+                        padding: "2px 6px",
+                        borderRadius: 5,
+                        background: "rgba(130,145,190,0.12)",
+                        color: "var(--crm-text-secondary)",
+                      }}
                     >
                       {dept}
                     </span>
@@ -985,85 +1579,204 @@ export default function AIAgentsPage() {
         </div>
       )}
 
+      {/* ── SECTION: AI AGENT FLEET (Moved directly below complete AI Department Agents) ── */}
+      <div id="fleet" style={{ marginTop: 32 }}>
+        <AgentShowcase agents={fleetAgents} />
+      </div>
+
+      {/* ── SECTION: AI WORKFLOW TEMPLATES & PERMISSIONS (Moved directly below) ── */}
+      <div id="templates" style={{ marginTop: 24 }} className="crm-auto-split">
+        <div>
+          <TemplateGallery
+            templates={WORKFLOW_TEMPLATES}
+            compatFor={compatFor}
+            installing={installing}
+            onPreview={setPreview}
+            onUse={installTemplate}
+          />
+        </div>
+        <PermissionsPanel
+          agents={fleetAgents}
+          toolsAvailable={toolsCount > 0 ? toolsCount : Object.keys(TOOLS_METADATA).length}
+        />
+      </div>
+
+      {/* ── MODAL: Template Preview ── */}
+      {preview && (
+        <TemplatePreview
+          template={preview}
+          compatibility={compatFor(preview)}
+          installing={installing === preview.id}
+          onClose={() => setPreview(null)}
+          onUse={() => void installTemplate(preview)}
+        />
+      )}
+
+      {/* ── MODAL: Automation Builder (for customizing installed templates) ── */}
+      {showBuilder && (
+        <AutomationBuilder
+          initial={editingAutomation}
+          onClose={() => {
+            setShowBuilder(false);
+            setEditingAutomation(null);
+          }}
+          onSaved={() => {
+            setShowBuilder(false);
+            setEditingAutomation(null);
+            void loadData();
+          }}
+        />
+      )}
+
       {/* ── MODAL: Run Agent Modal ── */}
       {selectedAgentForRun && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-md animate-fade-in"
+          onClick={() => setSelectedAgentForRun(null)}
+        >
           <div
-            className="w-full max-w-lg glass rounded-2xl p-6 shadow-2xl space-y-4"
-            style={{ background: "var(--crm-glass-bg)" }}
+            className="w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4"
+            style={{
+              background: "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(246,248,255,0.92))",
+              backdropFilter: "blur(28px) saturate(160%)",
+              WebkitBackdropFilter: "blur(28px) saturate(160%)",
+              border: "1px solid rgba(255,255,255,0.85)",
+              boxShadow: "0 24px 70px rgba(40,50,90,0.22)",
+            }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--crm-glass-border-soft)" }}>
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600">
-                  <Play className="h-4 w-4" />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                borderBottom: "1px solid var(--crm-border-soft)",
+                paddingBottom: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 12,
+                    background: "rgba(79,109,245,0.14)",
+                    color: "var(--crm-primary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Play size={18} />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold" style={{ color: "var(--crm-foreground)" }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 750, color: "var(--crm-text)" }}>
                     Execute {selectedAgentForRun.name}
                   </h3>
-                  <p className="text-xs" style={{ color: "var(--crm-muted-fg)" }}>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--crm-text-muted)" }}>
                     Department: {getDeptMeta(selectedAgentForRun.department).label}
                   </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedAgentForRun(null)}
-                className="rounded-lg p-1 text-muted-foreground hover:bg-black/5"
+                style={{ background: "none", border: "none", color: "var(--crm-text-muted)", cursor: "pointer", padding: 4 }}
               >
-                <X className="h-5 w-5" />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <p style={{ color: "var(--crm-muted-fg)" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 12.5 }}>
+              <p style={{ margin: 0, color: "var(--crm-text-muted)", lineHeight: 1.4 }}>
                 This agent will inspect authorized CRM data and carry out its designated task.
               </p>
 
               {selectedAgentForRun.requires_approval && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    background: "rgba(245,158,11,0.10)",
+                    border: "1px solid rgba(245,158,11,0.25)",
+                    color: "#b45309",
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <ShieldAlert size={16} style={{ flexShrink: 0 }} />
                   <span>
                     Approval Gate Enabled: Any sensitive data modification will be queued in Execution History for manual approval.
                   </span>
                 </div>
               )}
 
-              <div className="space-y-1">
-                <label className="font-semibold" style={{ color: "var(--crm-foreground)" }}>
+              <div>
+                <label
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "var(--crm-text)",
+                    display: "block",
+                    marginBottom: 6,
+                  }}
+                >
                   Context / Instructions (Optional):
                 </label>
                 <textarea
                   id="run-custom-prompt"
                   placeholder="e.g. Focus on hot leads in the Mumbai region or prioritize deals closing this month..."
                   rows={3}
-                  className="w-full rounded-xl p-3 text-xs outline-none"
                   style={{
-                    background: "rgba(0,0,0,0.03)",
-                    border: "1px solid var(--crm-glass-border)",
-                    color: "var(--crm-foreground)",
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(130,145,190,0.30)",
+                    background: "rgba(255,255,255,0.85)",
+                    fontSize: 12.5,
+                    color: "var(--crm-text)",
+                    outline: "none",
+                    boxSizing: "border-box",
                   }}
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t" style={{ borderColor: "var(--crm-glass-border-soft)" }}>
-              <button
-                onClick={() => setSelectedAgentForRun(null)}
-                className="rounded-xl px-4 py-2 text-xs font-semibold glass glass-hover"
-              >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 8,
+                paddingTop: 14,
+                borderTop: "1px solid var(--crm-border-soft)",
+              }}
+            >
+              <button type="button" onClick={() => setSelectedAgentForRun(null)} style={hbtn("ghost")}>
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={() => {
                   const inputEl = document.getElementById("run-custom-prompt") as HTMLTextAreaElement;
                   const prompt = inputEl?.value?.trim();
-                  handleExecuteAgent(selectedAgentForRun, prompt ? { custom_task: prompt } : {});
+                  void handleExecuteAgent(selectedAgentForRun, prompt ? { custom_task: prompt } : {});
                 }}
                 disabled={runningAction === selectedAgentForRun.id}
-                className="flex items-center gap-1.5 rounded-xl px-5 py-2 text-xs font-semibold text-white shadow-md"
-                style={{ background: "linear-gradient(135deg, #4F6EF7, #7C3AED)" }}
+                style={{
+                  ...hbtn("primary"),
+                  opacity: runningAction === selectedAgentForRun.id ? 0.75 : 1,
+                  cursor: runningAction === selectedAgentForRun.id ? "not-allowed" : "pointer",
+                }}
               >
-                <Play className={`h-3.5 w-3.5 ${runningAction === selectedAgentForRun.id ? "animate-spin" : ""}`} />
+                {runningAction === selectedAgentForRun.id ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Play size={14} />
+                )}
                 {runningAction === selectedAgentForRun.id ? "Analyzing CRM Data..." : "Run Autonomous Task"}
               </button>
             </div>
@@ -1078,7 +1791,7 @@ export default function AIAgentsPage() {
           onClose={() => setSelectedAgentForConfig(null)}
           onSaved={() => {
             setSelectedAgentForConfig(null);
-            loadData();
+            void loadData();
           }}
         />
       )}
@@ -1087,9 +1800,12 @@ export default function AIAgentsPage() {
       {isCreateOpen && (
         <CreateAgentModal
           onClose={() => setIsCreateOpen(false)}
-          onCreated={() => {
+          onCreated={(newAgent) => {
             setIsCreateOpen(false);
-            loadData();
+            if (newAgent && newAgent.id) {
+              setAgents((prev) => [newAgent, ...prev.filter((a) => a.id !== newAgent.id)]);
+            }
+            void loadData();
           }}
         />
       )}
@@ -1112,7 +1828,6 @@ function ConfigAgentModal({
   const [instructions, setInstructions] = useState(agent.instructions || "");
   const [allowedTools, setAllowedTools] = useState<string[]>(agent.allowed_tools || []);
   const [requiresApproval, setRequiresApproval] = useState(agent.requires_approval);
-  const [maxActions, setMaxActions] = useState(agent.max_actions_per_run || 10);
   const [saving, setSaving] = useState(false);
 
   const toggleTool = (toolName: string) => {
@@ -1124,16 +1839,19 @@ function ConfigAgentModal({
   const handleSave = async () => {
     setSaving(true);
     try {
+      const user = getStoredUser();
       const res = await fetch(`/api/agents/${agent.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
+        },
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim(),
           instructions: instructions.trim(),
           allowed_tools: allowedTools,
           requires_approval: requiresApproval,
-          max_actions_per_run: Number(maxActions) || 10,
         }),
       });
 
@@ -1148,119 +1866,208 @@ function ConfigAgentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto glass rounded-2xl p-6 shadow-2xl space-y-4"
-        style={{ background: "var(--crm-glass-bg)" }}
+        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 shadow-2xl space-y-4"
+        style={{
+          background: "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(246,248,255,0.92))",
+          backdropFilter: "blur(28px) saturate(160%)",
+          WebkitBackdropFilter: "blur(28px) saturate(160%)",
+          border: "1px solid rgba(255,255,255,0.85)",
+          boxShadow: "0 24px 70px rgba(40,50,90,0.22)",
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--crm-glass-border-soft)" }}>
-          <div className="flex items-center gap-2.5">
-            <Settings2 className="h-5 w-5 text-blue-600" />
-            <h3 className="text-base font-bold" style={{ color: "var(--crm-foreground)" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid var(--crm-border-soft)",
+            paddingBottom: 12,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Settings2 size={20} color="var(--crm-primary)" />
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 750, color: "var(--crm-text)" }}>
               Configure {agent.name}
             </h3>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-black/5">
-            <X className="h-5 w-5" />
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: "none", border: "none", color: "var(--crm-text-muted)", cursor: "pointer", padding: 4 }}
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <div className="space-y-4 text-xs">
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, fontSize: 12.5 }}>
           <div>
-            <label className="font-semibold block mb-1" style={{ color: "var(--crm-foreground)" }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "var(--crm-text)", display: "block", marginBottom: 6 }}>
               Agent Name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl px-3 py-2 outline-none"
-              style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--crm-glass-border)", color: "var(--crm-foreground)" }}
+              style={{
+                width: "100%",
+                padding: "9px 13px",
+                borderRadius: 12,
+                border: "1px solid rgba(130,145,190,0.30)",
+                background: "rgba(255,255,255,0.85)",
+                fontSize: 13,
+                color: "var(--crm-text)",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
             />
           </div>
 
           <div>
-            <label className="font-semibold block mb-1" style={{ color: "var(--crm-foreground)" }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "var(--crm-text)", display: "block", marginBottom: 6 }}>
               Description
             </label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-xl px-3 py-2 outline-none"
-              style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--crm-glass-border)", color: "var(--crm-foreground)" }}
+              style={{
+                width: "100%",
+                padding: "9px 13px",
+                borderRadius: 12,
+                border: "1px solid rgba(130,145,190,0.30)",
+                background: "rgba(255,255,255,0.85)",
+                fontSize: 13,
+                color: "var(--crm-text)",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
             />
           </div>
 
           <div>
-            <label className="font-semibold block mb-1" style={{ color: "var(--crm-foreground)" }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "var(--crm-text)", display: "block", marginBottom: 6 }}>
               System Prompt & Instructions
             </label>
             <textarea
               rows={5}
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              className="w-full rounded-xl p-3 outline-none font-mono text-[11px]"
-              style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--crm-glass-border)", color: "var(--crm-foreground)" }}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 12,
+                border: "1px solid rgba(130,145,190,0.30)",
+                background: "rgba(255,255,255,0.85)",
+                fontSize: 12,
+                fontFamily: "monospace",
+                color: "var(--crm-text)",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
             />
           </div>
 
           {/* Tools Checkboxes */}
           <div>
-            <label className="font-semibold block mb-2" style={{ color: "var(--crm-foreground)" }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "var(--crm-text)", display: "block", marginBottom: 6 }}>
               Authorized Tools ({allowedTools.length} selected)
             </label>
-            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 rounded-xl bg-black/5 dark:bg-white/5 border border-white/10">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: 8,
+                maxHeight: 180,
+                overflowY: "auto",
+                padding: 10,
+                borderRadius: 12,
+                background: "rgba(0,0,0,0.03)",
+                border: "1px solid rgba(130,145,190,0.22)",
+              }}
+            >
               {Object.values(TOOLS_METADATA).map((t) => {
                 const selected = allowedTools.includes(t.name);
                 return (
                   <label
                     key={t.name}
-                    className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-colors ${
-                      selected ? "bg-blue-500/15 text-blue-600 font-semibold" : "hover:bg-white/10"
-                    }`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 9px",
+                      borderRadius: 8,
+                      background: selected ? "rgba(79,109,245,0.12)" : "rgba(255,255,255,0.6)",
+                      border: selected ? "1px solid rgba(79,109,245,0.3)" : "1px solid transparent",
+                      color: selected ? "var(--crm-primary)" : "var(--crm-text)",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      fontFamily: "monospace",
+                    }}
                   >
                     <input
                       type="checkbox"
                       checked={selected}
                       onChange={() => toggleTool(t.name)}
-                      className="rounded accent-blue-600"
+                      style={{ cursor: "pointer" }}
                     />
-                    <span className="font-mono text-[11px] truncate">{t.name}</span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {t.name}
+                    </span>
                   </label>
                 );
               })}
             </div>
           </div>
 
-          {/* Approval Gate Toggle */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-black/5 dark:bg-white/5">
+          {/* Approval Gate */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "rgba(79,109,245,0.06)",
+              border: "1px solid rgba(79,109,245,0.18)",
+            }}
+          >
             <div>
-              <p className="font-semibold text-xs" style={{ color: "var(--crm-foreground)" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--crm-text)" }}>
                 Require Human Approval for Sensitive Actions
-              </p>
-              <p className="text-[11px] opacity-70" style={{ color: "var(--crm-muted-fg)" }}>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--crm-text-muted)", marginTop: 2 }}>
                 When enabled, write actions (deal stage updates, lead status) will pause for review.
-              </p>
+              </div>
             </div>
             <input
               type="checkbox"
               checked={requiresApproval}
               onChange={(e) => setRequiresApproval(e.target.checked)}
-              className="h-4 w-4 rounded accent-blue-600 cursor-pointer"
+              style={{ width: 16, height: 16, cursor: "pointer" }}
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-3 border-t" style={{ borderColor: "var(--crm-glass-border-soft)" }}>
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-xs font-semibold glass glass-hover">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 8,
+            paddingTop: 14,
+            borderTop: "1px solid var(--crm-border-soft)",
+          }}
+        >
+          <button type="button" onClick={onClose} style={hbtn("ghost")}>
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-xl px-5 py-2 text-xs font-semibold text-white shadow-md bg-blue-600 hover:bg-blue-700"
-          >
+          <button type="button" onClick={handleSave} disabled={saving} style={hbtn("primary")}>
             {saving ? "Saving..." : "Save Configuration"}
           </button>
         </div>
@@ -1269,13 +2076,13 @@ function ConfigAgentModal({
   );
 }
 
-/* ── Modal: Create New Agent ────────────────────────────────── */
+/* ── Modal: Create New Agent (Requirement 3: Clean, slightly more opaque white/translucent surface) ── */
 function CreateAgentModal({
   onClose,
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (newAgent?: AIAgent) => void;
 }) {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState<AgentDepartment>("sales");
@@ -1283,24 +2090,33 @@ function CreateAgentModal({
   const [instructions, setInstructions] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCreate = async () => {
     if (!name.trim()) {
+      setError("Agent name is required");
       toast.error("Agent name is required");
       return;
     }
 
     setCreating(true);
+    setError(null);
     try {
-      // Default recommended tools per department
+      const user = getStoredUser();
+
+      // Recommended tools per department
       const tools = Object.values(TOOLS_METADATA)
         .filter((t) => t.departmentHint.includes(department))
         .map((t) => t.name);
 
       const res = await fetch("/api/agents", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
+        },
         body: JSON.stringify({
+          account_id: user?.account_id,
           name: name.trim(),
           department,
           description: description.trim(),
@@ -1313,69 +2129,166 @@ function CreateAgentModal({
         }),
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "Failed to create agent");
+        throw new Error(data.error || "Failed to create agent");
       }
 
-      toast.success(`Agent "${name}" created successfully!`);
-      onCreated();
+      const created = data.data || data;
+      toast.success(`Agent "${name.trim()}" created successfully!`);
+      onCreated(created);
     } catch (err: any) {
-      toast.error(err.message || "Could not create agent");
+      console.error("Create agent error:", err);
+      const msg = err.message || "Could not create agent";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setCreating(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-lg glass rounded-2xl p-6 shadow-2xl space-y-4"
-        style={{ background: "var(--crm-glass-bg)" }}
+        className="w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4"
+        style={{
+          background: "linear-gradient(135deg, rgba(255,255,255,0.96), rgba(246,248,255,0.92))",
+          backdropFilter: "blur(28px) saturate(160%)",
+          WebkitBackdropFilter: "blur(28px) saturate(160%)",
+          border: "1px solid rgba(255,255,255,0.85)",
+          boxShadow: "0 24px 70px rgba(40,50,90,0.22)",
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--crm-glass-border-soft)" }}>
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/15 text-blue-600">
-              <Bot className="h-5 w-5" />
+        {/* Modal Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: "1px solid var(--crm-border-soft)",
+            paddingBottom: 12,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                background: "rgba(79,109,245,0.14)",
+                color: "var(--crm-primary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Bot size={20} />
             </div>
             <div>
-              <h3 className="text-base font-bold" style={{ color: "var(--crm-foreground)" }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 750, color: "var(--crm-text)" }}>
                 Create Custom AI Agent
               </h3>
-              <p className="text-xs" style={{ color: "var(--crm-muted-fg)" }}>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--crm-text-muted)" }}>
                 Add a specialized agent for your team's workflow
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-black/5">
-            <X className="h-5 w-5" />
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: "none", border: "none", color: "var(--crm-text-muted)", cursor: "pointer", padding: 4 }}
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <div className="space-y-3 text-xs">
+        {/* Error Alert */}
+        {error && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 13px",
+              borderRadius: 10,
+              background: "rgba(244,107,114,0.08)",
+              border: "1px solid rgba(244,107,114,0.25)",
+              color: "#f46b72",
+              fontSize: 12.5,
+            }}
+          >
+            <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{error}</span>
+          </div>
+        )}
+
+        {/* Form Body */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, fontSize: 12.5 }}>
           <div>
-            <label className="font-semibold block mb-1" style={{ color: "var(--crm-foreground)" }}>
+            <label
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--crm-text)",
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
               Agent Name *
             </label>
             <input
               type="text"
               placeholder="e.g. VIP Client Nurturing Agent"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl px-3 py-2 outline-none"
-              style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--crm-glass-border)", color: "var(--crm-foreground)" }}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (error) setError(null);
+              }}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 12,
+                border: "1px solid rgba(130,145,190,0.30)",
+                background: "rgba(255,255,255,0.85)",
+                fontSize: 13,
+                color: "var(--crm-text)",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
             />
           </div>
 
           <div>
-            <label className="font-semibold block mb-1" style={{ color: "var(--crm-foreground)" }}>
+            <label
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--crm-text)",
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
               Department
             </label>
             <select
               value={department}
               onChange={(e) => setDepartment(e.target.value as AgentDepartment)}
-              className="w-full rounded-xl px-3 py-2 outline-none"
-              style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--crm-glass-border)", color: "var(--crm-foreground)" }}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 12,
+                border: "1px solid rgba(130,145,190,0.30)",
+                background: "rgba(255,255,255,0.85)",
+                fontSize: 13,
+                color: "var(--crm-text)",
+                outline: "none",
+                cursor: "pointer",
+                boxSizing: "border-box",
+              }}
             >
               <option value="sales">Sales</option>
               <option value="customer_support">Customer Support</option>
@@ -1387,7 +2300,15 @@ function CreateAgentModal({
           </div>
 
           <div>
-            <label className="font-semibold block mb-1" style={{ color: "var(--crm-foreground)" }}>
+            <label
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--crm-text)",
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
               Short Description
             </label>
             <input
@@ -1395,13 +2316,30 @@ function CreateAgentModal({
               placeholder="e.g. Monitors high-intent leads and alerts VIP sales reps"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-xl px-3 py-2 outline-none"
-              style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--crm-glass-border)", color: "var(--crm-foreground)" }}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 12,
+                border: "1px solid rgba(130,145,190,0.30)",
+                background: "rgba(255,255,255,0.85)",
+                fontSize: 13,
+                color: "var(--crm-text)",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
             />
           </div>
 
           <div>
-            <label className="font-semibold block mb-1" style={{ color: "var(--crm-foreground)" }}>
+            <label
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "var(--crm-text)",
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
               Custom Instructions
             </label>
             <textarea
@@ -1409,40 +2347,74 @@ function CreateAgentModal({
               placeholder="Specific guidelines for this agent..."
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              className="w-full rounded-xl p-3 outline-none"
-              style={{ background: "rgba(0,0,0,0.03)", border: "1px solid var(--crm-glass-border)", color: "var(--crm-foreground)" }}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                borderRadius: 12,
+                border: "1px solid rgba(130,145,190,0.30)",
+                background: "rgba(255,255,255,0.85)",
+                fontSize: 12.5,
+                color: "var(--crm-text)",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
             />
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-black/5 dark:bg-white/5">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: "rgba(79,109,245,0.06)",
+              border: "1px solid rgba(79,109,245,0.18)",
+            }}
+          >
             <div>
-              <p className="font-semibold text-xs" style={{ color: "var(--crm-foreground)" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 750, color: "var(--crm-text)" }}>
                 Approval Gate
-              </p>
-              <p className="text-[11px] opacity-70" style={{ color: "var(--crm-muted-fg)" }}>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--crm-text-muted)", marginTop: 2 }}>
                 Require human confirmation before CRM modifications
-              </p>
+              </div>
             </div>
             <input
               type="checkbox"
               checked={requiresApproval}
               onChange={(e) => setRequiresApproval(e.target.checked)}
-              className="h-4 w-4 rounded accent-blue-600 cursor-pointer"
+              style={{ width: 16, height: 16, cursor: "pointer" }}
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-3 border-t" style={{ borderColor: "var(--crm-glass-border-soft)" }}>
-          <button onClick={onClose} className="rounded-xl px-4 py-2 text-xs font-semibold glass glass-hover">
+        {/* Modal Actions */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: 8,
+            paddingTop: 14,
+            borderTop: "1px solid var(--crm-border-soft)",
+          }}
+        >
+          <button type="button" onClick={onClose} style={hbtn("ghost")}>
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleCreate}
             disabled={creating}
-            className="rounded-xl px-5 py-2 text-xs font-semibold text-white shadow-md"
-            style={{ background: "linear-gradient(135deg, #4F6EF7, #7C3AED)" }}
+            style={{
+              ...hbtn("primary"),
+              opacity: creating ? 0.75 : 1,
+              cursor: creating ? "not-allowed" : "pointer",
+            }}
           >
-            {creating ? "Creating..." : "Create Agent"}
+            {creating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {creating ? "Creating Agent..." : "Create Agent"}
           </button>
         </div>
       </div>

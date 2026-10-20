@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { ContentItem, ContentStatus, ContentPlatform } from '@/types/crm3';
 import Link from 'next/link';
+import { v3fetch } from '@/lib/auth-client';
 import { ContentCalendar } from '@/components/content-studio/ContentCalendar';
 import { ContentGrid } from '@/components/content-studio/ContentGrid';
 
@@ -55,7 +56,7 @@ function AIGeneratorPanel({ onGenerated }: { onGenerated: (content: GeneratedCon
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch('/api/v3/ai/generate-content', {
+      const res = await v3fetch('/api/v3/ai/generate-content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, options: { platform, tone } }),
@@ -284,7 +285,7 @@ export default function ContentStudioPage() {
   const loadDrafts = useCallback(async () => {
     setLoadingDrafts(true);
     try {
-      const res = await fetch('/api/v3/content?status=ai_generated');
+      const res = await v3fetch('/api/v3/content?status=ai_generated');
       if (res.ok) {
         const d = await res.json() as { data: Partial<ContentItem>[] };
         setDraftContent(d.data ?? []);
@@ -297,7 +298,7 @@ export default function ContentStudioPage() {
   const loadPublished = useCallback(async () => {
     setLoadingPublished(true);
     try {
-      const res = await fetch('/api/v3/content?status=published');
+      const res = await v3fetch('/api/v3/content?status=published');
       if (res.ok) {
         const d = await res.json() as { data: Partial<ContentItem>[] };
         setPublishedContent(d.data ?? []);
@@ -308,7 +309,7 @@ export default function ContentStudioPage() {
   }, []);
 
   const handlePublish = useCallback(async (id: string) => {
-    const res = await fetch(`/api/v3/content/${id}`, {
+    const res = await v3fetch(`/api/v3/content/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'published' }),
@@ -322,7 +323,7 @@ export default function ContentStudioPage() {
 
   const handleGenerated = useCallback(async (content: GeneratedContent) => {
     try {
-      const res = await fetch('/api/v3/content', {
+      const res = await v3fetch('/api/v3/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tzmicha CRM</string>
+    <string name="title_activity_main">Tzmicha CRM</string>
+    <string name="package_name">com.tzmicha.crm</string>
+    <string name="custom_url_scheme">com.tzmicha.crm</string>
+</resources>

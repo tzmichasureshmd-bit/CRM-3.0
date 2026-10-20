@@ -1,0 +1,294 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════
+   TAILWIND v4 THEME TOKENS
+═══════════════════════════════════════════════════════════ */
+@theme {
+  --color-background:         var(--crm-background);
+  --color-foreground:         var(--crm-foreground);
+  --color-card:               var(--crm-glass-bg);
+  --color-card-foreground:    var(--crm-foreground);
+  --color-primary:            #4F6EF7;
+  --color-primary-foreground: #ffffff;
+  --color-secondary:          #7C3AED;
+  --color-muted:              var(--crm-muted);
+  --color-muted-foreground:   var(--crm-muted-fg);
+  --color-border:             var(--crm-border);
+  --color-destructive:        #EF4444;
+  --color-success:            #10B981;
+  --color-warning:            #F59E0B;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --radius-sm:  8px;
+  --radius-md:  12px;
+  --radius-lg:  16px;
+  --radius-xl:  20px;
+  --radius-2xl: 24px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIGHT MODE TOKENS
+═══════════════════════════════════════════════════════════ */
+:root {
+  /* Brand */
+  --brand-primary:   #4F6EF7;
+  --brand-secondary: #7C3AED;
+  --brand-accent:    #06B6D4;
+
+  /* Ambient background — soft colored light behind glass */
+  --crm-background: #EEF0FF;
+  --crm-bg-gradient:
+    radial-gradient(ellipse 80% 60% at 10% -10%,  rgba(167,139,250,0.22) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90%  0%,   rgba(251,191,136,0.18) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 60% at 50% 110%,  rgba(99,179,237,0.14)  0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80%  80%,  rgba(236,72,153,0.08)  0%, transparent 50%),
+    linear-gradient(160deg, #EEF0FF 0%, #F5F0FF 40%, #EFF6FF 70%, #F0FFFE 100%);
+
+  /* Glass surfaces */
+  --crm-glass-bg:           rgba(255,255,255,0.52);
+  --crm-glass-bg-strong:    rgba(255,255,255,0.72);
+  --crm-glass-bg-subtle:    rgba(255,255,255,0.32);
+  --crm-glass-border:       rgba(255,255,255,0.70);
+  --crm-glass-border-soft:  rgba(255,255,255,0.45);
+  --crm-glass-blur:         blur(24px);
+  --crm-glass-shadow:       0 4px 24px rgba(79,110,247,0.08), 0 1px 4px rgba(0,0,0,0.04);
+  --crm-glass-shadow-hover: 0 12px 40px rgba(79,110,247,0.16), 0 2px 8px rgba(0,0,0,0.06);
+  --crm-glass-shadow-lg:    0 20px 60px rgba(79,110,247,0.12), 0 4px 16px rgba(0,0,0,0.06);
+
+  /* Sidebar */
+  --crm-sidebar-bg:     rgba(255,255,255,0.78);
+  --crm-sidebar-border: rgba(255,255,255,0.80);
+  --crm-sidebar-width:  220px;
+  --crm-sidebar-collapsed: 64px;
+
+  /* Header */
+  --crm-header-bg: rgba(255,255,255,0.70);
+
+  /* Semantic */
+  --crm-foreground: #0F172A;
+  --crm-muted:      rgba(241,245,249,0.80);
+  --crm-muted-fg:   #64748B;
+  --crm-border:     rgba(203,213,225,0.55);
+
+  /* Legacy aliases */
+  --color-background:       #EEF0FF;
+  --color-foreground:       #0F172A;
+  --color-card:             rgba(255,255,255,0.52);
+  --color-card-foreground:  #0F172A;
+  --color-muted:            rgba(241,245,249,0.80);
+  --color-muted-foreground: #64748B;
+  --color-border:           rgba(203,213,225,0.55);
+  --glass-bg:               var(--crm-glass-bg);
+  --glass-border:           var(--crm-glass-border);
+  --glass-shadow:           var(--crm-glass-shadow);
+  --glass-shadow-hover:     var(--crm-glass-shadow-hover);
+  --sidebar-bg:             var(--crm-sidebar-bg);
+  --sidebar-width:          var(--crm-sidebar-width);
+  --sidebar-collapsed:      var(--crm-sidebar-collapsed);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DARK MODE TOKENS
+═══════════════════════════════════════════════════════════ */
+.dark {
+  --crm-background: #070B18;
+  --crm-bg-gradient:
+    radial-gradient(ellipse 80% 60% at 10% -10%,  rgba(124,58,237,0.20)  0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90%  0%,   rgba(79,110,247,0.14)  0%, transparent 55%),
+    radial-gradient(ellipse 70% 60% at 50% 110%,  rgba(6,182,212,0.10)   0%, transparent 60%),
+    linear-gradient(160deg, #070B18 0%, #0D1130 40%, #080C1A 70%, #060E1A 100%);
+
+  --crm-glass-bg:           rgba(15,23,42,0.55);
+  --crm-glass-bg-strong:    rgba(15,23,42,0.80);
+  --crm-glass-bg-subtle:    rgba(15,23,42,0.35);
+  --crm-glass-border:       rgba(255,255,255,0.09);
+  --crm-glass-border-soft:  rgba(255,255,255,0.05);
+  --crm-glass-shadow:       0 4px 24px rgba(0,0,0,0.40), 0 1px 4px rgba(0,0,0,0.30);
+  --crm-glass-shadow-hover: 0 12px 40px rgba(79,110,247,0.25), 0 2px 8px rgba(0,0,0,0.40);
+  --crm-glass-shadow-lg:    0 20px 60px rgba(0,0,0,0.50), 0 4px 16px rgba(0,0,0,0.35);
+
+  --crm-sidebar-bg:     rgba(8,14,28,0.88);
+  --crm-sidebar-border: rgba(255,255,255,0.07);
+  --crm-header-bg:      rgba(8,14,28,0.75);
+
+  --crm-foreground: #F1F5F9;
+  --crm-muted:      rgba(30,41,59,0.80);
+  --crm-muted-fg:   #94A3B8;
+  --crm-border:     rgba(255,255,255,0.07);
+
+  --color-background:       #070B18;
+  --color-foreground:       #F1F5F9;
+  --color-card:             rgba(15,23,42,0.55);
+  --color-card-foreground:  #F1F5F9;
+  --color-muted:            rgba(30,41,59,0.80);
+  --color-muted-foreground: #94A3B8;
+  --color-border:           rgba(255,255,255,0.07);
+  --glass-bg:               var(--crm-glass-bg);
+  --glass-border:           var(--crm-glass-border);
+  --glass-shadow:           var(--crm-glass-shadow);
+  --glass-shadow-hover:     var(--crm-glass-shadow-hover);
+  --sidebar-bg:             var(--crm-sidebar-bg);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BASE RESET
+═══════════════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  height: 100%;
+}
+
+body {
+  background: var(--crm-bg-gradient);
+  background-attachment: fixed;
+  color: var(--crm-foreground);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: var(--font-sans);
+}
+
+a            { color: inherit; text-decoration: none; }
+ul, ol       { list-style: none; }
+button       { cursor: pointer; border: none; background: none; font-family: inherit; font-size: inherit; color: inherit; padding: 0; line-height: inherit; }
+input, textarea, select { font-family: inherit; font-size: inherit; color: inherit; background: none; border: none; outline: none; appearance: none; -webkit-appearance: none; }
+img, svg     { display: block; max-width: 100%; }
+
+/* ═══════════════════════════════════════════════════════════
+   GLASS UTILITY CLASSES
+═══════════════════════════════════════════════════════════ */
+
+/* Level 1 — most transparent, background sections */
+.glass-1 {
+  background: var(--crm-glass-bg-subtle);
+  border: 1px solid var(--crm-glass-border-soft);
+  backdrop-filter: var(--crm-glass-blur);
+  -webkit-backdrop-filter: var(--crm-glass-blur);
+}
+
+/* Level 2 — standard cards (most used) */
+.glass {
+  background: var(--crm-glass-bg);
+  border: 1px solid var(--crm-glass-border);
+  backdrop-filter: var(--crm-glass-blur);
+  -webkit-backdrop-filter: var(--crm-glass-blur);
+  box-shadow: var(--crm-glass-shadow);
+}
+
+/* Level 3 — dialogs, dropdowns, important panels */
+.glass-3 {
+  background: var(--crm-glass-bg-strong);
+  border: 1px solid var(--crm-glass-border);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  box-shadow: var(--crm-glass-shadow-lg);
+}
+
+/* Hover lift */
+.glass-hover {
+  transition: box-shadow 0.22s ease, transform 0.22s ease;
+}
+.glass-hover:hover {
+  box-shadow: var(--crm-glass-shadow-hover);
+  transform: translateY(-2px);
+}
+
+/* Sidebar glass */
+.glass-sidebar {
+  background: var(--crm-sidebar-bg);
+  border-right: 1px solid var(--crm-sidebar-border);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+}
+
+/* Header glass */
+.glass-header {
+  background: var(--crm-header-bg);
+  border-bottom: 1px solid var(--crm-glass-border-soft);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* AI glow card */
+.glass-ai {
+  background: linear-gradient(135deg, rgba(79,110,247,0.10), rgba(124,58,237,0.08));
+  border: 1px solid rgba(79,110,247,0.22);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 0 32px rgba(79,110,247,0.10), var(--crm-glass-shadow);
+}
+
+/* Active nav pill */
+.nav-active {
+  background: linear-gradient(135deg, rgba(79,110,247,0.15), rgba(124,58,237,0.10));
+  border: 1px solid rgba(79,110,247,0.25);
+  color: var(--brand-primary) !important;
+  box-shadow: 0 2px 12px rgba(79,110,247,0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TYPOGRAPHY UTILITIES
+═══════════════════════════════════════════════════════════ */
+.gradient-text {
+  background: linear-gradient(135deg, #4F6EF7, #7C3AED);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.trend-up   { color: #10B981; }
+.trend-down { color: #EF4444; }
+
+/* ═══════════════════════════════════════════════════════════
+   ANIMATIONS
+═══════════════════════════════════════════════════════════ */
+.ai-pulse {
+  animation: ai-pulse 2.2s ease-in-out infinite;
+}
+@keyframes ai-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.6; transform: scale(0.95); }
+}
+
+.ai-orb-pulse {
+  animation: ai-orb 3s ease-in-out infinite;
+}
+@keyframes ai-orb {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79,110,247,0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(79,110,247,0); }
+}
+
+.skeleton {
+  background: linear-gradient(90deg,
+    rgba(148,163,184,0.10) 25%,
+    rgba(148,163,184,0.20) 50%,
+    rgba(148,163,184,0.10) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s infinite;
+  border-radius: var(--radius-md);
+}
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════════════════════════ */
+::-webkit-scrollbar              { width: 4px; height: 4px; }
+::-webkit-scrollbar-track        { background: transparent; }
+::-webkit-scrollbar-thumb        { background: rgba(148,163,184,0.28); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover  { background: rgba(148,163,184,0.48); }
+
+/* ═══════════════════════════════════════════════════════════
+   FOCUS
+═══════════════════════════════════════════════════════════ */
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}

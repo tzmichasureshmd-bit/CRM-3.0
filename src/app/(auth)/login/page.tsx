@@ -1,8 +1,28 @@
 'use client';
 
-import { useState } from 'react';
-import { Eye, EyeOff, Loader2, Zap } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Loader2, Brain, MessageSquare, TrendingUp, Bot, Users, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
+import { signInWithGoogle } from '@/lib/firebase';
+
+const FEATURES = [
+  { icon: <Brain size={18} />,         title: 'AI Lead Scoring',      desc: 'Explainable 0–100 scores with intent detection' },
+  { icon: <MessageSquare size={18} />, title: 'Unified Inbox',        desc: 'WhatsApp, Instagram, Facebook, Email in one place' },
+  { icon: <TrendingUp size={18} />,    title: 'Revenue Intelligence', desc: 'Content → Lead → Deal attribution tracking' },
+  { icon: <Bot size={18} />,           title: 'AI Agents',            desc: 'Autonomous agents with human approval gates' },
+  { icon: <Users size={18} />,         title: 'Customer 360',         desc: 'Full timeline, deals, and AI insights per contact' },
+];
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18">
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+      <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/>
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z"/>
+    </svg>
+  );
+}
 
 export default function LoginPage() {
   const [email, setEmail]               = useState('');
@@ -10,115 +30,226 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState('');
+  const [activeFeature, setActiveFeature] = useState(0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    const id = setInterval(() => setActiveFeature(i => (i + 1) % FEATURES.length), 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  // FIX-009: Clear any stale partial TOTP token on fresh login page entry
+  useEffect(() => {
+    localStorage.removeItem('crm_partial_token');
+  }, []);
+
+  // ── shared: save session + redirect ──────────────────────────
+  const saveAndRedirect = (data: Record<string, string>) => {
+    localStorage.removeItem('crm_partial_token'); // FIX-009: clear partial token on successful login
+    localStorage.setItem('crm_token', data.access_token);
+    localStorage.setItem('crm_user', JSON.stringify({
+      user_id:    data.user_id    ?? '',
+      account_id: data.account_id ?? '',
+      role:       data.role       ?? 'owner',
+      email:      data.email      ?? email.trim(),
+      full_name:  data.full_name  ?? email.trim().split('@')[0],
+      avatar_url: data.avatar_url ?? '',
+    }));
+    window.location.replace('/dashboard');
+  };
+
+  // ── Email + Password login via FastAPI (/api/v1/auth/login) ──
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      // Authenticate directly with Supabase so the app gets a real session
-      // (auth cookies) — this is what the /api/v3/* routes validate. It also
-      // lets us persist the access token for API clients that read crm_token.
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
       });
-
-      if (signInError) {
-        setError(
-          /not confirmed/i.test(signInError.message)
-            ? 'Please confirm your email before signing in.'
-            : signInError.message,
-        );
+      const data = await res.json() as Record<string, string>;
+      if (!res.ok || !data.access_token) {
+        setError(data.detail ?? 'Invalid email or password');
         setLoading(false);
         return;
       }
-      if (!data.session || !data.user) {
-        setError('Sign-in succeeded but no session was returned. Please try again.');
-        setLoading(false);
+      // TOTP required — redirect to TOTP verify page
+      if ((data as unknown as { totp_required?: boolean }).totp_required) {
+        localStorage.setItem('crm_partial_token', (data as unknown as { partial_token: string }).partial_token);
+        window.location.replace('/login/totp');
         return;
       }
-
-      const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>;
-      let accountId = (meta.account_id as string) ?? '';
-      let role = (meta.role as string) ?? 'owner';
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('account_id, role')
-          .eq('user_id', data.user.id)
-          .maybeSingle();
-        if (profile?.account_id) accountId = profile.account_id as string;
-        if (profile?.role) role = profile.role as string;
-      } catch { /* profile is best-effort */ }
-
-      localStorage.setItem('crm_token', data.session.access_token);
-      localStorage.setItem('crm_user', JSON.stringify({
-        user_id: data.user.id,
-        account_id: accountId,
-        role,
-        email: data.user.email ?? email.trim(),
-        full_name: (meta.full_name as string) ?? email.trim().split('@')[0],
-      }));
-      window.location.replace('/dashboard');
+      saveAndRedirect(data);
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError('Cannot connect to server.');
+      setLoading(false);
+    }
+  };
+
+  // ── Google login — EXACT same flow as Register ────────────────
+  const handleGoogle = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const idToken = await signInWithGoogle();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+      const data = await res.json() as Record<string, string>;
+      if (!res.ok || !data.access_token) {
+        setError(data.detail ?? 'Google sign-in failed');
+        setLoading(false);
+        return;
+      }
+      saveAndRedirect(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('popup-closed')) { setLoading(false); return; }
+      setError('Cannot connect to server.');
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(circle at 10% 10%, rgba(106,125,255,0.20), transparent 32%), radial-gradient(circle at 88% 8%, rgba(255,177,153,0.24), transparent 30%), #eef2ff', padding: 20 }}>
-      <div className="crm-glass-strong" style={{ width: '100%', maxWidth: 420, padding: '40px 36px' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', background: '#0f1117' }}>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-          <div className="crm-brand-icon" style={{ background: 'none', padding: 0, overflow: 'hidden' }}><img src="/logo.png" alt="Tzmicha" style={{ width: 36, height: 36, objectFit: 'contain' }} /></div>
+      {/* ── Left Panel (same as Register) ── */}
+      <div style={{ width: '45%', flexShrink: 0, display: 'flex', flexDirection: 'column', padding: '48px 52px', background: 'linear-gradient(145deg,#0f1117 0%,#1a1f2e 50%,#0f1117 100%)', borderRight: '1px solid rgba(255,255,255,0.06)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -100, left: -100, width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle,rgba(79,109,245,0.15) 0%,transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -80, right: -80, width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle,rgba(139,92,246,0.12) 0%,transparent 70%)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 64, position: 'relative' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, overflow: 'hidden' }}>
+            <img src="/logo.png" alt="Tzmicha" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+          </div>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 750, color: 'var(--crm-text)', letterSpacing: '-0.02em' }}>TZMICHA CRM</div>
-            <div style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Intelligent Growth OS · v3.0</div>
+            <div style={{ fontSize: 16, fontWeight: 750, color: 'white' }}>TZMICHA CRM</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.40)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Intelligent Growth OS</div>
           </div>
         </div>
 
-        <h1 style={{ fontSize: 22, fontWeight: 750, color: 'var(--crm-text)', margin: '0 0 6px' }}>Welcome back</h1>
-        <p style={{ fontSize: 13, color: 'var(--crm-text-muted)', margin: '0 0 28px' }}>Sign in to your CRM dashboard</p>
+        <div style={{ marginBottom: 48 }}>
+          <h2 style={{ fontSize: 32, fontWeight: 800, color: 'white', margin: '0 0 12px', lineHeight: 1.2, letterSpacing: '-0.03em' }}>
+            Welcome back.<br />
+            <span style={{ background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Let&apos;s grow.</span>
+          </h2>
+          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.50)', margin: 0, lineHeight: 1.6 }}>Your AI-powered CRM is ready and waiting.</p>
+        </div>
 
-        {error && (
-          <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.25)', color: '#f46b72', fontSize: 13, marginBottom: 18 }}>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={e => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required autoFocus
-              style={{ width: '100%', padding: '11px 14px', borderRadius: 12, border: '1px solid rgba(130,145,190,0.25)', background: 'rgba(255,255,255,0.60)', fontSize: 14, color: 'var(--crm-text)', outline: 'none', boxSizing: 'border-box' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Password</label>
-            <div style={{ position: 'relative' }}>
-              <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required
-                style={{ width: '100%', padding: '11px 42px 11px 14px', borderRadius: 12, border: '1px solid rgba(130,145,190,0.25)', background: 'rgba(255,255,255,0.60)', fontSize: 14, color: 'var(--crm-text)', outline: 'none', boxSizing: 'border-box' }} />
-              <button type="button" onClick={() => setShowPassword(p => !p)}
-                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--crm-text-muted)', padding: 0, display: 'flex', cursor: 'pointer' }}>
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {FEATURES.map((f, i) => (
+            <div key={i} onClick={() => setActiveFeature(i)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 14, cursor: 'pointer', transition: 'all 300ms ease', background: activeFeature === i ? 'rgba(79,109,245,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${activeFeature === i ? 'rgba(79,109,245,0.40)' : 'rgba(255,255,255,0.06)'}`, transform: activeFeature === i ? 'translateX(4px)' : 'none' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: activeFeature === i ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: activeFeature === i ? 'white' : 'rgba(255,255,255,0.40)', flexShrink: 0, transition: 'all 300ms' }}>
+                {f.icon}
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: activeFeature === i ? 'white' : 'rgba(255,255,255,0.60)', marginBottom: 2 }}>{f.title}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.4 }}>{f.desc}</div>
+              </div>
             </div>
-          </div>
-          <button type="submit" disabled={loading || !email.trim() || !password.trim()} className="crm-btn-primary"
-            style={{ width: '100%', padding: '12px', fontSize: 14, marginTop: 4, opacity: loading ? 0.75 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            {loading ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Signing in…</> : 'Sign In'}
-          </button>
-        </form>
+          ))}
+        </div>
 
-        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--crm-text-muted)', marginTop: 20 }}>
-          Don&apos;t have an account?{' '}
-          <Link href="/register" style={{ color: '#4f6df5', fontWeight: 600, textDecoration: 'none' }}>Create one free</Link>
-        </p>
+        <div style={{ marginTop: 'auto', paddingTop: 40, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex' }}>
+            {['#f46b72','#f4c95d','#28c99a','#4f6df5'].map((c, i) => (
+              <div key={i} style={{ width: 24, height: 24, borderRadius: '50%', background: c, border: '2px solid #0f1117', marginLeft: i > 0 ? -8 : 0 }} />
+            ))}
+          </div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.40)' }}>Join <strong style={{ color: 'rgba(255,255,255,0.70)' }}>500+</strong> businesses growing with TZMICHA</div>
+        </div>
       </div>
+
+      {/* ── Right Panel ── */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 48px', background: '#f8f9ff', overflowY: 'auto' }}>
+        <div style={{ width: '100%', maxWidth: 400 }}>
+
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f1117', margin: '0 0 6px', letterSpacing: '-0.02em' }}>Sign in to your CRM</h1>
+          <p style={{ fontSize: 14, color: '#8790aa', margin: '0 0 24px' }}>
+            Don&apos;t have an account?{' '}
+            <Link href="/register" style={{ color: '#4f6df5', fontWeight: 700, textDecoration: 'none' }}>Create one free</Link>
+          </p>
+
+          {error && (
+            <div style={{ padding: '10px 14px', borderRadius: 12, background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.25)', color: '#f46b72', fontSize: 13, marginBottom: 18 }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Google — primary CTA, same as Register */}
+          <button
+            onClick={() => void handleGoogle()}
+            disabled={loading}
+            style={{ width: '100%', padding: '12px 20px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.30)', background: 'white', fontSize: 14, fontWeight: 600, color: '#1a1a2e', cursor: loading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: loading ? 0.75 : 1, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 18 }}
+          >
+            {loading
+              ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              : <GoogleIcon />}
+            {loading ? 'Signing in…' : 'Continue with Google'}
+          </button>
+
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+            <div style={{ flex: 1, height: 1, background: 'rgba(130,145,190,0.20)' }} />
+            <span style={{ fontSize: 12, color: '#8790aa' }}>or sign in with email</span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(130,145,190,0.20)' }} />
+          </div>
+
+          {/* Email + Password */}
+          <form onSubmit={e => void handleEmailLogin(e)} style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 5 }}>Email</label>
+              <input
+                type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@company.com" required autoFocus
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              {/* Password label row with Forgot link */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#334e68' }}>Password</label>
+                <Link href="/forgot-password" style={{ fontSize: 12, color: '#4f6df5', fontWeight: 600, textDecoration: 'none' }}>
+                  Forgot password?
+                </Link>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'} value={password}
+                  onChange={e => setPassword(e.target.value)} placeholder="••••••••" required
+                  style={{ width: '100%', padding: '11px 42px 11px 14px', borderRadius: 12, border: '1.5px solid rgba(130,145,190,0.25)', background: 'white', fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box' }}
+                />
+                <button type="button" onClick={() => setShowPassword(p => !p)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8790aa', display: 'flex' }}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || !email.trim() || !password.trim()}
+              style={{ width: '100%', padding: '12px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: loading ? 0.75 : 1, marginTop: 2 }}
+            >
+              {loading
+                ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Signing in…</>
+                : 'Sign In'}
+            </button>
+          </form>
+
+          <p style={{ textAlign: 'center', fontSize: 11, color: '#8790aa', marginTop: 22, lineHeight: 1.6 }}>
+            By signing in you agree to our{' '}
+            <Link href="/terms" style={{ color: '#4f6df5', textDecoration: 'none' }}>Terms</Link>
+            {' '}and{' '}
+            <Link href="/privacy" style={{ color: '#4f6df5', textDecoration: 'none' }}>Privacy Policy</Link>
+          </p>
+        </div>
+      </div>
+
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     </div>
   );

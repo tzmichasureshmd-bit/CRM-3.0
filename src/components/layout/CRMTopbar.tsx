@@ -1,8 +1,17 @@
 'use client';
-import { Search, Bell, Settings, LayoutGrid, MessageSquare, Sun, Moon, User, LogOut, X, Users, TrendingUp, MessageCircle } from 'lucide-react';
+import { Search, Bell, Settings, LayoutGrid, MessageSquare, Sun, Moon, User, LogOut, X, Users, TrendingUp, MessageCircle, CheckCheck, Clock } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getStoredUser, getContacts, getDeals, getConversations } from '@/lib/api-client';
+
+interface NotifItem {
+  id: string;
+  title: string;
+  body: string;
+  href: string;
+  read: boolean;
+  created_at: string;
+}
 
 interface CRMTopbarProps {
   theme: 'light' | 'dark';
@@ -19,7 +28,10 @@ interface SearchResult {
 
 export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifs, setNotifs] = useState<NotifItem[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -35,10 +47,11 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
 
   const router = useRouter();
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setDropdownOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setSearchOpen(false);
         setQuery('');
@@ -48,6 +61,24 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  // Load notifications from backend
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+    if (!token) return;
+    fetch('/api/v3/notifications', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { data?: NotifItem[] } | null) => { if (d?.data) setNotifs(d.data.slice(0, 20)); })
+      .catch(() => {});
+  }, []);
+
+  const unreadCount = notifs.filter(n => !n.read).length;
+
+  const markAllRead = () => {
+    setNotifs(prev => prev.map(n => ({ ...n, read: true })));
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+    fetch('/api/v3/notifications/read-all', { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+  };
 
   // Ctrl+K / Cmd+K shortcut
   useEffect(() => {
@@ -251,15 +282,72 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
           <button className="crm-topbar-btn" aria-label="Messages" title="Inbox" onClick={() => router.push('/inbox')} style={{ color: 'var(--crm-text-nav)' }}>
             <MessageSquare size={15} strokeWidth={1.8} />
           </button>
-          <button className="crm-topbar-btn" aria-label="Notifications" title="Notifications" onClick={() => router.push('/settings/notifications')} style={{ position: 'relative', color: 'var(--crm-text-nav)' }}>
-            <Bell size={15} strokeWidth={1.8} />
-            <span style={{ position: 'absolute', top: 7, right: 7, width: 7, height: 7, borderRadius: '50%', background: '#DC2626', border: '1.5px solid white' }} />
-          </button>
+          {/* Notifications */}
+          <div ref={notifRef} style={{ position: 'relative' }}>
+            <button className="crm-topbar-btn" aria-label="Notifications" title="Notifications"
+              onClick={() => setNotifOpen(v => !v)}
+              style={{ position: 'relative', color: 'var(--crm-text-nav)' }}>
+              <Bell size={15} strokeWidth={1.8} />
+              {unreadCount > 0 && (
+                <span style={{ position: 'absolute', top: 6, right: 6, minWidth: 8, height: 8, borderRadius: '50%', background: '#DC2626', border: '1.5px solid white', fontSize: 9, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: unreadCount > 9 ? '0 3px' : 0 }}>
+                  {unreadCount > 9 ? '9+' : ''}
+                </span>
+              )}
+            </button>
+
+            {notifOpen && (
+              <div style={{
+                position: 'absolute', right: 0, top: 'calc(100% + 8px)', zIndex: 300,
+                width: 340, maxHeight: 440, display: 'flex', flexDirection: 'column',
+                background: 'rgba(255,255,255,0.98)', backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(130,145,190,0.18)', borderRadius: 14,
+                boxShadow: '0 12px 40px rgba(0,0,0,0.16)', overflow: 'hidden',
+              }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(130,145,190,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#0B1F3A' }}>Notifications {unreadCount > 0 && <span style={{ fontSize: 11, background: '#DC2626', color: 'white', borderRadius: 10, padding: '1px 6px', marginLeft: 4 }}>{unreadCount}</span>}</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllRead} title="Mark all read" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f6df5', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <CheckCheck size={12} /> All read
+                      </button>
+                    )}
+                    <button onClick={() => { setNotifOpen(false); router.push('/settings/notifications'); }} title="Notification settings" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#627D98', display: 'flex', alignItems: 'center' }}>
+                      <Settings size={13} />
+                    </button>
+                  </div>
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  {notifs.length === 0 ? (
+                    <div style={{ padding: '32px 16px', textAlign: 'center', color: '#627D98', fontSize: 13 }}>
+                      <Bell size={28} style={{ margin: '0 auto 8px', opacity: 0.3 }} />
+                      <div>No notifications yet</div>
+                    </div>
+                  ) : (
+                    notifs.map(n => (
+                      <button key={n.id} onClick={() => { router.push(n.href); setNotifOpen(false); }}
+                        style={{ width: '100%', display: 'flex', gap: 10, padding: '10px 16px', background: n.read ? 'none' : 'rgba(79,109,245,0.05)', border: 'none', borderBottom: '1px solid rgba(130,145,190,0.07)', cursor: 'pointer', textAlign: 'left' }}>
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', background: n.read ? 'transparent' : '#4f6df5', flexShrink: 0, marginTop: 5 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: n.read ? 500 : 700, color: '#0B1F3A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</div>
+                          <div style={{ fontSize: 11, color: '#627D98', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.body}</div>
+                          <div style={{ fontSize: 10, color: '#8790aa', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}><Clock size={9} />{new Date(n.created_at).toLocaleString()}</div>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <button className="crm-topbar-btn" aria-label="Settings" title="Settings" onClick={() => router.push('/settings')} style={{ color: 'var(--crm-text-nav)' }}>
             <Settings size={15} strokeWidth={1.8} />
           </button>
           <button className="crm-topbar-btn" aria-label="Apps" title="Dashboard" onClick={() => router.push('/dashboard')} style={{ color: 'var(--crm-text-nav)' }}>
             <LayoutGrid size={15} strokeWidth={1.8} />
+          </button>
+          {/* Theme toggle — visible in topbar */}
+          <button className="crm-topbar-btn" aria-label="Toggle theme" title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'} onClick={onToggleTheme} style={{ color: 'var(--crm-text-nav)' }}>
+            {theme === 'light' ? <Moon size={15} strokeWidth={1.8} /> : <Sun size={15} strokeWidth={1.8} />}
           </button>
 
           {/* User dropdown */}

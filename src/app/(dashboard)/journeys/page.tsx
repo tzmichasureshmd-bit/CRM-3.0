@@ -7,6 +7,7 @@ import {
   GitBranch, Brain, Timer, Flag, ArrowRight, X,
   ChevronRight, Users, BarChart3, Activity,
 } from 'lucide-react';
+import { v3fetch } from '@/lib/auth-client';
 
 // ── Types ─────────────────────────────────────────────────────
 interface Journey {
@@ -681,7 +682,7 @@ export default function JourneysPage() {
   const loadJourneys = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/v3/journeys');
+      const res = await v3fetch('/api/v3/journeys');
       if (res.ok) {
         const d = await res.json() as { journeys: Journey[] };
         setJourneys(d.journeys ?? []);
@@ -694,7 +695,7 @@ export default function JourneysPage() {
   useEffect(() => { void loadJourneys(); }, [loadJourneys]);
 
   const loadExecutions = useCallback(async (journeyId: string) => {
-    const res = await fetch(`/api/v3/journeys/${journeyId}/executions`);
+    const res = await v3fetch(`/api/v3/journeys/${journeyId}/executions`);
     if (res.ok) {
       const d = await res.json() as { executions: Execution[] };
       setExecutions(d.executions ?? []);
@@ -708,7 +709,7 @@ export default function JourneysPage() {
   }, [loadExecutions]);
 
   const handleCreate = useCallback(async (data: { name: string; description: string; trigger_type: string }) => {
-    const res = await fetch('/api/v3/journeys', {
+    const res = await v3fetch('/api/v3/journeys', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -722,7 +723,7 @@ export default function JourneysPage() {
 
   const handleSave = useCallback(async (nodes: JourneyNode[], edges: JourneyEdge[]) => {
     if (!activeJourney) return;
-    const res = await fetch(`/api/v3/journeys/${activeJourney.id}`, {
+    const res = await v3fetch(`/api/v3/journeys/${activeJourney.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ nodes, edges }),
@@ -736,7 +737,7 @@ export default function JourneysPage() {
 
   const handlePublish = useCallback(async () => {
     if (!activeJourney) return;
-    const res = await fetch(`/api/v3/journeys/${activeJourney.id}/publish`, { method: 'POST' });
+    const res = await v3fetch(`/api/v3/journeys/${activeJourney.id}/publish`, { method: 'POST' });
     if (res.ok) {
       const d = await res.json() as { journey: Journey };
       setActiveJourney(d.journey);
@@ -749,7 +750,7 @@ export default function JourneysPage() {
 
   const handleToggle = useCallback(async (journey: Journey) => {
     const newStatus = journey.status === 'active' ? 'paused' : 'active';
-    const res = await fetch(`/api/v3/journeys/${journey.id}`, {
+    const res = await v3fetch(`/api/v3/journeys/${journey.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
@@ -762,7 +763,7 @@ export default function JourneysPage() {
 
   const handleDelete = useCallback(async (journey: Journey) => {
     if (!confirm(`Delete journey "${journey.name}"?`)) return;
-    const res = await fetch(`/api/v3/journeys/${journey.id}`, { method: 'DELETE' });
+    const res = await v3fetch(`/api/v3/journeys/${journey.id}`, { method: 'DELETE' });
     if (res.ok) {
       setJourneys(prev => prev.filter(j => j.id !== journey.id));
       if (activeJourney?.id === journey.id) setActiveJourney(null);
@@ -775,7 +776,7 @@ export default function JourneysPage() {
     setTestResult(null);
     setError(null);
     try {
-      const res = await fetch(`/api/v3/journeys/${activeJourney.id}/execute`, {
+      const res = await v3fetch(`/api/v3/journeys/${activeJourney.id}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contact_id: contactId }),
@@ -789,7 +790,7 @@ export default function JourneysPage() {
       }
       await loadExecutions(activeJourney.id);
       // Refresh journey stats
-      const jr = await fetch(`/api/v3/journeys/${activeJourney.id}`);
+      const jr = await v3fetch(`/api/v3/journeys/${activeJourney.id}`);
       if (jr.ok) {
         const jd = await jr.json() as { journey: Journey };
         setActiveJourney(jd.journey);

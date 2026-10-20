@@ -15,13 +15,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
+import { getServiceClient } from '@/lib/supabase/service';
 import type {
   ReportResponse, ReportKpi, ReportChart, ReportTable, ReportColumn,
   ReportSeries, ValueKind,
 } from '@/lib/reports-types';
 
-type SB = Awaited<ReturnType<typeof createClient>>;
+type SB = ReturnType<typeof getServiceClient>;
 
 const PALETTE = {
   blue: '#4f6df5', violet: '#8b5cf6', green: '#28c99a', amber: '#f4c95d',
@@ -54,15 +55,12 @@ const platformLabel = (p: string): string => PLATFORM_LABELS[p] ?? titleCase(p);
 
 interface Ctx { accountId: string; role: string; currency: string; accountName: string }
 
-async function getCtx(supabase: SB, userId: string): Promise<Ctx | null> {
-  const { data: profile } = await supabase
-    .from('profiles').select('account_id, role').eq('user_id', userId).single();
-  if (!profile?.account_id) return null;
+async function getCtx(supabase: SB, accountId: string, role: string): Promise<Ctx> {
   const { data: account } = await supabase
-    .from('accounts').select('name, currency').eq('id', profile.account_id).single();
+    .from('accounts').select('name, currency').eq('id', accountId).single();
   return {
-    accountId: profile.account_id as string,
-    role: (profile.role as string) ?? 'agent',
+    accountId,
+    role,
     currency: (account?.currency as string) ?? 'USD',
     accountName: (account?.name as string) ?? '',
   };
@@ -217,20 +215,18 @@ const GRAN_LABEL: Record<Granularity, string> = { day: 'daily', week: 'weekly', 
 
 // ── GET ───────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const ctx = await getCtx(supabase, user.id);
-    if (!ctx) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
+    const ctx = await getCtx(db, user.account_id, user.role);
     const url = new URL(req.url);
     const range = parseRange(url);
     const paging = readPaging(url);
     const prev = previousRange(range);
 
-    return NextResponse.json(await analyticsReport(supabase, ctx, range, prev, paging));
+    return NextResponse.json(await analyticsReport(db, ctx, range, prev, paging));
   } catch (err) {
     console.error('[analytics]', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

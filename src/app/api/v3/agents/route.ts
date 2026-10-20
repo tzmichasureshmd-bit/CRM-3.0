@@ -3,33 +3,25 @@
  * GET  /api/v3/agents — list agents for account
  * POST /api/v3/agents — create agent
  *
- * Security: account_id always from session.
+ * Auth: FastAPI JWT verified server-side via verifyRequest().
+ * DB:   Service-role client — account_id always from verified token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-
-async function getAccountId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
-  const { data } = await supabase.from('profiles').select('account_id').eq('user_id', userId).single();
-  return (data?.account_id as string) ?? null;
-}
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 const VALID_TYPES = ['lead_qualification', 'sales_assistant', 'followup', 'customer_support', 'content', 'appointment', 'customer_success'];
 
-// ── GET /api/v3/agents ────────────────────────────────────────
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('crm3_ai_agents')
       .select('id, name, type, description, status, enabled, instructions, allowed_tools, requires_approval, max_actions_per_run, model, provider, temperature, execution_count, success_count, failure_count, last_run_at, created_at, updated_at')
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .order('created_at', { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -40,16 +32,12 @@ export async function GET() {
   }
 }
 
-// ── POST /api/v3/agents ───────────────────────────────────────
 export async function POST(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
     const body = await req.json() as {
       name?: string;
       type?: string;
@@ -69,10 +57,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `type must be one of: ${VALID_TYPES.join(', ')}` }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('crm3_ai_agents')
       .insert({
-        account_id: accountId,
+        account_id: user.account_id,
         name: body.name.trim(),
         type: body.type,
         description: body.description ?? null,
@@ -94,11 +82,10 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Audit log
-    await supabase.from('crm3_agent_audit_log').insert({
-      account_id: accountId,
+    await db.from('crm3_agent_audit_log').insert({
+      account_id: user.account_id,
       agent_id: data.id,
-      user_id: user.id,
+      user_id: user.user_id,
       event_type: 'agent_created',
       event_data: { name: body.name, type: body.type },
     });

@@ -173,7 +173,7 @@ export default function FacebookInboxPage() {
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [connected, setConnected] = useState(true);
+  const [connected, setConnected] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
