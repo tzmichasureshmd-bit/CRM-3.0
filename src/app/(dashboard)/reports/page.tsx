@@ -308,7 +308,7 @@ export default function ReportsPage() {
         <div className="crm-rpt-error">
           <TriangleAlert size={14} /> {error.message}
           <div className="crm-rpt-error-actions">
-            {error.auth && <button onClick={() => { void clearSession().finally(() => window.location.replace('/login')); }}>Sign in</button>}
+            {error.auth && <button onClick={() => clearSession()}>Sign in</button>}
             <button onClick={() => setNonce(n => n + 1)}>Retry</button>
           </div>
         </div>

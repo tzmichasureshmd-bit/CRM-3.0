@@ -246,7 +246,7 @@ export default function RevenueIntelligencePage() {
   const showGranularity = tab === 'trends' || tab === 'winloss';
 
   const goToLogin = () => {
-    void clearSession().finally(() => window.location.replace('/login'));
+    clearSession();
   };
 
   return (

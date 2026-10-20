@@ -40,6 +40,7 @@
   "exclude": [
     "node_modules",
     "frontend",
+    "SHARVANI",
     "Tzmicha_CRM-main",
     "backend",
     "ai-service",
