@@ -2,29 +2,178 @@
 
 /* ── Design Tokens ── */
 :root {
-  --crm-bg: #eef2ff;
-  --crm-text: #0B1F3A;
-  --crm-text-strong: #081A33;
-  --crm-text-secondary: #334E68;
-  --crm-text-muted: #627D98;
-  --crm-text-nav: #173B66;
-  --crm-primary: #2563EB;
-  --crm-green: #059669;
-  --crm-red: #DC2626;
+  /* ── Light theme ── */
+  --crm-bg: #F4F6FC;
+  --crm-text: #172033;
+  --crm-text-strong: #0F172A;
+  --crm-text-secondary: #475569;
+  --crm-text-muted: #64748B;
+  --crm-text-nav: #172033;
+  --crm-primary: #1D4ED8;
+  --crm-green: #047857;
+  --crm-red: #B91C1C;
+  --crm-card-bg: rgba(255,255,255,0.92);
+  --crm-border: rgba(30,41,59,0.16);
+  --crm-accent: rgba(29,78,216,0.10);
+  --crm-success: #047857;
+  --crm-warning: #92400E;
+  --crm-danger: #B91C1C;
+  --crm-purple: #6D28D9;
   --crm-radius-lg: 22px;
   --crm-radius-md: 16px;
   --crm-radius-sm: 12px;
+
+  /* ── Journey scoped tokens ── */
+  --journey-foreground: #172033;
+  --journey-muted-foreground: #64748B;
+  --journey-glass-background: rgba(255,255,255,0.92);
+  --journey-glass-border: rgba(30,41,59,0.16);
+
+  /* ── Segments scoped tokens ── */
+  --segments-foreground: #172033;
+  --segments-muted-foreground: #64748B;
+  --segments-glass-background: rgba(255,255,255,0.92);
+  --segments-glass-border: rgba(30,41,59,0.16);
+
+  /* ── Premium palette ── */
+  --crm-seg-navy: #0B1020;
+  --crm-seg-purple: #7C3AED;
+  --crm-seg-blue: #3B82F6;
+  --crm-seg-cyan: #22D3EE;
+  --crm-seg-lavender: #C4B5FD;
+  --crm-seg-emerald: #34D399;
+  --crm-seg-amber: #FBBF24;
+  --crm-seg-emerald: #34D399;
+  --crm-seg-amber: #FBBF24;
 }
 html[data-theme="dark"] {
-  --crm-bg: #070b18;
-  --crm-text: #f4f7ff;
-  --crm-text-strong: #ffffff;
-  --crm-text-secondary: #aab4cf;
-  --crm-text-muted: #727e9d;
-  --crm-text-nav: #c8d8f0;
-  --crm-primary: #6680ff;
-  --crm-green: #34d399;
-  --crm-red: #f87171;
+  /* ── Dark theme ── */
+  --crm-bg: #080D1B;
+  --crm-text: #F8FAFC;
+  --crm-text-strong: #FFFFFF;
+  --crm-text-secondary: #CBD5E1;
+  --crm-text-muted: #A8B5CA;
+  --crm-text-nav: #F8FAFC;
+  --crm-primary: #60A5FA;
+  --crm-green: #34D399;
+  --crm-red: #FCA5A5;
+  --crm-card-bg: rgba(17,24,43,0.88);
+  --crm-border: rgba(255,255,255,0.14);
+  --crm-accent: rgba(96,165,250,0.10);
+  --crm-success: #34D399;
+  --crm-warning: #FBBF24;
+  --crm-danger: #FCA5A5;
+  --crm-purple: #A78BFA;
+  --crm-radius-lg: 22px;
+  --crm-radius-md: 16px;
+  --crm-radius-sm: 12px;
+
+  /* ── Journey scoped tokens ── */
+  --journey-foreground: #F8FAFC;
+  --journey-muted-foreground: #A8B5CA;
+  --journey-glass-background: rgba(17,24,43,0.88);
+  --journey-glass-border: rgba(255,255,255,0.14);
+
+  /* ── Segments scoped tokens ── */
+  --segments-foreground: #F8FAFC;
+  --segments-muted-foreground: #A8B5CA;
+  --segments-glass-background: rgba(17,24,43,0.88);
+  --segments-glass-border: rgba(255,255,255,0.14);
+
+  /* ── Premium palette ── */
+  --crm-seg-navy: #0B1020;
+  --crm-seg-purple: #7C3AED;
+  --crm-seg-blue: #3B82F6;
+  --crm-seg-cyan: #22D3EE;
+  --crm-seg-lavender: #C4B5FD;
+  --crm-seg-emerald: #34D399;
+  --crm-seg-amber: #FBBF24;
+  --crm-seg-emerald: #34D399;
+  --crm-seg-amber: #FBBF24;
+}
+
+/* ── Tailwind Theme (v4) ── */
+@theme {
+  --color-crm-bg: var(--crm-bg);
+  --color-crm-text: var(--crm-text);
+  --color-crm-text-strong: var(--crm-text-strong);
+  --color-crm-text-secondary: var(--crm-text-secondary);
+  --color-crm-text-muted: var(--crm-text-muted);
+  --color-crm-text-nav: var(--crm-text-nav);
+  --color-crm-primary: var(--crm-primary);
+  --color-crm-green: var(--crm-green);
+  --color-crm-red: var(--crm-red);
+  --color-crm-card-bg: var(--crm-card-bg);
+  --color-crm-border: var(--crm-border);
+  --color-crm-accent: var(--crm-accent);
+  --color-crm-success: var(--crm-success);
+  --color-crm-warning: var(--crm-warning);
+  --color-crm-danger: var(--crm-danger);
+  --color-crm-purple: var(--crm-purple);
+  --color-crm-seg-navy: var(--crm-seg-navy);
+  --color-crm-seg-purple: var(--crm-seg-purple);
+  --color-crm-seg-blue: var(--crm-seg-blue);
+  --color-crm-seg-cyan: var(--crm-seg-cyan);
+  --color-crm-seg-lavender: var(--crm-seg-lavender);
+  --color-crm-seg-emerald: var(--crm-seg-emerald);
+  --color-crm-seg-amber: var(--crm-seg-amber);
+
+  /* Journey scoped */
+  --color-journey-foreground: var(--journey-foreground);
+  --color-journey-muted-foreground: var(--journey-muted-foreground);
+  --color-journey-glass-background: var(--journey-glass-background);
+  --color-journey-glass-border: var(--journey-glass-border);
+
+  /* Segments scoped */
+  --color-segments-foreground: var(--segments-foreground);
+  --color-segments-muted-foreground: var(--segments-muted-foreground);
+  --color-segments-glass-background: var(--segments-glass-background);
+  --color-segments-glass-border: var(--segments-glass-border);
+}
+
+/* ── Utility classes for all crm-* variants ── */
+.text-crm-text { color: var(--crm-text); }
+.text-crm-text-strong { color: var(--crm-text-strong); }
+.text-crm-text-secondary { color: var(--crm-text-secondary); }
+.text-crm-muted { color: var(--crm-text-muted); }
+.text-crm-primary { color: var(--crm-primary); }
+.text-crm-success { color: var(--crm-success); }
+.text-crm-warning { color: var(--crm-warning); }
+.text-crm-danger { color: var(--crm-danger); }
+.text-crm-purple { color: var(--crm-purple); }
+
+.bg-crm-bg { background-color: var(--crm-bg); }
+.bg-crm-card-bg { background-color: var(--crm-card-bg); }
+.bg-crm-accent { background-color: var(--crm-accent); }
+
+.border-crm-border { border-color: var(--crm-border); }
+
+/* ── crim-* aliases (journeys page uses these) ── */
+.bg-crim-bg { background-color: var(--crm-bg); }
+.bg-crim-card-bg { background-color: var(--crm-card-bg); }
+.bg-crim-accent { background-color: var(--crm-accent); }
+.text-crim-text { color: var(--crm-text); }
+.text-crim-text-strong { color: var(--crm-text-strong); }
+.text-crim-muted { color: var(--crm-text-muted); }
+.text-crim-primary { color: var(--crm-primary); }
+.text-crim-success { color: var(--crm-success); }
+.text-crim-warning { color: var(--crm-warning); }
+.text-crim-danger { color: var(--crm-danger); }
+.border-crim-border { border-color: var(--crm-border); }
+
+/* ── Journey Glassmorphism ── */
+.crim-journey-glass {
+  position: relative;
+  background: var(--journey-glass-background);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--journey-glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255,255,255,0.40);
+}
+html[data-theme="dark"] .crim-journey-glass {
+  background: var(--journey-glass-background);
+  border-color: var(--journey-glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
 /* ── Reset ── */
@@ -41,66 +190,6 @@ button, input, textarea, select { font: inherit; }
 button { border: 0; background: none; cursor: pointer; }
 img { max-width: 100%; display: block; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
-
-/* ── Harmonized Scrollbars (Horizontal & Vertical) ── */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(99, 102, 241, 0.42) rgba(224, 231, 255, 0.16);
-}
-
-html[data-theme="dark"] * {
-  scrollbar-color: rgba(129, 140, 248, 0.38) rgba(15, 23, 42, 0.22);
-}
-
-/* WebKit / Blink / Edge / Safari (covers both horizontal and vertical) */
-::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(224, 231, 255, 0.16);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, rgba(79, 109, 245, 0.45), rgba(139, 92, 246, 0.45));
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background-clip: padding-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, rgba(79, 109, 245, 0.75), rgba(139, 92, 246, 0.75));
-  box-shadow: 0 0 8px rgba(79, 109, 245, 0.28);
-}
-
-::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(135deg, rgba(79, 109, 245, 0.90), rgba(139, 92, 246, 0.90));
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-/* Dark mode WebKit scrollbars */
-html[data-theme="dark"] ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.22);
-}
-
-html[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.42), rgba(139, 92, 246, 0.42));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.78), rgba(139, 92, 246, 0.78));
-  box-shadow: 0 0 8px rgba(129, 140, 248, 0.30);
-}
-
-html[data-theme="dark"] ::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.92), rgba(139, 92, 246, 0.92));
-}
 
 /* ── App background ── */
 .crm-app {
@@ -183,17 +272,11 @@ html[data-theme="dark"] .crm-sidebar {
   overflow-x: hidden;
   padding-bottom: 8px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(99, 102, 241, 0.35) transparent;
+  scrollbar-color: rgba(130,145,190,0.25) transparent;
 }
 .crm-sidebar-nav::-webkit-scrollbar { width: 3px; }
 .crm-sidebar-nav::-webkit-scrollbar-track { background: transparent; }
-.crm-sidebar-nav::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, rgba(79, 109, 245, 0.35), rgba(139, 92, 246, 0.35));
-  border-radius: 4px;
-}
-.crm-sidebar-nav::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, rgba(79, 109, 245, 0.65), rgba(139, 92, 246, 0.65));
-}
+.crm-sidebar-nav::-webkit-scrollbar-thumb { background: rgba(130,145,190,0.30); border-radius: 4px; }
 
 /* ── Nav section label ── */
 .crm-nav-section-label {
@@ -555,6 +638,23 @@ html[data-theme="dark"] .crm-attention-card {
   display: flex; align-items: center; justify-content: center;
   font-size: 9px; font-weight: 700; color: white; flex-shrink: 0;
 }
+
+/* ── Journey Builder utility classes ── */
+.text-crm-text { color: var(--crm-text); }
+.text-crm-text-strong { color: var(--crm-text-strong); }
+.text-crm-text-secondary { color: var(--crm-text-secondary); }
+.text-crm-muted { color: var(--crm-text-muted); }
+.text-crm-primary { color: var(--crm-primary); }
+.text-crm-success { color: var(--crm-success); }
+.text-crm-warning { color: var(--crm-warning); }
+.text-crm-danger { color: var(--crm-danger); }
+.text-crm-purple { color: var(--crm-purple); }
+
+.bg-crm-bg { background: var(--crm-bg); }
+.bg-crm-card-bg { background: var(--crm-card-bg); }
+.bg-crm-accent { background: var(--crm-accent); }
+
+.border-crm-border { border-color: var(--crm-border); }
 
 /* ── Custom cursor ── */
 * { cursor: none !important; }
@@ -1384,4 +1484,617 @@ html[data-theme="dark"] .crm-bill-chip { background: rgba(255,255,255,0.05); bor
   .crm-bill-card, .crm-bill-cta, .crm-bill-number button { transition: none !important; }
   .crm-bill-card:hover, .crm-bill-cta:hover { transform: none !important; }
 }
+
+/* ── Premium Segments Glassmorphism ── */
+.crm-seg-glass {
+  position: relative;
+  background: var(--crm-card-bg);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid var(--crm-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255,255,255,0.40);
+}
+html[data-theme="dark"] .crm-seg-glass {
+  background: rgba(14, 20, 44, 0.75);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.crm-seg-glass-strong {
+  position: relative;
+  background: var(--crm-card-bg);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--crm-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255,255,255,0.50);
+}
+html[data-theme="dark"] .crm-seg-glass-strong {
+  background: rgba(14, 20, 44, 0.85);
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.crm-seg-glow {
+  position: relative;
+}
+.crm-seg-glow::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--crm-seg-purple), var(--crm-seg-cyan));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.crm-seg-glow:hover::after {
+  opacity: 0.5;
+}
+
+/* ── Ambient glow backgrounds ── */
+.crm-seg-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.crm-seg-ambient-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(64px);
+  opacity: 0.35;
+  animation: crm-seg-float 14s ease-in-out infinite;
+}
+.crm-seg-ambient-blob:nth-child(1) {
+  width: 320px; height: 320px; top: -80px; left: -80px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.45), transparent 70%);
+}
+.crm-seg-ambient-blob:nth-child(2) {
+  width: 280px; height: 280px; bottom: -60px; right: -60px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.40), transparent 70%);
+  animation-delay: -4s;
+  animation-duration: 18s;
+}
+.crm-seg-ambient-blob:nth-child(3) {
+  width: 220px; height: 220px; top: 40%; left: 45%;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.30), transparent 70%);
+  animation-delay: -8s;
+  animation-duration: 22s;
+}
+html[data-theme="dark"] .crm-seg-ambient-blob {
+  opacity: 0.25;
+}
+@keyframes crm-seg-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(12px, -8px) scale(1.05); }
+  66% { transform: translate(-8px, 12px) scale(0.95); }
+}
+
+/* ── Glass input ── */
+.crm-seg-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--crm-border);
+  background: rgba(255,255,255,0.35);
+  color: var(--crm-text);
+  font-size: 13px;
+  outline: none;
+  transition: all 200ms ease;
+  box-sizing: border-box;
+}
+.crm-seg-input::placeholder { color: var(--crm-text-muted); opacity: 0.6; }
+.crm-seg-input:focus {
+  border-color: var(--crm-seg-blue);
+  background: rgba(255,255,255,0.50);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+html[data-theme="dark"] .crm-seg-input {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.10);
+}
+html[data-theme="dark"] .crm-seg-input:focus {
+  background: rgba(255,255,255,0.08);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.20);
+}
+
+/* ── Glass select ── */
+.crm-seg-select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--crm-border);
+  background: rgba(255,255,255,0.35);
+  color: var(--crm-text);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: all 200ms ease;
+  box-sizing: border-box;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23627D98'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
+.crm-seg-select:focus {
+  border-color: var(--crm-seg-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+html[data-theme="dark"] .crm-seg-select {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.10);
+}
+
+/* ── Premium button ── */
+.crm-seg-btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, var(--crm-seg-purple), var(--crm-seg-blue));
+  color: #fff;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  transition: all 250ms ease;
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.30);
+}
+.crm-seg-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.42);
+  filter: brightness(1.05);
+}
+.crm-seg-btn-primary:active { transform: scale(0.97); }
+.crm-seg-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.crm-seg-btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--crm-border);
+  background: rgba(255,255,255,0.30);
+  color: var(--crm-text);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 200ms ease;
+}
+.crm-seg-btn-ghost:hover {
+  background: rgba(255,255,255,0.45);
+  border-color: var(--crm-seg-blue);
+  color: var(--crm-seg-blue);
+}
+html[data-theme="dark"] .crm-seg-btn-ghost {
+  background: rgba(255,255,255,0.05);
+}
+html[data-theme="dark"] .crm-seg-btn-ghost:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--crm-seg-blue);
+  color: var(--crm-seg-blue);
+}
+
+/* ── Sparkle accent ── */
+.crm-sparkle {
+  position: absolute;
+  width: 6px; height: 6px;
+  background: #fff;
+  border-radius: 50%;
+  filter: blur(1px);
+  opacity: 0;
+  animation: crm-sparkle-pulse 2s ease-in-out infinite;
+}
+@keyframes crm-sparkle-pulse {
+  0%, 100% { opacity: 0; transform: scale(0.5); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* ── Badge ── */
+.crm-seg-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  border-radius: 900px;
+  font-size: 10px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.crm-seg-badge-dynamic {
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--crm-seg-cyan);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+}
+.crm-seg-badge-static {
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--crm-seg-purple);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+}
+.crm-seg-badge-ai {
+  background: rgba(196, 181, 253, 0.12);
+  color: var(--crm-seg-lavender);
+  border: 1px solid rgba(196, 181, 253, 0.25);
+}
+
+/* ── Stat card ── */
+.crm-seg-stat {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  padding: 20px;
+  height: 130px;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.crm-seg-stat-gradient {
+  position: absolute; inset: 0; opacity: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent 60%);
+  transition: opacity 300ms ease;
+}
+.crm-seg-stat:hover .crm-seg-stat-gradient { opacity: 1; }
+.crm-seg-stat:hover { transform: translateY(-4px); }
+
+.crm-seg-stat-icon {
+  width: 44px; height: 44px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.crm-seg-stat-value { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.crm-seg-stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.crm-seg-stat-sub { font-size: 11px; opacity: 0.7; }
+
+/* ── Segment card ── */
+.crm-seg-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  height: 200px;
+  display: flex; flex-direction: column;
+  cursor: pointer;
+  transition: all 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.crm-seg-card:hover { transform: translateY(-6px); }
+.crm-seg-card-hover-ring {
+  position: absolute; inset: -1px; border-radius: 19px;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--crm-seg-purple), var(--crm-seg-cyan));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: destination-out;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.crm-seg-card:hover .crm-seg-card-hover-ring { opacity: 0.5; }
+
+/* ── Empty state ── */
+.crm-seg-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 60px 24px;
+}
+
+/* ── Journey Glassmorphism ── */
+.crm-journey-glass {
+  position: relative;
+  background: var(--journey-glass-background);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--journey-glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255,255,255,0.40);
+}
+html[data-theme="dark"] .crm-journey-glass {
+  background: var(--journey-glass-background);
+  border-color: var(--journey-glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.crm-journey-glass-strong {
+  position: relative;
+  background: var(--journey-glass-background);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--journey-glass-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255,255,255,0.50);
+}
+html[data-theme="dark"] .crm-journey-glass-strong {
+  background: var(--journey-glass-background);
+  border-color: var(--journey-glass-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* ── Journey Input ── */
+.crm-journey-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--journey-glass-border);
+  background: var(--journey-glass-background);
+  color: var(--journey-foreground);
+  font-size: 13px;
+  outline: none;
+  transition: all 200ms ease;
+  box-sizing: border-box;
+}
+.crm-journey-input::placeholder { color: var(--journey-muted-foreground); opacity: 0.7; }
+.crm-journey-input:focus {
+  border-color: var(--crm-seg-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* ── Journey Select ── */
+.crm-journey-select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--journey-glass-border);
+  background: var(--journey-glass-background);
+  color: var(--journey-foreground);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: all 200ms ease;
+  box-sizing: border-box;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748B'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
+.crm-journey-select:focus {
+  border-color: var(--crm-seg-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* ── Journey Button Primary ── */
+.crm-journey-btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, var(--crm-seg-purple), var(--crm-seg-blue));
+  color: #fff;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  transition: all 250ms ease;
+  box-shadow: 0 8px 24px rgba(124, 58, 237, 0.30);
+}
+.crm-journey-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.42);
+  filter: brightness(1.05);
+}
+.crm-journey-btn-primary:active { transform: scale(0.97); }
+.crm-journey-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+/* ── Journey Button Ghost ── */
+.crm-journey-btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--journey-glass-border);
+  background: var(--journey-glass-background);
+  color: var(--journey-foreground);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 200ms ease;
+}
+.crm-journey-btn-ghost:hover {
+  background: rgba(59, 130, 246, 0.10);
+  border-color: var(--crm-seg-blue);
+  color: var(--crm-seg-blue);
+}
+html[data-theme="dark"] .crm-journey-btn-ghost:hover {
+  background: rgba(59, 130, 246, 0.15);
+}
+
+/* ── Journey Badge ── */
+.crm-journey-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  border-radius: 900px;
+  font-size: 10px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.crm-journey-badge-active {
+  background: rgba(34, 211, 238, 0.12);
+  color: var(--crm-seg-cyan);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+}
+.crm-journey-badge-draft {
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--crm-seg-purple);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+}
+.crm-journey-badge-paused {
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--crm-seg-amber);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+/* ── Segments Glassmorphism (updated) ── */
+.crm-seg-glass {
+  background: var(--segments-glass-background);
+  border-color: var(--segments-glass-border);
+}
+html[data-theme="dark"] .crm-seg-glass {
+  background: var(--segments-glass-background);
+  border-color: var(--segments-glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.crm-seg-glass-strong {
+  background: var(--segments-glass-background);
+  border-color: var(--segments-glass-border);
+}
+html[data-theme="dark"] .crm-seg-glass-strong {
+  background: var(--segments-glass-background);
+  border-color: var(--segments-glass-border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* ── Ambient background for both tabs ── */
+.crm-tab-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.crm-tab-ambient-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(64px);
+  opacity: 0.35;
+  animation: crm-tab-float 14s ease-in-out infinite;
+}
+.crm-tab-ambient-blob:nth-child(1) {
+  width: 320px; height: 320px; top: -80px; left: -80px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.45), transparent 70%);
+}
+.crm-tab-ambient-blob:nth-child(2) {
+  width: 280px; height: 280px; bottom: -60px; right: -60px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.40), transparent 70%);
+  animation-delay: -4s;
+  animation-duration: 18s;
+}
+.crm-tab-ambient-blob:nth-child(3) {
+  width: 220px; height: 220px; top: 40%; left: 45%;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.30), transparent 70%);
+  animation-delay: -8s;
+  animation-duration: 22s;
+}
+html[data-theme="dark"] .crm-tab-ambient-blob {
+  opacity: 0.25;
+}
+@keyframes crm-tab-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(12px, -8px) scale(1.05); }
+  66% { transform: translate(-8px, 12px) scale(0.95); }
+}
+
+/* ── Journey & Segments color utilities ──
+   Theme-aware foreground/background utilities built on the design tokens
+   in :root and html[data-theme="dark"]. Opacity variants use color-mix so
+   they stay correct when the theme switches. ── */
+
+/* ── Segments palette text (theme-constant) ── */
+.text-crm-seg-purple { color: var(--crm-seg-purple); }
+.text-crm-seg-blue   { color: var(--crm-seg-blue); }
+.text-crm-seg-cyan   { color: var(--crm-seg-cyan); }
+.text-crm-seg-lavender { color: var(--crm-seg-lavender); }
+.text-crm-seg-emerald { color: var(--crm-seg-emerald); }
+.text-crm-seg-amber  { color: var(--crm-seg-amber); }
+.text-crm-seg-navy   { color: var(--crm-seg-navy); }
+
+/* ── CRM palette backgrounds (theme-aware) ── */
+.bg-crm-primary { background-color: var(--crm-primary); }
+.bg-crm-primary\/10 { background-color: color-mix(in srgb, var(--crm-primary), transparent 90%); }
+.bg-crm-primary\/5  { background-color: color-mix(in srgb, var(--crm-primary), transparent 95%); }
+.bg-crm-success { background-color: var(--crm-success); }
+.bg-crm-success\/10 { background-color: color-mix(in srgb, var(--crm-success), transparent 90%); }
+.bg-crm-warning { background-color: var(--crm-warning); }
+.bg-crm-warning\/10 { background-color: color-mix(in srgb, var(--crm-warning), transparent 90%); }
+.bg-crm-muted { background-color: var(--crm-text-muted); }
+.bg-crm-muted\/10 { background-color: color-mix(in srgb, var(--crm-text-muted), transparent 90%); }
+.bg-crm-danger { background-color: var(--crm-danger); }
+.bg-crm-danger\/10 { background-color: color-mix(in srgb, var(--crm-danger), transparent 90%); }
+.bg-crm-purple { background-color: var(--crm-purple); }
+
+.bg-crm-bg\/20 { background-color: color-mix(in srgb, var(--crm-bg), transparent 80%); }
+.bg-crm-bg\/30 { background-color: color-mix(in srgb, var(--crm-bg), transparent 70%); }
+.bg-crm-bg\/40 { background-color: color-mix(in srgb, var(--crm-bg), transparent 60%); }
+.bg-crm-bg\/50 { background-color: color-mix(in srgb, var(--crm-bg), transparent 50%); }
+.bg-crm-card-bg\/20 { background-color: color-mix(in srgb, var(--crm-card-bg), transparent 80%); }
+.bg-crm-card-bg\/50 { background-color: color-mix(in srgb, var(--crm-card-bg), transparent 50%); }
+.bg-crm-card-bg\/80 { background-color: color-mix(in srgb, var(--crm-card-bg), transparent 20%); }
+.bg-crm-card-bg\/90 { background-color: color-mix(in srgb, var(--crm-card-bg), transparent 10%); }
+.bg-crm-accent\/5  { background-color: color-mix(in srgb, var(--crm-primary), transparent 95%); }
+.bg-crm-accent\/40 { background-color: color-mix(in srgb, var(--crm-primary), transparent 60%); }
+.bg-crm-accent\/50 { background-color: color-mix(in srgb, var(--crm-primary), transparent 50%); }
+
+/* ── Segments palette backgrounds (theme-constant) ── */
+.bg-crm-seg-purple { background-color: var(--crm-seg-purple); }
+.bg-crm-seg-blue   { background-color: var(--crm-seg-blue); }
+.bg-crm-seg-cyan   { background-color: var(--crm-seg-cyan); }
+.bg-crm-seg-lavender { background-color: var(--crm-seg-lavender); }
+.bg-crm-seg-emerald { background-color: var(--crm-seg-emerald); }
+.bg-crm-seg-amber  { background-color: var(--crm-seg-amber); }
+.bg-crm-seg-purple\/10 { background-color: color-mix(in srgb, var(--crm-seg-purple), transparent 90%); }
+.bg-crm-seg-purple\/20 { background-color: color-mix(in srgb, var(--crm-seg-purple), transparent 80%); }
+.bg-crm-seg-blue\/10 { background-color: color-mix(in srgb, var(--crm-seg-blue), transparent 90%); }
+.bg-crm-seg-blue\/20 { background-color: color-mix(in srgb, var(--crm-seg-blue), transparent 80%); }
+.bg-crm-seg-cyan\/20 { background-color: color-mix(in srgb, var(--crm-seg-cyan), transparent 80%); }
+.bg-crm-seg-lavender\/20 { background-color: color-mix(in srgb, var(--crm-seg-lavender), transparent 80%); }
+.bg-crm-seg-emerald\/10 { background-color: color-mix(in srgb, var(--crm-seg-emerald), transparent 90%); }
+.bg-crm-seg-amber\/10 { background-color: color-mix(in srgb, var(--crm-seg-amber), transparent 90%); }
+
+/* ── Border colors ── */
+.border-crm-primary { border-color: var(--crm-primary); }
+.border-crm-primary\/30 { border-color: color-mix(in srgb, var(--crm-primary), transparent 70%); }
+.border-crm-success\/20 { border-color: color-mix(in srgb, var(--crm-success), transparent 80%); }
+.border-crm-warning\/20 { border-color: color-mix(in srgb, var(--crm-warning), transparent 80%); }
+.border-crm-muted\/20 { border-color: color-mix(in srgb, var(--crm-text-muted), transparent 80%); }
+.border-crm-danger\/20 { border-color: color-mix(in srgb, var(--crm-danger), transparent 80%); }
+.border-crm-border\/10 { border-color: color-mix(in srgb, var(--crm-border), transparent 90%); }
+.border-crm-border\/20 { border-color: color-mix(in srgb, var(--crm-border), transparent 80%); }
+.border-crm-border\/30 { border-color: color-mix(in srgb, var(--crm-border), transparent 70%); }
+.border-crm-border\/50 { border-color: color-mix(in srgb, var(--crm-border), transparent 50%); }
+
+.border-crm-seg-blue   { border-color: var(--crm-seg-blue); }
+.border-crm-seg-blue\/30   { border-color: color-mix(in srgb, var(--crm-seg-blue), transparent 70%); }
+.border-crm-seg-purple\/30 { border-color: color-mix(in srgb, var(--crm-seg-purple), transparent 70%); }
+.border-crm-seg-emerald\/20 { border-color: color-mix(in srgb, var(--crm-seg-emerald), transparent 80%); }
+.border-crm-seg-amber\/20 { border-color: color-mix(in srgb, var(--crm-seg-amber), transparent 80%); }
+
+/* ── Ring colors ── */
+.ring-crm-primary\/50 { --tw-ring-color: color-mix(in srgb, var(--crm-primary), transparent 50%); }
+.ring-crm-success\/50 { --tw-ring-color: color-mix(in srgb, var(--crm-success), transparent 50%); }
+.ring-crm-warning\/50 { --tw-ring-color: color-mix(in srgb, var(--crm-warning), transparent 50%); }
+.ring-crm-danger\/50 { --tw-ring-color: color-mix(in srgb, var(--crm-danger), transparent 50%); }
+.ring-crm-purple\/50 { --tw-ring-color: color-mix(in srgb, var(--crm-seg-purple), transparent 50%); }
+
+/* ── Shadow colors ── */
+.shadow-crm-primary\/30 { --tw-shadow-color: color-mix(in srgb, var(--crm-primary), transparent 70%); box-shadow: 0 8px 24px color-mix(in srgb, var(--crm-primary), transparent 70%); }
+.shadow-crm-success\/30 { --tw-shadow-color: color-mix(in srgb, var(--crm-success), transparent 70%); box-shadow: 0 8px 24px color-mix(in srgb, var(--crm-success), transparent 70%); }
+
+/* ── Gradient utilities ── */
+.bg-linear-gradient-to-r {
+  background-image: linear-gradient(to right, var(--tw-gradient-stops));
+}
+.from-crm-primary {
+  --tw-gradient-from: var(--crm-primary);
+  --tw-gradient-to: transparent;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.to-crm-purple { --tw-gradient-to: var(--crm-purple); }
+.from-crm-seg-purple {
+  --tw-gradient-from: var(--crm-seg-purple);
+  --tw-gradient-to: transparent;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.to-crm-seg-blue { --tw-gradient-to: var(--crm-seg-blue); }
+.from-crm-seg-blue {
+  --tw-gradient-from: var(--crm-seg-blue);
+  --tw-gradient-to: transparent;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.to-crm-seg-emerald { --tw-gradient-to: var(--crm-seg-emerald); }
+.from-crm-seg-cyan {
+  --tw-gradient-from: var(--crm-seg-cyan);
+  --tw-gradient-to: transparent;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.from-crm-seg-lavender {
+  --tw-gradient-from: var(--crm-seg-lavender);
+  --tw-gradient-to: transparent;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.to-crm-seg-purple { --tw-gradient-to: var(--crm-seg-purple); }
+
+/* ── Checkbox accent ── */
+.accent-crm-seg-blue { accent-color: var(--crm-seg-blue); }
 
