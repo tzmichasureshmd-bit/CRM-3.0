@@ -37,9 +37,9 @@ async def get_ai_keys(current_user: dict = Depends(get_current_user)):
     db = get_supabase()
     res = db.table("account_settings").select("value") \
             .eq("account_id", current_user["account_id"]) \
-            .eq("key", "ai_keys").maybe_single().execute()
+            .eq("key", "ai_keys").limit(1).execute()
     if res and res.data:
-        raw = res.data["value"]
+        raw = res.data[0]["value"]
         # value column is text — parse JSON string back to dict
         if isinstance(raw, str):
             try:

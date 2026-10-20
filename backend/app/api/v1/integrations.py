@@ -69,9 +69,9 @@ async def save_integration(channel: str, body: dict, user=Depends(get_current_us
                 .select("value") \
                 .eq("account_id", account_id) \
                 .eq("key", key) \
-                .maybe_single() \
+                .limit(1) \
                 .execute()
-            if existing.data and existing.data.get("value", "").strip():
+            if existing.data and existing.data[0].get("value", "").strip():
                 logger.info("Skipping empty value for %s — keeping existing", key)
                 continue
         supabase.table("account_settings").upsert({

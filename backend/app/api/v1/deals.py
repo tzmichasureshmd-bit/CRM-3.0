@@ -201,9 +201,9 @@ async def create_deal(
 
     # Determine status from stage name if stage_id provided
     if data.get("stage_id"):
-        stage_res = db.table("pipeline_stages").select("name").eq("id", data["stage_id"]).maybe_single().execute()
+        stage_res = db.table("pipeline_stages").select("name").eq("id", data["stage_id"]).limit(1).execute()
         if stage_res.data:
-            stage_name = stage_res.data.get("name", "").lower()
+            stage_name = stage_res.data[0].get("name", "").lower()
             if stage_name == "won":
                 data["status"] = "won"
             elif stage_name == "lost":
@@ -230,9 +230,9 @@ async def update_deal(
 
     # Auto-set status when stage changes to won/lost
     if data.get("stage_id"):
-        stage_res = db.table("pipeline_stages").select("name").eq("id", data["stage_id"]).maybe_single().execute()
+        stage_res = db.table("pipeline_stages").select("name").eq("id", data["stage_id"]).limit(1).execute()
         if stage_res.data:
-            stage_name = stage_res.data.get("name", "").lower()
+            stage_name = stage_res.data[0].get("name", "").lower()
             if stage_name == "won":
                 data["status"] = "won"
             elif stage_name == "lost":
@@ -273,11 +273,11 @@ async def move_deal_stage(
     if not new_stage_id:
         raise HTTPException(status_code=400, detail="stage_id is required")
 
-    stage_res = db.table("pipeline_stages").select("name").eq("id", new_stage_id).eq("account_id", user["account_id"]).maybe_single().execute()
+    stage_res = db.table("pipeline_stages").select("name").eq("id", new_stage_id).eq("account_id", user["account_id"]).limit(1).execute()
     if not stage_res.data:
         raise HTTPException(status_code=404, detail="Stage not found")
 
-    stage_name = stage_res.data.get("name", "").lower()
+    stage_name = stage_res.data[0].get("name", "").lower()
     new_status = "won" if stage_name == "won" else "lost" if stage_name == "lost" else "open"
 
     res = (

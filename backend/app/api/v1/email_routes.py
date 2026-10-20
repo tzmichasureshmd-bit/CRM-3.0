@@ -26,9 +26,9 @@ class SmtpSettings(BaseModel):
 async def get_smtp_settings(current_user: dict = Depends(get_current_user)):
     db = get_supabase()
     account_id = current_user["account_id"]
-    res = db.table("account_settings").select("*").eq("account_id", account_id).eq("key", "smtp").maybe_single().execute()
+    res = db.table("account_settings").select("*").eq("account_id", account_id).eq("key", "smtp").limit(1).execute()
     if res and res.data:
-        return res.data["value"]
+        return res.data[0]["value"]
     # Return current env-based config (masked password)
     svc = get_email_service()
     return {
