@@ -31,6 +31,13 @@ export class ApiError extends Error {
   }
 }
 
+/** Clear the CRM session and redirect to login. */
+export function clearSession(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('crm_token');
+  window.location.href = '/login';
+}
+
 /** Read the CRM JWT from localStorage (browser only). */
 function getCrmToken(): string | null {
   if (typeof window === 'undefined') return null;
