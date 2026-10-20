@@ -205,88 +205,86 @@ async def login(body: LoginRequest, db=Depends(get_db)):
 
 @router.post("/auth/google", response_model=TokenResponse)
 async def google_auth(body: GoogleAuthRequest, db=Depends(get_db)):
-    payload    = await verify_firebase_token(body.id_token)
-    google_id  = payload["sub"]
-    email      = payload.get("email", "").lower().strip()
-    full_name  = payload.get("name", email.split("@")[0])
-    avatar_url = payload.get("picture", "")
-
-    # FIX-007: Require verified email from Google before any linking
-    if not payload.get("email_verified", False):
-        raise HTTPException(status_code=400, detail="Google account email is not verified.")
-
-    # Case 1: Existing Google UID — return existing profile
-    existing_google = db.table("profiles").select(
-        "user_id,account_id,role,token_version"
-    ).eq("google_id", google_id).maybe_single().execute()
-
-    if existing_google and existing_google.data:
-        p = existing_google.data
-        check_account_active(p)
-        token_version = p.get("token_version", 1) or 1
-        return TokenResponse(
-            access_token=create_token(p["user_id"], p["account_id"], p["role"],
-                                      token_version=token_version),
-            user_id=p["user_id"], account_id=p["account_id"], role=p["role"],
-            full_name=full_name, email=email, avatar_url=avatar_url,
-        )
-
-    # FIX-007: Check for existing email/password profile with same email.
-    # Safe linking: link only if the email matches AND google_id is not yet set.
-    # We do NOT auto-link — we return a clear error directing the user to sign in
-    # with their password first, then link from account settings.
-    if email:
-        existing_email = db.table("profiles").select(
-            "user_id,account_id,role,google_id,token_version"
-        ).eq("email", email).maybe_single().execute()
-
-        if existing_email and existing_email.data:
-            ep = existing_email.data
-            if ep.get("google_id") and ep["google_id"] != google_id:
-                # Another Google account is already linked — conflict
-                raise HTTPException(
-                    status_code=409,
-                    detail="This email is already linked to a different Google account."
-                )
-            if not ep.get("google_id"):
-                # FIX-007: Email exists but no Google ID linked yet.
-                # Reject automatic linking — require explicit user action.
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "An account with this email already exists. "
-                        "Sign in with your password, then link Google from account settings."
-                    )
-                )
-
-    # Case 3: New user — create account
     try:
+        payload    = await verify_firebase_token(body.id_token)
+        google_id  = payload["sub"]
+        email      = payload.get("email", "").lower().strip()
+        full_name  = payload.get("name", email.split("@")[0])
+        avatar_url = payload.get("picture", "")
+
+        # FIX-007: Require verified email from Google before any linking
+        if not payload.get("email_verified", False):
+            raise HTTPException(status_code=400, detail="Google account email is not verified.")
+
+        # Case 1: Existing Google UID — return existing profile
+        existing_google = db.table("profiles").select(
+            "user_id,account_id,role,token_version"
+        ).eq("google_id", google_id).maybe_single().execute()
+
+        if existing_google and existing_google.data:
+            p = existing_google.data
+            check_account_active(p)
+            token_version = p.get("token_version", 1) or 1
+            return TokenResponse(
+                access_token=create_token(p["user_id"], p["account_id"], p["role"],
+                                          token_version=token_version),
+                user_id=p["user_id"], account_id=p["account_id"], role=p["role"],
+                full_name=full_name, email=email, avatar_url=avatar_url,
+            )
+
+        # FIX-007: Check for existing email/password profile with same email.
+        if email:
+            existing_email = db.table("profiles").select(
+                "user_id,account_id,role,google_id,token_version"
+            ).eq("email", email).maybe_single().execute()
+
+            if existing_email and existing_email.data:
+                ep = existing_email.data
+                if ep.get("google_id") and ep["google_id"] != google_id:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="This email is already linked to a different Google account."
+                    )
+                if not ep.get("google_id"):
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "An account with this email already exists. "
+                            "Sign in with your password, then link Google from account settings."
+                        )
+                    )
+
+        # Case 3: New user — create account + profile
         account_res = db.table("accounts").insert({
             "name": full_name, "plan": "free", "currency": "USD"
         }).execute()
         account_id = account_res.data[0]["id"]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create workspace: {e}")
 
-    import uuid
-    user_id = str(uuid.uuid4())
-    try:
-        db.table("profiles").insert({
-            "user_id": user_id, "account_id": account_id, "full_name": full_name,
-            "email": email, "avatar_url": avatar_url, "google_id": google_id,
-            "role": "owner", "token_version": 1,
-        }).execute()
-    except Exception as e:
-        err_str = str(e).lower()
-        if "unique" in err_str or "duplicate" in err_str:
-            raise HTTPException(status_code=409, detail="Account already exists. Please sign in.")
-        raise HTTPException(status_code=500, detail=f"Failed to create profile: {e}")
+        import uuid
+        user_id = str(uuid.uuid4())
+        try:
+            db.table("profiles").insert({
+                "user_id": user_id, "account_id": account_id, "full_name": full_name,
+                "email": email, "avatar_url": avatar_url, "google_id": google_id,
+                "role": "owner", "token_version": 1,
+            }).execute()
+        except Exception as e:
+            err_str = str(e).lower()
+            if "unique" in err_str or "duplicate" in err_str:
+                raise HTTPException(status_code=409, detail="Account already exists. Please sign in.")
+            raise HTTPException(status_code=500, detail=f"Failed to create profile: {e}")
 
-    return TokenResponse(
-        access_token=create_token(user_id, account_id, "owner"),
-        user_id=user_id, account_id=account_id, role="owner",
-        full_name=full_name, email=email, avatar_url=avatar_url,
-    )
+        return TokenResponse(
+            access_token=create_token(user_id, account_id, "owner"),
+            user_id=user_id, account_id=account_id, role="owner",
+            full_name=full_name, email=email, avatar_url=avatar_url,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[google_auth] unexpected error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Google sign-in failed: {str(e)[:200]}")
 
 
 # ── TOTP / Google Authenticator ───────────────────────────────────────────────
