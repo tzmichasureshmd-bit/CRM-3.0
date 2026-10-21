@@ -53,9 +53,16 @@ class TokenResponse(BaseModel):
     user_id:      str
     account_id:   str
     role:         str
-    full_name:    str
-    email:        str
+    full_name:    str = ""
+    email:        str = ""
     avatar_url:   str = ""
+
+    from pydantic import field_validator
+
+    @field_validator("full_name", "email", "avatar_url", mode="before")
+    @classmethod
+    def coerce_none_to_empty(cls, v):
+        return v or ""
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -135,7 +142,7 @@ async def register(body: RegisterRequest, db=Depends(get_db)):
     try:
         account_res = db.table("accounts").insert({
             "name": body.account_name.strip(), "plan": "free", "currency": "USD"
-        }).select("id").execute()
+        }).execute()
         account_id = account_res.data[0]["id"]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create workspace: {e}")
@@ -196,8 +203,8 @@ async def login(body: LoginRequest, db=Depends(get_db)):
         access_token=create_token(p["user_id"], p["account_id"], p["role"],
                                   token_version=token_version),
         user_id=p["user_id"], account_id=p["account_id"], role=p["role"],
-        full_name=p.get("full_name", ""), email=p.get("email", ""),
-        avatar_url=p.get("avatar_url", ""),
+        full_name=p.get("full_name") or "", email=p.get("email") or "",
+        avatar_url=p.get("avatar_url") or "",
     )
 
 
@@ -257,7 +264,7 @@ async def google_auth(body: GoogleAuthRequest, db=Depends(get_db)):
         # Case 3: New user — create account + profile
         account_res = db.table("accounts").insert({
             "name": full_name, "plan": "free", "currency": "USD"
-        }).select("id").execute()
+        }).execute()
         account_id = account_res.data[0]["id"]
 
         import uuid
@@ -351,8 +358,8 @@ async def totp_verify_login(body: TotpVerifyLoginRequest, db=Depends(get_db)):
         access_token=create_token(user_id, profile["account_id"], profile["role"],
                                   token_version=token_version),
         user_id=user_id, account_id=profile["account_id"], role=profile["role"],
-        full_name=profile.get("full_name", ""), email=profile.get("email", ""),
-        avatar_url=profile.get("avatar_url", ""),
+        full_name=profile.get("full_name") or "", email=profile.get("email") or "",
+        avatar_url=profile.get("avatar_url") or "",
     )
 
 
@@ -395,7 +402,9 @@ async def otp_send(body: OtpSendRequest, request: Request, db=Depends(get_db)):
     ).eq("email", email).limit(1).execute()
 
     if existing_otp.data:
-        created_at_str = existing_otp.data.get("created_at", "")
+        # data is a list of rows; get the first row dict
+        first_row = existing_otp.data[0] if isinstance(existing_otp.data, list) else existing_otp.data
+        created_at_str = first_row.get("created_at", "") if isinstance(first_row, dict) else ""
         if created_at_str:
             try:
                 created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
@@ -415,15 +424,16 @@ async def otp_send(body: OtpSendRequest, request: Request, db=Depends(get_db)):
     code_hash  = hash_otp(code)  # FIX-003: store hash, not plaintext
     expires_at = (datetime.utcnow() + timedelta(minutes=OTP_EXPIRE_MINS)).strftime("%Y-%m-%dT%H:%M:%S")
 
-    # Upsert OTP record — try full schema, fall back if columns missing
+    # Upsert OTP record — store hash only, never plaintext
+    # code field is set to "[hashed]" as a sentinel; actual verification uses code_hash.
     try:
         db.table("email_otps").upsert({
-            "email": email, "code": code, "code_hash": code_hash,
+            "email": email, "code": "[hashed]", "code_hash": code_hash,
             "expires_at": expires_at, "used": False, "attempt_count": 0,
         }, on_conflict="email").execute()
     except Exception:
         db.table("email_otps").upsert({
-            "email": email, "code": code,
+            "email": email, "code": "[hashed]",
             "expires_at": expires_at, "used": False,
         }, on_conflict="email").execute()
 
@@ -517,8 +527,8 @@ async def otp_verify(body: OtpVerifyRequest, db=Depends(get_db)):
             access_token=create_token(p["user_id"], p["account_id"], p["role"],
                                       token_version=token_version),
             user_id=p["user_id"], account_id=p["account_id"], role=p["role"],
-            full_name=p.get("full_name", ""), email=p.get("email", ""),
-            avatar_url=p.get("avatar_url", ""),
+            full_name=p.get("full_name") or "", email=p.get("email") or "",
+            avatar_url=p.get("avatar_url") or "",
         )
 
     # New user via OTP — auto-create
@@ -526,7 +536,7 @@ async def otp_verify(body: OtpVerifyRequest, db=Depends(get_db)):
     user_id = str(uuid.uuid4())
     name    = email.split("@")[0]
 
-    account_res = db.table("accounts").insert({"name": name, "plan": "free", "currency": "USD"}).select("id").execute()
+    account_res = db.table("accounts").insert({"name": name, "plan": "free", "currency": "USD"}).execute()
     account_id  = account_res.data[0]["id"]
 
     db.table("profiles").insert({

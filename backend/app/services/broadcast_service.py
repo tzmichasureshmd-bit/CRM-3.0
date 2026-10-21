@@ -25,6 +25,8 @@ logger = logging.getLogger("crm.broadcast_service")
 # In-memory execution store for per-recipient audit logs and retry isolation
 # Key: broadcast_id -> Dict of execution data
 _BROADCAST_RESULTS_CACHE: Dict[str, Dict[str, Any]] = {}
+# NOTE: _ACTIVE_BROADCAST_LOCKS is kept for same-process dedup only.
+# Cross-process / post-restart dedup is handled by DB status check in send_all.
 _ACTIVE_BROADCAST_LOCKS: set = set()
 
 
@@ -375,7 +377,7 @@ class BroadcastService:
         and per-recipient result tracking for retry safety.
         If selected_contact_ids is provided, sends only to those selected eligible contacts.
         """
-        # Server-side concurrency guard (Duplicate Send Prevention)
+        # Same-process concurrency guard
         lock_key = f"{account_id}:{broadcast_id}"
         if lock_key in _ACTIVE_BROADCAST_LOCKS:
             raise ValueError(f"Broadcast {broadcast_id} is currently sending. Duplicate request rejected.")
@@ -406,6 +408,13 @@ class BroadcastService:
                 raise ValueError(f"Broadcast {broadcast_id} not found in tenant account")
 
             broadcast = b_lookup.data[0]
+
+            # DB-level duplicate-send guard: reject if already sending (survives restarts)
+            if broadcast.get("status") == "sending":
+                raise ValueError(
+                    f"Broadcast {broadcast_id} is already in 'sending' state. "
+                    "If a previous run crashed, reset status to 'draft' before retrying."
+                )
             platform = broadcast.get("platform") or "whatsapp"
             message = broadcast.get("message") or ""
             subject = broadcast.get("name") or "CRM 3.0 Broadcast"
@@ -515,7 +524,7 @@ class BroadcastService:
             if sent_count > 0 and failed_count == 0:
                 final_status = "sent"
             elif sent_count > 0 and failed_count > 0:
-                final_status = "sent"  # partial success
+                final_status = "partial"  # partial success
             elif sent_count == 0 and failed_count > 0:
                 final_status = "failed"
             else:
@@ -638,7 +647,7 @@ class BroadcastService:
             # 3. Update database counts
             current_sent = exec_record.get("sent_count", 0) + newly_sent
             current_failed = still_failed
-            final_status = "sent" if still_failed == 0 else "sent"
+            final_status = "sent" if still_failed == 0 else "partial"
 
             self._update_broadcast_counts(
                 db=db,
