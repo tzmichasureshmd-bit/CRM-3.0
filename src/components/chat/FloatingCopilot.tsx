@@ -39,9 +39,10 @@ export function FloatingCopilot() {
     setLoading(true);
 
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
       const res = await fetch('/api/v3/copilot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ query }),
       });
       

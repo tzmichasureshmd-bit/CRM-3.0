@@ -30,14 +30,12 @@ export function AIInsights() {
 
   const load = useCallback(async () => {
     try {
-      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
-      const res = await fetch(`${BACKEND}/api/v1/command-center`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const res = await fetch('/api/v3/ai/recommendations', {
+        headers: { Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : ''}` },
       });
       if (res.ok) {
-        const d = await res.json() as { ai_recommendations?: Insight[] };
-        setInsights(d.ai_recommendations ?? []);
+        const d = await res.json() as Insight[];
+        setInsights(Array.isArray(d) ? d : []);
       }
     } finally {
       setLoading(false);

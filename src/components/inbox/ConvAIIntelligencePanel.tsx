@@ -75,9 +75,10 @@ export function ConvAIIntelligencePanel({
     setLoading(true);
     setError(null);
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
       const res = await fetch('/api/v3/ai/summarize-conversation', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ conversationId }),
       });
       if (!res.ok) throw new Error('Analysis failed');

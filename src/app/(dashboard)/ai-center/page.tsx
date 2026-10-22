@@ -91,14 +91,13 @@ export default function CopilotPage() {
       created_at: new Date().toISOString(),
     };
 
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
 
     try {
-      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
-      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
-      const res = await fetch(`${BACKEND}/api/v1/copilot`, {
+      const res = await fetch('/api/v3/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ query: query.trim() }),

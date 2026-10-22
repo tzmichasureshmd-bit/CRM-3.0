@@ -109,6 +109,40 @@ def _reload_meta_settings(supabase, account_id: str):
             object.__setattr__(settings, k, v)
 
 
+@router.post("/settings/integrations/telegram/register-webhook")
+async def register_telegram_webhook(body: dict, user=Depends(get_current_user)):
+    """Register Telegram webhook server-side — bot token never touches the browser."""
+    supabase = get_supabase()
+    res = supabase.table("account_settings") \
+        .select("value") \
+        .eq("account_id", user["account_id"]) \
+        .eq("key", "TELEGRAM_BOT_TOKEN") \
+        .limit(1) \
+        .execute()
+    token = res.data[0]["value"] if res.data else ""
+    if not token:
+        return {"ok": False, "description": "Bot token not configured"}
+    webhook_url = body.get("webhook_url", "")
+    if not webhook_url:
+        return {"ok": False, "description": "webhook_url required"}
+    secret_res = supabase.table("account_settings") \
+        .select("value") \
+        .eq("account_id", user["account_id"]) \
+        .eq("key", "TELEGRAM_WEBHOOK_SECRET") \
+        .limit(1) \
+        .execute()
+    secret = secret_res.data[0]["value"] if secret_res.data else ""
+    params = {
+        "url": webhook_url,
+        "allowed_updates": ["message", "edited_message", "callback_query"],
+    }
+    if secret:
+        params["secret_token"] = secret
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(f"https://api.telegram.org/bot{token}/setWebhook", params=params)
+    return r.json()
+
+
 @router.get("/settings/integrations/telegram/bot-info")
 async def get_telegram_bot_info(user=Depends(get_current_user)):
     """Server-side Telegram getMe — never exposes bot token to browser."""

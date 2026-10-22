@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Search, Plus, Phone, Mail, Tag, Filter, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Users, Search, Plus, Phone, Mail, Tag, Filter, X, AlertCircle, CheckCircle2, Brain, Zap } from 'lucide-react';
 import { getContacts, createContact, type Contact } from '@/lib/api-client';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -133,6 +133,7 @@ export default function ContactsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [banner, setBanner] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,6 +162,29 @@ export default function ContactsPage() {
     setShowAdd(false);
     setBanner(`✅ Contact "${contact.name ?? contact.phone ?? contact.email}" added`);
     setTimeout(() => setBanner(null), 3500);
+  };
+
+  const analyzeContact = async (id: string) => {
+    setAnalyzing(id);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const res = await fetch('/api/v3/ai/lead-intelligence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contactId: id }),
+      });
+      if (res.ok) {
+        const d = await res.json() as { score?: number; intent?: string; qualification_status?: string };
+        setContacts(prev => prev.map(c => c.id === id ? {
+          ...c,
+          lead_score: d.score ?? c.lead_score,
+          lead_score_tier: (d.score ?? 0) >= 70 ? 'hot' : (d.score ?? 0) >= 40 ? 'warm' : 'cold',
+        } : c));
+        setBanner(`✅ AI scored contact — ${d.qualification_status ?? 'analyzed'}`);
+        setTimeout(() => setBanner(null), 3000);
+      }
+    } catch { /* silent */ }
+    finally { setAnalyzing(null); }
   };
 
   const activeFilters = (statusFilter !== 'all' ? 1 : 0) + (sourceFilter !== 'all' ? 1 : 0);
@@ -210,7 +234,7 @@ export default function ContactsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(130,145,190,0.12)' }}>
-                  {['Name', 'Phone', 'Email', 'Company', 'Status', 'Score', 'Source', 'Tags'].map(h => (
+                  {['Name', 'Phone', 'Email', 'Company', 'Status', 'Score', 'Source', 'Tags', 'AI'].map(h => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -240,6 +264,12 @@ export default function ContactsPage() {
                           <span key={tag} style={{ fontSize: 10, fontWeight: 600, color: '#4f6df5', background: 'rgba(79,109,245,0.10)', borderRadius: 6, padding: '2px 6px' }}><Tag size={8} style={{ display: 'inline', marginRight: 2 }} />{tag}</span>
                         ))}
                       </div>
+                    </td>
+                    <td style={{ padding: '12px 16px' }}>
+                      <button onClick={() => void analyzeContact(c.id)} disabled={analyzing === c.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 9px', borderRadius: 8, background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.20)', color: '#8b5cf6', fontSize: 11, fontWeight: 600, cursor: 'pointer', opacity: analyzing === c.id ? 0.6 : 1 }}>
+                        <Brain size={10} />{analyzing === c.id ? '...' : 'Score'}
+                      </button>
                     </td>
                   </tr>
                 ))}

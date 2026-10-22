@@ -148,21 +148,42 @@ function ChatPanel({ conv, onClose }: { conv: WAConv; onClose: () => void }) {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const bottomRef = { current: null as HTMLDivElement | null };
+  const lastCountRef = { current: 0 };
+  const atBottomRef = { current: true };
+  const listRef = { current: null as HTMLDivElement | null };
 
-  const loadMsgs = useCallback(async () => {
+  const loadMsgs = useCallback(async (silent = false) => {
     try {
       const r = await fetch(`${BACKEND}/api/v1/conversations/${conv.id}/messages`, { headers: getH() });
       if (r.ok) {
         const j = await r.json() as { messages?: WAMsg[]; data?: WAMsg[] };
-        setMsgs(j.messages ?? j.data ?? []);
+        const next = j.messages ?? j.data ?? [];
+        // silent refresh: only update if new messages arrived
+        if (silent && next.length === lastCountRef.current) return;
+        lastCountRef.current = next.length;
+        setMsgs(next);
       }
-    } finally { setLoading(false); }
+    } finally { if (!silent) setLoading(false); }
   }, [conv.id]);
+
+  // track if user is scrolled to bottom
+  const onScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  };
 
   useEffect(() => { void loadMsgs(); }, [loadMsgs]);
 
+  // silent poll every 5s — only scrolls if user is already at bottom
   useEffect(() => {
-    if (bottomRef.current) bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    const id = setInterval(() => void loadMsgs(true), 5000);
+    return () => clearInterval(id);
+  }, [loadMsgs]);
+
+  useEffect(() => {
+    if (atBottomRef.current && bottomRef.current)
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [msgs]);
 
   const send = async () => {
@@ -195,7 +216,7 @@ function ChatPanel({ conv, onClose }: { conv: WAConv; onClose: () => void }) {
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div ref={el => { listRef.current = el; }} onScroll={onScroll} style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         {loading ? (
           <div style={{ textAlign: 'center', color: WA.muted, fontSize: 13, marginTop: 40 }}>Loading messages…</div>
         ) : msgs.length === 0 ? (
@@ -219,6 +240,24 @@ function ChatPanel({ conv, onClose }: { conv: WAConv; onClose: () => void }) {
 
       {/* Input */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: WA.panel, borderTop: `1px solid ${WA.divider}`, flexShrink: 0 }}>
+        {/* Media attach */}
+        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: '50%', background: WA.panel, cursor: 'pointer', flexShrink: 0 }}>
+          <input type="file" accept="image/*,video/*,application/pdf" style={{ display: 'none' }}
+            onChange={async e => {
+              const file = e.target.files?.[0];
+              if (!file || sending) return;
+              setSending(true);
+              try {
+                const fd = new FormData();
+                fd.append('file', file);
+                fd.append('conversation_id', conv.id);
+                fd.append('platform', 'whatsapp');
+                await fetch(`${BACKEND}/api/v1/meta/send-media`, { method: 'POST', headers: { Authorization: getH().Authorization }, body: fd });
+                await loadMsgs();
+              } finally { setSending(false); e.target.value = ''; }
+            }} />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={WA.muted} strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+        </label>
         <input
           value={text}
           onChange={e => setText(e.target.value)}
@@ -268,6 +307,12 @@ export default function WhatsAppPage() {
   }, []);
 
   useEffect(() => { void init(); }, [init]);
+
+  // silent sidebar poll every 8s — refreshes conv list without any visual disruption
+  useEffect(() => {
+    const id = setInterval(() => void init(), 8000);
+    return () => clearInterval(id);
+  }, [init]);
 
   const saveCreds = async () => {
     setSaving(true); setSaveMsg('');

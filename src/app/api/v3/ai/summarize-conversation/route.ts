@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
+import { resolveAIKey, aiComplete } from '@/lib/ai/key-resolver';
 
 const INTENT_KEYWORDS: Record<string, string[]> = {
   'High Buying Intent':    ['price', 'pricing', 'cost', 'buy', 'purchase', 'order', 'payment', 'how much', 'rate', 'plan', 'subscribe'],
@@ -120,32 +121,21 @@ export async function POST(req: NextRequest) {
     const nextAction = getNextAction(intent, score, sentiment);
 
     let summary = '';
-    const openaiKey = process.env.OPENAI_API_KEY;
 
-    if (openaiKey && msgs.length >= 2) {
+    const aiKey = await resolveAIKey(supabase, user.account_id);
+
+    if (aiKey.provider !== 'none' && msgs.length >= 2) {
       try {
         const transcript = msgs.slice(-15)
           .map(m => `${m.sender_type === 'customer' ? 'Customer' : 'Agent'}: ${m.content_text ?? ''}`)
           .join('\n');
-
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: 'You are a CRM analyst. Summarize this customer conversation in 2-3 sentences. Include: what the customer wants, their current status, and any key questions or objections. Be factual — only use information from the conversation. Do not invent details.' },
-              { role: 'user', content: `Conversation:\n${transcript}` },
-            ],
-            temperature: 0.2,
-            max_tokens: 150,
-          }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          summary = data.choices[0].message.content.trim();
-        }
+        const result = await aiComplete(
+          aiKey,
+          'You are a CRM analyst. Summarize this customer conversation in 2-3 sentences. Include: what the customer wants, their current status, and any key questions or objections. Be factual — only use information from the conversation.',
+          `Conversation:\n${transcript}`,
+          { maxTokens: 150, temperature: 0.2 },
+        );
+        if (result) summary = result;
       } catch { /* fallback below */ }
     }
 

@@ -233,8 +233,12 @@ export default function AIAgentsPage() {
     setLoading(true);
     try {
       const user = getStoredUser();
-      const accountParam = user?.account_id ? `?account_id=${encodeURIComponent(user.account_id)}` : "";
-      const headers: Record<string, string> = user?.account_id ? { "x-account-id": user.account_id } : {};
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const accountParam = user?.account_id ? `?account_id=${encodeURIComponent(user.account_id)}` : '';
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+        ...(user?.account_id ? { 'x-account-id': user.account_id } : {}),
+      };
 
       const [agentsRes, runsRes] = await Promise.all([
         fetch(`/api/agents${accountParam}`, { headers }),
@@ -362,10 +366,12 @@ export default function AIAgentsPage() {
 
     try {
       const user = getStoredUser();
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
       const res = await fetch(`/api/agents/${agent.id}/toggle`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
           ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
         },
         body: JSON.stringify({ enabled: nextState }),
@@ -396,10 +402,12 @@ export default function AIAgentsPage() {
     setRunningAction(agent.id);
     try {
       const user = getStoredUser();
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
       const res = await fetch(`/api/agents/${agent.id}/run`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
           ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
         },
         body: JSON.stringify({ context: customContext }),
@@ -433,10 +441,12 @@ export default function AIAgentsPage() {
     setRunningAction(runId);
     try {
       const user = getStoredUser();
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
       const res = await fetch(`/api/agents/runs/${runId}/approve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
           ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
         },
       });
@@ -460,10 +470,12 @@ export default function AIAgentsPage() {
     setRunningAction(runId);
     try {
       const user = getStoredUser();
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
       const res = await fetch(`/api/agents/runs/${runId}/reject`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
           ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
         },
       });
@@ -1840,10 +1852,12 @@ function ConfigAgentModal({
     setSaving(true);
     try {
       const user = getStoredUser();
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
       const res = await fetch(`/api/agents/${agent.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
           ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
         },
         body: JSON.stringify({
@@ -2103,6 +2117,7 @@ function CreateAgentModal({
     setError(null);
     try {
       const user = getStoredUser();
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
 
       // Recommended tools per department
       const tools = Object.values(TOOLS_METADATA)
@@ -2113,6 +2128,7 @@ function CreateAgentModal({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
           ...(user?.account_id ? { "x-account-id": user.account_id } : {}),
         },
         body: JSON.stringify({

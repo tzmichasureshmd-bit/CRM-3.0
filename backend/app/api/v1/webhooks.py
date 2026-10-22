@@ -288,8 +288,24 @@ async def whatsapp_verify(
     hub_verify_token: str = Query(alias="hub.verify_token"),
     hub_challenge: str = Query(alias="hub.challenge"),
 ):
-    if hub_mode == "subscribe" and hub_verify_token == settings.whatsapp_verify_token:
-        return int(hub_challenge)
+    """Meta sends GET to verify the webhook. Must return hub.challenge as plain text."""
+    # Also check DB-stored token in case it was saved via Settings UI
+    stored_token = settings.whatsapp_verify_token
+    try:
+        supabase = get_supabase()
+        res = supabase.table("account_settings") \
+            .select("value") \
+            .eq("key", "WHATSAPP_VERIFY_TOKEN") \
+            .neq("value", "") \
+            .limit(1) \
+            .execute()
+        if res.data:
+            stored_token = res.data[0]["value"]
+    except Exception:
+        pass
+    if hub_mode == "subscribe" and hub_verify_token == stored_token:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(hub_challenge)
     raise HTTPException(status_code=403, detail="Verification failed")
 
 
@@ -388,9 +404,22 @@ async def instagram_verify(
     hub_verify_token: str = Query(alias="hub.verify_token"),
     hub_challenge: str = Query(alias="hub.challenge"),
 ):
-    token = settings.instagram_verify_token
-    if hub_mode == "subscribe" and hub_verify_token == token:
-        return int(hub_challenge)
+    stored_token = settings.instagram_verify_token
+    try:
+        supabase = get_supabase()
+        res = supabase.table("account_settings") \
+            .select("value") \
+            .eq("key", "INSTAGRAM_VERIFY_TOKEN") \
+            .neq("value", "") \
+            .limit(1) \
+            .execute()
+        if res.data:
+            stored_token = res.data[0]["value"]
+    except Exception:
+        pass
+    if hub_mode == "subscribe" and hub_verify_token == stored_token:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(hub_challenge)
     raise HTTPException(status_code=403, detail="Verification failed")
 
 
@@ -440,9 +469,22 @@ async def facebook_verify(
     hub_verify_token: str = Query(alias="hub.verify_token"),
     hub_challenge: str = Query(alias="hub.challenge"),
 ):
-    token = settings.facebook_verify_token
-    if hub_mode == "subscribe" and hub_verify_token == token:
-        return int(hub_challenge)
+    stored_token = settings.facebook_verify_token
+    try:
+        supabase = get_supabase()
+        res = supabase.table("account_settings") \
+            .select("value") \
+            .eq("key", "FACEBOOK_VERIFY_TOKEN") \
+            .neq("value", "") \
+            .limit(1) \
+            .execute()
+        if res.data:
+            stored_token = res.data[0]["value"]
+    except Exception:
+        pass
+    if hub_mode == "subscribe" and hub_verify_token == stored_token:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(hub_challenge)
     raise HTTPException(status_code=403, detail="Verification failed")
 
 

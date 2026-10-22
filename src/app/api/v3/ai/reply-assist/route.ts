@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
+import { resolveAIKey, aiComplete } from '@/lib/ai/key-resolver';
 
 const TONE_MAP: Record<string, string> = {
   professional: 'Write a professional, formal business reply. Use proper grammar and a respectful tone.',
@@ -59,9 +60,10 @@ export async function POST(req: NextRequest) {
 
     const msgs = (messages ?? []).reverse();
     const lastCustomerMsg = msgs.filter(m => m.sender_type === 'customer').slice(-1)[0]?.content_text ?? '';
-    const openaiKey = process.env.OPENAI_API_KEY;
+    const { user, db: supabase2 } = auth as { user: { account_id: string }; db: typeof supabase };
+    const aiKey = await resolveAIKey(supabase2, user.account_id);
 
-    if (!openaiKey) {
+    if (aiKey.provider === 'none') {
       return NextResponse.json({ reply: FALLBACKS[action] ?? 'Thank you for your message.' });
     }
 
@@ -78,26 +80,14 @@ export async function POST(req: NextRequest) {
       ? `Conversation:\n${transcript}`
       : `Conversation context:\n${transcript}\n\nCustomer's last message: "${lastCustomerMsg}"\n\nWrite the reply:`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: action === 'summarize' ? 0.2 : 0.7,
-        max_tokens: action === 'detailed' ? 400 : action === 'summarize' ? 300 : 200,
-      }),
+    const reply = await aiComplete(aiKey, systemPrompt, userPrompt, {
+      maxTokens: action === 'detailed' ? 400 : action === 'summarize' ? 300 : 200,
+      temperature: action === 'summarize' ? 0.2 : 0.7,
     });
 
-    if (!response.ok) {
+    if (!reply) {
       return NextResponse.json({ reply: FALLBACKS[action] ?? 'Thank you for your message.' });
     }
-
-    const data = await response.json();
-    const reply = data.choices[0].message.content.trim();
     return NextResponse.json({ reply, action, generated_at: new Date().toISOString() });
   } catch (err) {
     console.error('[reply-assist]', err);

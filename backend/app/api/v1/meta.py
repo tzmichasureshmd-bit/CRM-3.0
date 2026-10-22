@@ -62,6 +62,43 @@ def _get_fb_creds_for_account(account_id: str) -> tuple[str, str]:
     )
 
 
+# ── WhatsApp Status ──────────────────────────────────────────
+@router.get("/whatsapp/status")
+async def whatsapp_status(user: dict = Depends(get_current_user)):
+    """Check if WhatsApp is configured and the phone number is valid."""
+    try:
+        supabase = get_supabase()
+        res = supabase.table("account_settings") \
+            .select("key, value") \
+            .eq("account_id", user["account_id"]) \
+            .in_("key", ["WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_ACCESS_TOKEN"]) \
+            .neq("value", "") \
+            .execute()
+        wa = {row["key"]: row["value"] for row in (res.data or []) if row.get("value", "").strip()}
+    except Exception:
+        wa = {}
+    s = get_settings()
+    phone_id = wa.get("WHATSAPP_PHONE_NUMBER_ID") or s.whatsapp_phone_number_id
+    token    = wa.get("WHATSAPP_ACCESS_TOKEN") or s.whatsapp_access_token
+    if not phone_id or not token:
+        return {"configured": False, "phone_number": None}
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(
+            f"{GRAPH}/{phone_id}",
+            params={"fields": "id,display_phone_number,verified_name,quality_rating", "access_token": token},
+        )
+    if r.status_code != 200:
+        return {"configured": True, "valid": False, "error": _fb_error(r)}
+    data = r.json()
+    return {
+        "configured": True,
+        "valid": True,
+        "phone_number": data.get("display_phone_number"),
+        "verified_name": data.get("verified_name"),
+        "quality_rating": data.get("quality_rating"),
+    }
+
+
 # ── Facebook Page Info ────────────────────────────────────────
 @router.get("/meta/page")
 async def get_fb_page(user: dict = Depends(get_current_user)):

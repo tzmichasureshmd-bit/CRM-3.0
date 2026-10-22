@@ -456,7 +456,7 @@ export default function InboxPage() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [showAIPanel, setShowAIPanel] = useState(true);
 
   // ── Load conversations ─────────────────────────────────────
   const loadConversations = useCallback(async () => {

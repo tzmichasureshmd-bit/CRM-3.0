@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { CalendarDays, Clock, CheckCircle, AlertCircle, Plus, RefreshCw, X, Search } from 'lucide-react';
+import { CalendarDays, Clock, CheckCircle, AlertCircle, Plus, RefreshCw, X, Search, Brain, Zap, ArrowRight } from 'lucide-react';
 import { getFollowUps, createFollowUp, updateFollowUp } from '@/lib/api-client';
 import type { FollowUp } from '@/lib/api-client';
 import { v3fetch } from '@/lib/auth-client';
+import Link from 'next/link';
 
 interface Contact {
   id: string;
@@ -194,6 +195,20 @@ export default function FollowUpsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'overdue' | 'today' | 'upcoming'>('all');
   const [showAdd, setShowAdd] = useState(false);
+  const [aiRecs, setAiRecs] = useState<{ id: string; what: string; action_href: string; urgency: string; action_label: string }[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const loadAI = useCallback(async () => {
+    setAiLoading(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const res = await fetch('/api/v3/ai/recommendations', { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const d = await res.json() as { id: string; what: string; action_href: string; urgency: string; action_label: string }[];
+        setAiRecs(Array.isArray(d) ? d : []);
+      }
+    } finally { setAiLoading(false); }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -204,7 +219,7 @@ export default function FollowUpsPage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); void loadAI(); }, [load, loadAI]);
 
   const now = Date.now();
   const filtered = followups.filter(f => {
@@ -250,6 +265,31 @@ export default function FollowUpsPage() {
           </button>
         </div>
       </div>
+
+      {/* AI Recommendations Panel */}
+      {(aiRecs.length > 0 || aiLoading) && (
+        <div style={{ padding: '14px 18px', borderRadius: 14, background: 'linear-gradient(135deg,rgba(79,109,245,0.10),rgba(139,92,246,0.07))', border: '1px solid rgba(79,109,245,0.20)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Brain size={15} color="#4f6df5" />
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--crm-text)' }}>AI Recommendations</span>
+            {aiLoading && <span style={{ fontSize: 11, color: 'var(--crm-text-muted)' }}>Analyzing...</span>}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {aiRecs.slice(0, 3).map(r => {
+              const urgColor = r.urgency === 'immediate' ? '#f46b72' : r.urgency === 'today' ? '#f4c95d' : '#4f6df5';
+              return (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.50)', border: `1px solid ${urgColor}20` }}>
+                  <Zap size={12} color={urgColor} style={{ flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: 12, color: 'var(--crm-text)', lineHeight: 1.4 }}>{r.what}</span>
+                  <Link href={r.action_href} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, fontWeight: 700, color: urgColor, textDecoration: 'none', flexShrink: 0 }}>
+                    {r.action_label} <ArrowRight size={10} />
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div style={{ display: 'flex', gap: 6 }}>
