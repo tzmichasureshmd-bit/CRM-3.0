@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Bell, ChevronLeft, CheckCircle2, AlertCircle, X, Mail, Smartphone, MessageSquare, TrendingUp, CalendarDays, Bot } from 'lucide-react';
 import Link from 'next/link';
+import { v3fetch } from '@/lib/auth-client';
 
 function Banner({ type, text, onClose }: { type: 'success' | 'error'; text: string; onClose: () => void }) {
   return (
@@ -92,40 +92,44 @@ function NotifRow({ icon, label, desc, value, onChange }: {
 }
 
 export default function NotificationsPage() {
-  const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_PREFS);
-  const [userId, setUserId] = useState('');
 
   const set = (key: keyof NotifPrefs) => (v: boolean) =>
     setPrefs(prev => ({ ...prev, [key]: v }));
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
-    setUserId(user.id);
-    const { data: profile } = await supabase
-      .from('profiles').select('notification_prefs')
-      .eq('user_id', user.id).maybeSingle();
-    if (profile?.notification_prefs) {
-      setPrefs({ ...DEFAULT_PREFS, ...(profile.notification_prefs as Partial<NotifPrefs>) });
-    }
+    try {
+      const res = await v3fetch('/api/v3/profile');
+      if (res.ok) {
+        const json = await res.json() as { profile?: { notification_prefs?: Partial<NotifPrefs> } };
+        if (json.profile?.notification_prefs) {
+          setPrefs({ ...DEFAULT_PREFS, ...json.profile.notification_prefs });
+        }
+      }
+    } catch { /* use defaults */ }
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 
   const handleSave = async () => {
     setSaving(true); setBanner(null);
     try {
-      const { error } = await supabase.from('profiles')
-        .update({ notification_prefs: prefs })
-        .eq('user_id', userId);
-      if (error) setBanner({ type: 'error', text: error.message });
-      else setBanner({ type: 'success', text: 'Notification preferences saved.' });
+      const res = await v3fetch('/api/v3/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notification_prefs: prefs }),
+      });
+      if (!res.ok) {
+        const d = await res.json() as { error?: string };
+        setBanner({ type: 'error', text: d.error ?? 'Failed to save.' });
+      } else {
+        setBanner({ type: 'success', text: 'Notification preferences saved.' });
+      }
     } catch (err) {
       setBanner({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save.' });
     } finally { setSaving(false); }

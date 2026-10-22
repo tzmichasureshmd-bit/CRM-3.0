@@ -3,26 +3,18 @@
  * GET /api/v3/automations/executions
  * Query: automation_id, status, from, to, execution_id, limit
  *
- * Security: account_id from session.
+ * Auth: FastAPI JWT via verifyRequest(). account_id always from token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-
-async function getAccountId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
-  const { data } = await supabase.from('profiles').select('account_id').eq('user_id', userId).single();
-  return (data?.account_id as string) ?? null;
-}
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 export async function GET(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
     const url = new URL(req.url);
     const automationId = url.searchParams.get('automation_id');
     const status = url.searchParams.get('status');
@@ -31,10 +23,10 @@ export async function GET(req: NextRequest) {
     const executionId = url.searchParams.get('execution_id');
     const limit = Math.min(parseInt(url.searchParams.get('limit') ?? '50'), 200);
 
-    let query = supabase
+    let query = db
       .from('crm3_automation_executions')
       .select('id,automation_id,contact_id,conversation_id,trigger_type,status,current_step,total_steps,steps_log,error_message,started_at,completed_at,wait_until,automation:automations(name)')
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .order('started_at', { ascending: false })
       .limit(limit);
 
@@ -50,7 +42,11 @@ export async function GET(req: NextRequest) {
     const executions = (data ?? []).map(e => {
       const start = e.started_at ? new Date(e.started_at).getTime() : null;
       const end = e.completed_at ? new Date(e.completed_at).getTime() : null;
-      return { ...e, duration_ms: start && end ? end - start : null, automation_name: (e.automation as { name?: string } | null)?.name ?? null };
+      return {
+        ...e,
+        duration_ms: start && end ? end - start : null,
+        automation_name: (e.automation as { name?: string } | null)?.name ?? null,
+      };
     });
 
     return NextResponse.json({ executions, total: executions.length });

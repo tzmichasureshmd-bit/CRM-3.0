@@ -6,7 +6,6 @@ import {
   Brain, Zap, RefreshCw, Phone, Mail, Building2,
   DollarSign, Link2,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { v3fetch } from '@/lib/auth-client';
 
@@ -98,7 +97,6 @@ const JOURNEY_STAGES = ['Discovery', 'Engagement', 'Conversation', 'Qualificatio
 
 // ── Main Component ───────────────────────────────────────────
 export default function CustomersPage() {
-  const supabase = createClient();
   const [contacts, setContacts]       = useState<Contact[]>([]);
   const [selected, setSelected]       = useState<Contact | null>(null);
   const [conversations, setConvs]     = useState<Conversation[]>([]);
@@ -114,12 +112,13 @@ export default function CustomersPage() {
   // Load contact list
   const loadContacts = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('contacts')
-      .select('id,name,phone,email,company,lead_status,lead_score,lead_score_tier,lead_score_reason,source,created_at,last_customer_reply_at')
-      .order('last_customer_reply_at', { ascending: false, nullsFirst: false })
-      .limit(100);
-    setContacts((data as Contact[]) ?? []);
+    try {
+      const res = await v3fetch('/api/v3/contacts?limit=100');
+      if (res.ok) {
+        const json = await res.json() as { data?: Contact[]; contacts?: Contact[] };
+        setContacts(json.data ?? json.contacts ?? []);
+      }
+    } catch { /* silent */ }
     setLoading(false);
   }, []);
 
@@ -135,29 +134,18 @@ export default function CustomersPage() {
     setAttribution([]);
 
     const [convRes, dealRes, attrRes] = await Promise.all([
-      supabase
-        .from('conversations')
-        .select('id,platform,status,last_message_text,last_message_at,unread_count,created_at')
-        .eq('contact_id', contact.id)
-        .order('last_message_at', { ascending: false })
-        .limit(10),
-      supabase
-        .from('deals')
-        .select('id,title,value,currency,status,created_at')
-        .eq('contact_id', contact.id)
-        .order('created_at', { ascending: false })
-        .limit(10),
-      supabase
-        .from('crm3_attribution')
-        .select('id,content_id,campaign_id,source,channel,attribution_method,attribution_confidence,revenue_amount,is_won,created_at')
-        .eq('contact_id', contact.id)
-        .order('created_at', { ascending: false })
-        .limit(10),
+      v3fetch(`/api/v3/conversations?contact_id=${contact.id}&limit=10`),
+      v3fetch(`/api/v3/deals?contact_id=${contact.id}&limit=10`),
+      v3fetch(`/api/v3/attribution?contact_id=${contact.id}&limit=10`),
     ]);
 
-    const convs    = (convRes.data  as Conversation[]) ?? [];
-    const dealList = (dealRes.data  as Deal[])         ?? [];
-    const attrList = (attrRes.data  as Attribution[])  ?? [];
+    const convJson = convRes.ok ? await convRes.json() as { data?: Conversation[] } : {};
+    const dealJson = dealRes.ok ? await dealRes.json() as { data?: Deal[] } : {};
+    const attrJson = attrRes.ok ? await attrRes.json() as { data?: Attribution[] } : {};
+
+    const convs    = convJson.data ?? [];
+    const dealList = dealJson.data ?? [];
+    const attrList = attrJson.data ?? [];
     setConvs(convs);
     setDeals(dealList);
     setAttribution(attrList);

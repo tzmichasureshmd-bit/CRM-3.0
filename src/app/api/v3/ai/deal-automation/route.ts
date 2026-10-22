@@ -8,7 +8,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import {
   parseNaturalLanguageDeal,
   type ParsedDealIntent,
@@ -17,22 +16,6 @@ import type { ContactRecord, PipelineStageRecord } from '@/lib/crm-pipeline-stor
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    // Authenticated user check when available; allow safe processing in dev environments
-    let accountId: string | null = null;
-    if (user?.id) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('account_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      accountId = profile?.account_id ?? null;
-    }
-
     const body = await req.json().catch(() => ({}));
     const { prompt, stages = [], contacts = [] } = body as {
       prompt?: string;
@@ -137,7 +120,7 @@ Respond ONLY with a JSON object in this format:
             summary: `Create deal "${content.title}" (${content.currency} ${content.value}) in stage "${matchedStage.name}".`,
           };
 
-          return NextResponse.json({ success: true, parsed, provider: 'openai', accountId });
+          return NextResponse.json({ success: true, parsed, provider: 'openai' });
         }
       } catch (aiErr) {
         console.warn('[deal-automation] OpenAI parsing fallback triggered:', aiErr);
@@ -150,7 +133,6 @@ Respond ONLY with a JSON object in this format:
       success: true,
       parsed,
       provider: 'rules-engine',
-      accountId,
     });
   } catch (err) {
     console.error('[deal-automation] Execution exception:', err);

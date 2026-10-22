@@ -13,6 +13,7 @@ from app.api.v1 import (
     follow_ups, broadcasts, appointments, segments, journeys,
     revenue_intelligence, attribution, copilot, ai_routes, email_routes, meta, instagram_routes,
     ai_settings, integrations, notifications, analytics,
+    knowledge, media, experiments, billing,
 )
 
 settings = get_settings()
@@ -75,6 +76,10 @@ app.include_router(meta.router,                  prefix=PREFIX, tags=["Meta"])
 app.include_router(instagram_routes.router,      prefix=PREFIX, tags=["Instagram"])
 app.include_router(ai_settings.router,           prefix=PREFIX, tags=["AI Settings"])
 app.include_router(integrations.router,          prefix=PREFIX, tags=["Integrations"])
+app.include_router(knowledge.router,             prefix=PREFIX, tags=["Knowledge Base"])
+app.include_router(media.router,                 prefix=PREFIX, tags=["Media"])
+app.include_router(experiments.router,           prefix=PREFIX, tags=["A/B Testing"])
+app.include_router(billing.router,               prefix=PREFIX, tags=["Billing"])
 
 # v3 aliases — frontend calls /api/v3/instagram/* and /api/v3/instagram/settings/*
 # Traefik routes all /api/* directly to this backend, bypassing the Next.js proxy.
@@ -93,6 +98,10 @@ app.include_router(ai_routes.router,             prefix=PREFIX_V3, tags=["AI v3"
 app.include_router(copilot.router,               prefix=PREFIX_V3, tags=["Copilot v3"])
 app.include_router(notifications.router,         prefix=PREFIX_V3, tags=["Notifications v3"])
 app.include_router(analytics.router,             prefix=PREFIX_V3, tags=["Analytics v3"])
+app.include_router(knowledge.router,             prefix=PREFIX_V3, tags=["Knowledge Base v3"])
+app.include_router(media.router,                 prefix=PREFIX_V3, tags=["Media v3"])
+app.include_router(experiments.router,           prefix=PREFIX_V3, tags=["A/B Testing v3"])
+app.include_router(billing.router,               prefix=PREFIX_V3, tags=["Billing v3"])
 
 
 @app.get("/")

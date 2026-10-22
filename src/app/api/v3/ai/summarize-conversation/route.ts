@@ -4,13 +4,12 @@
  *
  * Returns: summary, intent, sentiment, lead_score, next_action
  * Uses real messages only. Never fabricates data.
- * Falls back gracefully when AI key is missing.
+ * Auth: FastAPI JWT via verifyRequest(). account_id always from token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
-// ── Intent categories ─────────────────────────────────────────
 const INTENT_KEYWORDS: Record<string, string[]> = {
   'High Buying Intent':    ['price', 'pricing', 'cost', 'buy', 'purchase', 'order', 'payment', 'how much', 'rate', 'plan', 'subscribe'],
   'Pricing Inquiry':       ['price', 'pricing', 'cost', 'how much', 'rate', 'fee', 'charge'],
@@ -31,15 +30,12 @@ function detectIntent(messages: string): string {
   return 'Unknown';
 }
 
-// ── Sentiment detection ───────────────────────────────────────
 function detectSentiment(messages: string): { sentiment: string; explanation: string } {
   const lower = messages.toLowerCase();
   const positive = ['great', 'good', 'excellent', 'love', 'perfect', 'amazing', 'thank', 'yes', 'interested', 'want', 'please', 'happy', 'wonderful'];
   const negative = ['bad', 'terrible', 'awful', 'hate', 'no', 'not', 'never', 'cancel', 'refund', 'complaint', 'unhappy', 'disappointed', 'worst'];
-
   const posCount = positive.filter(w => lower.includes(w)).length;
   const negCount = negative.filter(w => lower.includes(w)).length;
-
   if (posCount > 0 && negCount > 0) return { sentiment: 'Mixed', explanation: 'Customer expressed both positive and negative signals' };
   if (posCount >= 2) return { sentiment: 'Positive', explanation: 'Customer used positive language and showed interest' };
   if (negCount >= 2) return { sentiment: 'Negative', explanation: 'Customer expressed dissatisfaction or objections' };
@@ -48,7 +44,6 @@ function detectSentiment(messages: string): { sentiment: string; explanation: st
   return { sentiment: 'Neutral', explanation: 'No strong positive or negative signals detected' };
 }
 
-// ── NBA based on intent + score ───────────────────────────────
 function getNextAction(intent: string, score: number, sentiment: string): string {
   if (sentiment === 'Negative') return 'Address customer concerns immediately and offer resolution';
   if (intent === 'High Buying Intent' || score >= 80) return 'Send pricing details and schedule a demo call';
@@ -65,24 +60,24 @@ function getNextAction(intent: string, score: number, sentiment: string): string
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db: supabase } = auth;
 
+  try {
     const { conversationId } = await req.json();
     if (!conversationId) return NextResponse.json({ error: 'conversationId required' }, { status: 400 });
 
-    // ── Verify ownership ──────────────────────────────────────
+    // Verify ownership — account_id scoped
     const { data: conv } = await supabase
       .from('conversations')
       .select('id, contact_id, platform, status, contacts(name, lead_score, lead_status, source)')
       .eq('id', conversationId)
+      .eq('account_id', user.account_id)
       .single();
 
     if (!conv) return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
 
-    // ── Fetch messages ────────────────────────────────────────
     const { data: messages } = await supabase
       .from('messages')
       .select('content_text, sender_type, created_at')
@@ -108,15 +103,12 @@ export async function POST(req: NextRequest) {
     const customerMsgs = msgs.filter(m => m.sender_type === 'customer');
     const customerText = customerMsgs.map(m => m.content_text ?? '').join(' ');
 
-    // ── Rule-based analysis (always runs) ────────────────────
     const intent = detectIntent(customerText);
     const { sentiment, explanation: sentimentExplanation } = detectSentiment(customerText);
 
-    // ── Lead score from contact or recalculate ────────────────
     const contact = conv.contacts as { lead_score?: number; lead_status?: string; source?: string } | null;
     let score = contact?.lead_score ?? 0;
     if (score === 0) {
-      // Quick recalc from messages
       if (customerMsgs.length >= 5) score += 15;
       else if (customerMsgs.length >= 2) score += 8;
       if (intent === 'High Buying Intent') score += 25;
@@ -127,14 +119,12 @@ export async function POST(req: NextRequest) {
 
     const nextAction = getNextAction(intent, score, sentiment);
 
-    // ── AI summary (OpenAI if available, rule-based fallback) ─
     let summary = '';
     const openaiKey = process.env.OPENAI_API_KEY;
 
     if (openaiKey && msgs.length >= 2) {
       try {
-        const transcript = msgs
-          .slice(-15)
+        const transcript = msgs.slice(-15)
           .map(m => `${m.sender_type === 'customer' ? 'Customer' : 'Agent'}: ${m.content_text ?? ''}`)
           .join('\n');
 
@@ -144,10 +134,7 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             messages: [
-              {
-                role: 'system',
-                content: 'You are a CRM analyst. Summarize this customer conversation in 2-3 sentences. Include: what the customer wants, their current status, and any key questions or objections. Be factual — only use information from the conversation. Do not invent details.',
-              },
+              { role: 'system', content: 'You are a CRM analyst. Summarize this customer conversation in 2-3 sentences. Include: what the customer wants, their current status, and any key questions or objections. Be factual — only use information from the conversation. Do not invent details.' },
               { role: 'user', content: `Conversation:\n${transcript}` },
             ],
             temperature: 0.2,
@@ -159,24 +146,19 @@ export async function POST(req: NextRequest) {
           const data = await res.json();
           summary = data.choices[0].message.content.trim();
         }
-      } catch {
-        // AI failed — use rule-based fallback below
-      }
+      } catch { /* fallback below */ }
     }
 
-    // Rule-based summary fallback
     if (!summary) {
       const contactName = (conv.contacts as { name?: string } | null)?.name ?? 'The customer';
       const msgCount = customerMsgs.length;
       summary = `${contactName} has sent ${msgCount} message${msgCount !== 1 ? 's' : ''} via ${conv.platform ?? 'this channel'}. `;
-      summary += `Detected intent: ${intent}. `;
-      summary += `Sentiment: ${sentiment}. `;
+      summary += `Detected intent: ${intent}. Sentiment: ${sentiment}. `;
       if (score >= 70) summary += 'High buying intent — recommend immediate follow-up.';
       else if (score >= 40) summary += 'Moderate interest — continue nurturing.';
       else summary += 'Early stage — monitor for engagement signals.';
     }
 
-    // ── Persist AI analysis back to conversation ──────────────
     await supabase
       .from('conversations')
       .update({
@@ -187,12 +169,11 @@ export async function POST(req: NextRequest) {
         ai_next_action: nextAction,
         ai_analyzed_at: new Date().toISOString(),
       })
-      .eq('id', conversationId);
+      .eq('id', conversationId)
+      .eq('account_id', user.account_id);
 
     return NextResponse.json({
-      summary,
-      intent,
-      sentiment,
+      summary, intent, sentiment,
       sentiment_explanation: sentimentExplanation,
       lead_score: score,
       next_action: nextAction,

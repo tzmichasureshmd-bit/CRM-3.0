@@ -1,20 +1,11 @@
-/**
- * CRM 3.0 — Smart Customer Segments (Premium Redesign)
- * Glassmorphism segmentation page with explicit text colors for visibility.
- */
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Navigation, Plus, RefreshCw, Search, X,
-  AlertCircle, CloudDownload,
-} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Navigation, Plus, RefreshCw, CloudDownload, AlertCircle } from 'lucide-react';
+import { v3fetch } from '@/lib/auth-client';
 
 import SegmentSummary from '@/components/segments/SegmentSummary';
-import SegmentRuleBuilder from '@/components/segments/SegmentRuleBuilder';
-import SegmentLivePreview from '@/components/segments/SegmentLivePreview';
 import SegmentsGrid from '@/components/segments/SegmentsGrid';
 import SegmentDetails from '@/components/segments/SegmentDetails';
 import CreateSegmentModal from '@/components/segments/CreateSegmentModal';
@@ -28,7 +19,7 @@ interface Segment {
   last_computed_at: string | null;
   created_at: string;
   updated_at: string;
-  rules?: any[];
+  rules?: unknown[];
 }
 
 export default function SegmentsPage() {
@@ -43,9 +34,9 @@ export default function SegmentsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/v3/segments');
+      const res = await v3fetch('/api/v3/segments');
       if (!res.ok) throw new Error('Failed to load segments');
-      const d = await res.json();
+      const d = await res.json() as { segments?: Segment[] };
       setSegments(d.segments ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load segments');
@@ -59,11 +50,11 @@ export default function SegmentsPage() {
   const handleRefreshSegment = async (id: string) => {
     setRefreshing(id);
     try {
-      const res = await fetch(`/api/v3/segments/${id}/refresh`, { method: 'POST' });
+      const res = await v3fetch(`/api/v3/segments/${id}/refresh`, { method: 'POST' });
       if (!res.ok) throw new Error('Refresh failed');
-      const d = await res.json();
-      setSegments((prev) => prev.map((s) => s.id === id ? { ...s, contact_count: d.contact_count, last_computed_at: d.calculated_at } : s));
-      if (openSegment?.id === id) setOpenSegment((prev) => prev ? { ...prev, contact_count: d.contact_count, last_computed_at: d.calculated_at } : prev);
+      const d = await res.json() as { contact_count: number; calculated_at: string };
+      setSegments(prev => prev.map(s => s.id === id ? { ...s, contact_count: d.contact_count, last_computed_at: d.calculated_at } : s));
+      if (openSegment?.id === id) setOpenSegment(prev => prev ? { ...prev, contact_count: d.contact_count, last_computed_at: d.calculated_at } : prev);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refresh failed');
     } finally {
@@ -72,44 +63,44 @@ export default function SegmentsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const res = await fetch(`/api/v3/segments/${id}`, { method: 'DELETE' });
+    const res = await v3fetch(`/api/v3/segments/${id}`, { method: 'DELETE' });
     if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      setError(d.error || 'Failed to delete');
+      const d = await res.json().catch(() => ({})) as { error?: string };
+      setError(d.error ?? 'Failed to delete');
       return;
     }
-    setSegments((prev) => prev.filter((s) => s.id !== id));
+    setSegments(prev => prev.filter(s => s.id !== id));
     if (openSegment?.id === id) setOpenSegment(null);
   };
 
   const handleMembershipChange = async (segmentId: string, action: 'add' | 'remove', contactIds: string[]) => {
-    const res = await fetch(`/api/v3/segments/${segmentId}/membership`, {
+    const res = await v3fetch(`/api/v3/segments/${segmentId}/membership`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, contact_ids: contactIds }),
     });
     if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      setError(d.error || 'Membership update failed');
+      const d = await res.json().catch(() => ({})) as { error?: string };
+      setError(d.error ?? 'Membership update failed');
       return;
     }
-    const d = await res.json();
-    setSegments((prev) => prev.map((s) => s.id === segmentId ? { ...s, contact_count: d.contact_count } : s));
-    if (openSegment?.id === segmentId) setOpenSegment((prev) => prev ? { ...prev, contact_count: d.contact_count } : prev);
+    const d = await res.json() as { contact_count: number };
+    setSegments(prev => prev.map(s => s.id === segmentId ? { ...s, contact_count: d.contact_count } : s));
+    if (openSegment?.id === segmentId) setOpenSegment(prev => prev ? { ...prev, contact_count: d.contact_count } : prev);
   };
 
-  const handleCreate = async (data: { name: string; description: string | undefined; type: string; rules?: any[] }) => {
-    const res = await fetch('/api/v3/segments', {
+  const handleCreate = async (data: { name: string; description: string | undefined; type: string; rules?: unknown[] }) => {
+    const res = await v3fetch('/api/v3/segments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      throw new Error(d.error || 'Failed to create segment');
+      const d = await res.json().catch(() => ({})) as { error?: string };
+      throw new Error(d.error ?? 'Failed to create segment');
     }
-    const created = await res.json();
-    setSegments((prev) => [created.segment, ...prev]);
+    const created = await res.json() as { segment: Segment };
+    setSegments(prev => [created.segment, ...prev]);
   };
 
   return (
@@ -122,7 +113,7 @@ export default function SegmentsPage() {
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto p-6 lg:p-8">
-        {/* Premium Header */}
+        {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-8">
           <div className="flex flex-col">
             <div className="flex items-center gap-2.5 mb-2">
@@ -134,7 +125,7 @@ export default function SegmentsPage() {
             </p>
             <div className="mt-3 flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-[#34D399] animate-pulse" />
-              <span className="text-[11px] font-bold text-[#34D399]">Live data • Connected to Supabase</span>
+              <span className="text-[11px] font-bold text-[#34D399]">Live data • Connected to CRM</span>
             </div>
           </div>
 
@@ -142,29 +133,24 @@ export default function SegmentsPage() {
             <button
               onClick={() => void loadSegments()}
               disabled={loading}
-              className="px-5 py-2.5 rounded-xl border border-[#rgba(255,255,255,0.14)] bg-[#11182B] dark:bg-[#11182B] text-[#F8FAFC] dark:text-[#F8FAFC] text-[12px] flex items-center gap-2 transition-colors disabled:opacity-50"
-              title="Refresh Data"
+              className="px-5 py-2.5 rounded-xl border border-white/10 bg-[#11182B] text-[#F8FAFC] text-[12px] flex items-center gap-2 transition-colors disabled:opacity-50"
             >
               <RefreshCw size={14} strokeWidth={2} className={loading ? 'animate-spin' : ''} />
               {loading ? 'Refreshing…' : 'Refresh Data'}
             </button>
             <button
               onClick={() => setShowCreate(true)}
-              className="px-6 py-2.5 rounded-xl border border-transparent bg-linear-gradient-to-r from-[#7C3AED] to-[#3B82F6] text-white text-sm font-bold shadow-lg hover:shadow-[#7C3AED]/30 transition-all relative overflow-hidden"
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] text-white text-sm font-bold shadow-lg flex items-center gap-2"
             >
               <Plus size={14} strokeWidth={2} />
               Create Segment
-              <div className="absolute top-[30%] right-[-6px] w-2 h-2 rounded-full bg-white animate-pulse" style={{ animationDelay: '0.2s' }} />
-              <div className="absolute top-[60%] right-[-10px] w-2 h-2 rounded-full bg-white animate-pulse" style={{ animationDelay: '0.8s' }} />
-              <div className="absolute top-[10%] right-[-14px] w-2 h-2 rounded-full bg-white animate-pulse" style={{ animationDelay: '1.4s' }} />
             </button>
             <button
               onClick={() => {
-                window.location.href = `/api/v3/segments/${openSegment?.id || 'all'}/export`;
+                if (openSegment) window.location.href = `/api/v3/segments/${openSegment.id}/export`;
               }}
               disabled={!openSegment}
-              className="px-5 py-2.5 rounded-xl border border-[#rgba(255,255,255,0.14)] bg-[#11182B] dark:bg-[#11182B] text-[#F8FAFC] dark:text-[#F8FAFC] text-[12px] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Export Contacts"
+              className="px-5 py-2.5 rounded-xl border border-white/10 bg-[#11182B] text-[#F8FAFC] text-[12px] flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <CloudDownload size={14} strokeWidth={2} />
               Export
@@ -178,19 +164,18 @@ export default function SegmentsPage() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mb-6 rounded-xl border border-[#FCA5A5]/30 bg-[#FEE2E2] dark:bg-[#B91C1C]/10 px-4 py-3 flex items-center gap-3"
+            className="mb-6 rounded-xl border border-red-300/30 bg-red-50 dark:bg-red-900/10 px-4 py-3 flex items-center gap-3"
           >
-            <AlertCircleIcon strokeWidth={14} />
-            <span className="text-[12px] text-[#B91C1C] dark:text-[#FCA5A5] font-medium">{error}</span>
-            <button onClick={() => setError(null)} className="ml-auto text-[10px] font-medium text-[#B91C1C] dark:text-[#FCA5A5] underline">Dismiss</button>
+            <AlertCircle size={14} className="text-red-600 dark:text-red-400" />
+            <span className="text-[12px] text-red-700 dark:text-red-400 font-medium">{error}</span>
+            <button onClick={() => setError(null)} className="ml-auto text-[10px] font-medium text-red-600 dark:text-red-400 underline">Dismiss</button>
           </motion.div>
         )}
 
-        {/* Premium Analytics Cards */}
+        {/* Analytics Cards */}
         <SegmentSummary segments={segments} />
 
         <div className="mt-10">
-          {/* Segments Grid Workspace */}
           <SegmentsGrid
             segments={segments}
             onOpen={setOpenSegment}
@@ -218,15 +203,5 @@ export default function SegmentsPage() {
         onCreated={handleCreate}
       />
     </div>
-  );
-}
-
-function AlertCircleIcon({ className, strokeWidth }: { className?: string; strokeWidth?: number }) {
-  return (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" width={strokeWidth ? strokeWidth : 16} height={strokeWidth ? strokeWidth : 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth ? strokeWidth : 2} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
   );
 }

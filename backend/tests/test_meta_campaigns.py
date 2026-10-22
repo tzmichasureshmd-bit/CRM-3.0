@@ -51,7 +51,7 @@ async def test_successful_fetch():
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
-        campaigns = await service.fetch_meta_campaigns(override_token="test_token_secret")
+        campaigns = await service.fetch_meta_campaigns(override_token="test_token_secret", override_ad_account_id="act_123456789")
         assert len(campaigns) == 2
         assert campaigns[0]["name"] == "Summer Lead Gen 2026"
         assert campaigns[1]["status"] == "PAUSED"
@@ -80,7 +80,7 @@ async def test_pagination_handling():
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.side_effect = [page1, page2]
-        campaigns = await service.fetch_meta_campaigns(override_token="test_token")
+        campaigns = await service.fetch_meta_campaigns(override_token="test_token", override_ad_account_id="act_123456789")
         assert len(campaigns) == 2
         assert campaigns[0]["id"] == "1"
         assert campaigns[1]["id"] == "2"
@@ -95,7 +95,7 @@ async def test_empty_campaigns():
 
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
-        campaigns = await service.fetch_meta_campaigns(override_token="test_token")
+        campaigns = await service.fetch_meta_campaigns(override_token="test_token", override_ad_account_id="act_123456789")
         assert len(campaigns) == 0
 
 
@@ -116,7 +116,7 @@ async def test_expired_token_error_handling():
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
         with pytest.raises(PermissionError) as exc_info:
-            await service.fetch_meta_campaigns(override_token="expired_token_123")
+            await service.fetch_meta_campaigns(override_token="expired_token_123", override_ad_account_id="act_123456789")
         assert "invalid or expired" in str(exc_info.value)
         # Ensure secret token was not leaked in error message
         assert "expired_token_123" not in str(exc_info.value)
@@ -138,7 +138,7 @@ async def test_missing_permission_error():
     with patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_response
         with pytest.raises(PermissionError) as exc_info:
-            await service.fetch_meta_campaigns(override_token="valid_token_no_scope")
+            await service.fetch_meta_campaigns(override_token="valid_token_no_scope", override_ad_account_id="act_123456789")
         assert "ads_read" in str(exc_info.value)
 
 
@@ -188,7 +188,7 @@ async def test_sync_deduplication_and_crm_isolation():
     with patch.object(service, "fetch_meta_campaigns", new_callable=AsyncMock) as mock_fetch:
         mock_fetch.return_value = mock_meta_data
         with patch("app.services.meta_campaign_service.get_supabase_client", return_value=mock_db):
-            result = await service.sync_campaigns(account_id=account_id, override_token="dummy_token")
+            result = await service.sync_campaigns(account_id=account_id, override_token="dummy_token", override_ad_account_id="act_123456789")
 
             assert result["success"] is True
             assert result["fetched_count"] == 2

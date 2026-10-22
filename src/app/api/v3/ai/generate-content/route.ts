@@ -1,17 +1,17 @@
 /**
  * CRM 3.0 — AI Content Generator API
  * POST /api/v3/ai/generate-content
+ * Auth: FastAPI JWT via verifyRequest(). account_id always from token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 export async function POST(req: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
 
+  try {
     const { prompt, options = {} } = await req.json();
     if (!prompt?.trim()) return NextResponse.json({ error: 'Prompt required' }, { status: 400 });
 
@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
 
     const openaiKey = process.env.OPENAI_API_KEY;
     if (!openaiKey) {
-      // Fallback: template-based generation without AI
       return NextResponse.json(templateFallback(prompt, platform));
     }
 
@@ -43,10 +42,7 @@ Respond ONLY with valid JSON in this exact format:
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiKey}`,
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openaiKey}` },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
@@ -60,14 +56,11 @@ Respond ONLY with valid JSON in this exact format:
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      console.error('[generate-content] OpenAI error:', err);
       return NextResponse.json(templateFallback(prompt, platform));
     }
 
     const data = await response.json();
     const content = JSON.parse(data.choices[0].message.content);
-
     return NextResponse.json(content);
   } catch (err) {
     console.error('[generate-content]', err);
@@ -75,7 +68,6 @@ Respond ONLY with valid JSON in this exact format:
   }
 }
 
-// ── Template fallback (no AI key needed) ─────────────────────
 function templateFallback(prompt: string, platform: string) {
   const topic = prompt.slice(0, 50);
   return {

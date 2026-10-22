@@ -7,6 +7,7 @@ import {
   AtSign, Mail, Sparkles, Megaphone, Rss, Zap, GitBranch,
   Bot, BarChart3, Activity, FileBarChart, Settings, Key,
   Shield, CreditCard, Server, ChevronDown, ChevronRight,
+  BookOpen, Image, FlaskConical,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -68,6 +69,14 @@ const NAV = [
       { href: '/revenue', icon: BarChart3, label: 'Revenue Attribution' },
       { href: '/analytics', icon: Activity, label: 'Analytics' },
       { href: '/reports', icon: FileBarChart, label: 'Reports' },
+      { href: '/experiments', icon: FlaskConical, label: 'A/B Testing' },
+    ],
+  },
+  {
+    id: 'content-tools', label: 'CONTENT TOOLS',
+    items: [
+      { href: '/knowledge', icon: BookOpen, label: 'Knowledge Base' },
+      { href: '/media', icon: Image, label: 'Media Library' },
     ],
   },
   {

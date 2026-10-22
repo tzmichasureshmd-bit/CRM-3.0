@@ -4,7 +4,7 @@ Covers H.4, H.5, H.6 from the test plan.
 """
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from tests.conftest import TEST_USER_ID, TEST_ACCOUNT_ID
+from tests.conftest import TEST_USER_ID, TEST_ACCOUNT_ID, set_db_result
 
 
 VALID_FIREBASE_PAYLOAD = {
@@ -16,12 +16,34 @@ VALID_FIREBASE_PAYLOAD = {
 }
 
 
+def _make_limit_side_effect(db, responses: list):
+    """
+    Make .limit(1).execute().data return successive values from `responses`.
+    google_auth calls .limit(1).execute() twice:
+      1st: google_id lookup
+      2nd: email lookup (only if google_id not found)
+    """
+    call_count = [0]
+    original_limit = db.table.return_value.select.return_value.eq.return_value.limit
+
+    def limit_side_effect(*args, **kwargs):
+        mock = MagicMock()
+        idx = call_count[0]
+        call_count[0] += 1
+        val = responses[idx] if idx < len(responses) else None
+        mock.execute.return_value.data = [val] if val is not None else []
+        return mock
+
+    db.table.return_value.select.return_value.eq.return_value.limit.side_effect = limit_side_effect
+
+
 class TestGoogleAuth:
     def test_new_google_user_creates_account(self, app_client):
         client, db = app_client
-        # No existing google_id, no existing email
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
+        # google_id lookup → not found; email lookup → not found
+        _make_limit_side_effect(db, [None, None])
         db.table.return_value.insert.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
+        db.table.return_value.insert.return_value.select.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
 
         with patch("app.api.v1.auth.verify_firebase_token", new=AsyncMock(return_value=VALID_FIREBASE_PAYLOAD)):
             resp = client.post("/api/v1/auth/google", json={"id_token": "valid-firebase-token"})
@@ -37,8 +59,8 @@ class TestGoogleAuth:
             "user_id": TEST_USER_ID, "account_id": TEST_ACCOUNT_ID,
             "role": "owner", "token_version": 1, "is_active": True,
         }
-        # First eq call (google_id lookup) returns existing profile
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = existing_profile
+        # google_id lookup → found (returns existing profile immediately)
+        _make_limit_side_effect(db, [existing_profile])
 
         with patch("app.api.v1.auth.verify_firebase_token", new=AsyncMock(return_value=VALID_FIREBASE_PAYLOAD)):
             resp = client.post("/api/v1/auth/google", json={"id_token": "valid-firebase-token"})
@@ -57,7 +79,7 @@ class TestGoogleAuth:
     def test_unverified_google_email_returns_400(self, app_client):
         client, db = app_client
         unverified_payload = {**VALID_FIREBASE_PAYLOAD, "email_verified": False}
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
+        set_db_result(db, None)
 
         with patch("app.api.v1.auth.verify_firebase_token", new=AsyncMock(return_value=unverified_payload)):
             resp = client.post("/api/v1/auth/google", json={"id_token": "unverified-token"})
@@ -68,24 +90,13 @@ class TestGoogleAuth:
     def test_google_login_with_existing_email_password_account_returns_409(self, app_client):
         """FIX-007: Google login with email matching existing email/password account must not auto-link."""
         client, db = app_client
-
-        call_count = [0]
-        def side_effect(*args, **kwargs):
-            mock = MagicMock()
-            call_count[0] += 1
-            if call_count[0] == 1:
-                # google_id lookup — not found
-                mock.execute.return_value.data = None
-            else:
-                # email lookup — found existing email/password account (no google_id)
-                mock.execute.return_value.data = {
-                    "user_id": TEST_USER_ID, "account_id": TEST_ACCOUNT_ID,
-                    "role": "owner", "google_id": None,
-                    "token_version": 1, "is_active": True,
-                }
-            return mock
-
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.side_effect = side_effect
+        existing_email_profile = {
+            "user_id": TEST_USER_ID, "account_id": TEST_ACCOUNT_ID,
+            "role": "owner", "google_id": None,
+            "token_version": 1, "is_active": True,
+        }
+        # google_id lookup → not found; email lookup → found (no google_id)
+        _make_limit_side_effect(db, [None, existing_email_profile])
 
         with patch("app.api.v1.auth.verify_firebase_token", new=AsyncMock(return_value=VALID_FIREBASE_PAYLOAD)):
             resp = client.post("/api/v1/auth/google", json={"id_token": "valid-firebase-token"})
@@ -97,22 +108,13 @@ class TestGoogleAuth:
     def test_google_login_conflicting_google_id_returns_409(self, app_client):
         """FIX-007: Email linked to a different Google UID must be rejected."""
         client, db = app_client
-
-        call_count = [0]
-        def side_effect(*args, **kwargs):
-            mock = MagicMock()
-            call_count[0] += 1
-            if call_count[0] == 1:
-                mock.execute.return_value.data = None  # google_id not found
-            else:
-                mock.execute.return_value.data = {
-                    "user_id": TEST_USER_ID, "account_id": TEST_ACCOUNT_ID,
-                    "role": "owner", "google_id": "different-google-uid",
-                    "token_version": 1, "is_active": True,
-                }
-            return mock
-
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.side_effect = side_effect
+        conflicting_profile = {
+            "user_id": TEST_USER_ID, "account_id": TEST_ACCOUNT_ID,
+            "role": "owner", "google_id": "different-google-uid",
+            "token_version": 1, "is_active": True,
+        }
+        # google_id lookup → not found; email lookup → found with different google_id
+        _make_limit_side_effect(db, [None, conflicting_profile])
 
         with patch("app.api.v1.auth.verify_firebase_token", new=AsyncMock(return_value=VALID_FIREBASE_PAYLOAD)):
             resp = client.post("/api/v1/auth/google", json={"id_token": "valid-firebase-token"})

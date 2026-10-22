@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { User, ChevronLeft, CheckCircle2, AlertCircle, X, Camera } from 'lucide-react';
 import Link from 'next/link';
 
@@ -48,34 +47,48 @@ const LANGUAGES = [
 ];
 
 export default function ProfilePage() {
-  const supabase = createClient();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+  const [banner, setBanner]     = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState('');
+  const [email, setEmail]       = useState('');
+  const [role, setRole]         = useState('');
   const [timezone, setTimezone] = useState('UTC');
   const [language, setLanguage] = useState('en');
-  const [userId, setUserId] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
-    setEmail(user.email ?? '');
-    setUserId(user.id);
-    const { data: profile } = await supabase
-      .from('profiles').select('full_name, role, timezone, language')
-      .eq('user_id', user.id).maybeSingle();
-    if (profile) {
-      setFullName(profile.full_name ?? '');
-      setRole(profile.role ?? '');
-      setTimezone(profile.timezone ?? 'UTC');
-      setLanguage(profile.language ?? 'en');
-    }
+    try {
+      const token = localStorage.getItem('crm_token');
+      if (!token) { setLoading(false); return; }
+
+      // Load from localStorage first for instant display
+      const stored = localStorage.getItem('crm_user');
+      if (stored) {
+        const u = JSON.parse(stored) as Record<string, string>;
+        setEmail(u.email ?? '');
+        setFullName(u.full_name ?? '');
+        setRole(u.role ?? '');
+        setAvatarUrl(u.avatar_url ?? '');
+      }
+
+      // Fetch fresh profile from API
+      const res = await fetch('/api/v3/profile', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const { profile } = await res.json() as { profile: Record<string, string> };
+        setFullName(profile.full_name ?? '');
+        setEmail(profile.email ?? '');
+        setRole(profile.role ?? '');
+        setTimezone(profile.timezone ?? 'UTC');
+        setLanguage(profile.language ?? 'en');
+        setAvatarUrl(profile.avatar_url ?? '');
+      }
+    } catch { /* use localStorage fallback */ }
     setLoading(false);
-  }, [supabase]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -83,11 +96,26 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true); setBanner(null);
     try {
-      const { error } = await supabase.from('profiles')
-        .update({ full_name: fullName.trim(), timezone, language })
-        .eq('user_id', userId);
-      if (error) setBanner({ type: 'error', text: error.message });
-      else setBanner({ type: 'success', text: 'Profile updated successfully.' });
+      const token = localStorage.getItem('crm_token');
+      if (!token) { setBanner({ type: 'error', text: 'Not authenticated.' }); return; }
+
+      const res = await fetch('/api/v3/profile', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ full_name: fullName.trim(), timezone, language }),
+      });
+      const data = await res.json() as Record<string, unknown>;
+      if (!res.ok) {
+        setBanner({ type: 'error', text: (data.error as string) ?? 'Failed to save.' });
+      } else {
+        // Update localStorage cache
+        const stored = localStorage.getItem('crm_user');
+        if (stored) {
+          const u = JSON.parse(stored) as Record<string, string>;
+          localStorage.setItem('crm_user', JSON.stringify({ ...u, full_name: fullName.trim() }));
+        }
+        setBanner({ type: 'success', text: 'Profile updated successfully.' });
+      }
     } catch (err) {
       setBanner({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save.' });
     } finally { setSaving(false); }
@@ -119,9 +147,13 @@ export default function ProfilePage() {
           <div className="crm-glass" style={{ padding: 20, borderRadius: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
               <div style={{ position: 'relative' }}>
-                <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 24, fontWeight: 700 }}>
-                  {initials}
-                </div>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={fullName} style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 24, fontWeight: 700 }}>
+                    {initials}
+                  </div>
+                )}
                 <div style={{ position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: '50%', background: 'white', border: '2px solid rgba(130,145,190,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--crm-text-muted)' }}>
                   <Camera size={11} />
                 </div>
@@ -144,7 +176,7 @@ export default function ProfilePage() {
             <div>
               <label style={labelStyle}>Email Address</label>
               <input type="email" value={email} disabled style={{ ...inputStyle, background: 'rgba(130,145,190,0.06)', color: 'var(--crm-text-muted)', cursor: 'not-allowed' }} />
-              <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>Managed by Supabase Auth — cannot be changed here.</div>
+              <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 4 }}>Contact support to change your email address.</div>
             </div>
             <div>
               <label style={labelStyle}>Role</label>

@@ -7,28 +7,20 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 import type { LeadIntelligence, ScoreFactor } from '@/types/crm3';
 
 export async function POST(req: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db: supabase } = auth;
+  const accountId = user.account_id;
 
+  try {
     const { contactId } = await req.json();
     if (!contactId) {
       return NextResponse.json({ error: 'contactId required' }, { status: 400 });
     }
-
-    // ── Get account_id from session (NEVER from request body) ──
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_id')
-      .eq('user_id', user.id)
-      .single();
-    const accountId = profile?.account_id;
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
 
     // ── Fetch contact data ──────────────────────────────────
     const { data: contact } = await supabase

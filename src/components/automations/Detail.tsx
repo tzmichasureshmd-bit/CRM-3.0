@@ -5,7 +5,7 @@ import {
   X, Play, Pause, Pencil, Copy, Trash2, FlaskConical, Loader2,
   AlertCircle, CheckCircle, XCircle, Clock, History, ChevronDown, ChevronUp, Zap,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { v3fetch } from '@/lib/auth-client';
 import { TRIGGER_MAP, ACTION_MAP, OPERATOR_MAP, CONDITION_FIELD_MAP } from '@/lib/ai/automation-catalog';
 import type { Automation, AutomationStep, Execution, ConditionClause } from './types';
 import { STATUS_META, EXEC_STATUS_META, stepSummary, fmtDate } from './types';
@@ -18,7 +18,7 @@ interface DetailProps {
 }
 
 export function AutomationDetail({ automation: initial, onClose, onChanged, onEdit }: DetailProps) {
-  const supabase = useMemo(() => createClient(), []);
+  
   const [automation, setAutomation] = useState(initial);
   const [steps, setSteps] = useState<AutomationStep[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
@@ -35,7 +35,7 @@ export function AutomationDetail({ automation: initial, onClose, onChanged, onEd
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/v3/automations/${initial.id}`);
+      const res = await v3fetch(`/api/v3/automations/${initial.id}`);
       const data = await res.json() as { automation?: Automation; steps?: AutomationStep[]; executions?: Execution[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? 'Failed to load');
       if (data.automation) setAutomation(data.automation);
@@ -50,10 +50,13 @@ export function AutomationDetail({ automation: initial, onClose, onChanged, onEd
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('contacts').select('id,name').order('created_at', { ascending: false }).limit(100);
-      setContacts((data as { id: string; name: string | null }[]) ?? []);
+      const cr = await v3fetch('/api/v3/contacts?limit=100');
+      if (cr.ok) {
+        const cd = await cr.json() as { data?: { id: string; name: string | null }[]; contacts?: { id: string; name: string | null }[] };
+        setContacts(cd.data ?? cd.contacts ?? []);
+      }
     })();
-  }, [supabase]);
+  }, []);
 
   async function toggleActive() {
     setBusy(true); setError(null);

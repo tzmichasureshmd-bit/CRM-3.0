@@ -2,34 +2,28 @@
  * CRM 3.0 — Duplicate Automation
  * POST /api/v3/automations/[id]/duplicate
  * Copies an automation + its steps as a new draft.
+ * Auth: FastAPI JWT via verifyRequest(). account_id always from token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
-async function getAccountId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string | null> {
-  const { data } = await supabase.from('profiles').select('account_id').eq('user_id', userId).single();
-  return (data?.account_id as string) ?? null;
-}
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
-    const { data: source } = await supabase.from('automations').select('*').eq('id', id).eq('account_id', accountId).single();
+    const { data: source } = await db.from('automations').select('*').eq('id', id).eq('account_id', user.account_id).single();
     if (!source) return NextResponse.json({ error: 'Automation not found' }, { status: 404 });
 
-    const { data: automation, error } = await supabase
+    const { data: automation, error } = await db
       .from('automations')
       .insert({
-        account_id: accountId,
-        created_by: user.id,
+        account_id: user.account_id,
+        created_by: user.user_id,
         name: `${source.name} (Copy)`,
         description: source.description,
         trigger_type: source.trigger_type,
@@ -47,7 +41,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     if (error || !automation) return NextResponse.json({ error: error?.message ?? 'Failed to duplicate' }, { status: 500 });
 
-    const { data: steps } = await supabase
+    const { data: steps } = await db
       .from('automation_steps')
       .select('step_type,position,config,parent_step_id,branch')
       .eq('automation_id', id)
@@ -62,7 +56,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         parent_step_id: null,
         branch: s.branch,
       }));
-      await supabase.from('automation_steps').insert(rows);
+      await db.from('automation_steps').insert(rows);
     }
 
     return NextResponse.json({ automation }, { status: 201 });

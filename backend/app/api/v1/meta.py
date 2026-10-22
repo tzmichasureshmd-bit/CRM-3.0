@@ -1,21 +1,20 @@
 """
 meta.py — Facebook Page info, posts, and outbound message sending.
 Webhook handlers (Instagram/Facebook/WhatsApp) live in webhooks.py only.
+
+All routes require a valid FastAPI JWT (get_current_user).
+FB credentials are always scoped to the authenticated account_id.
 """
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from app.core.config import get_settings
 from app.db.supabase import get_supabase
+from app.middleware.auth import get_current_user
 import httpx
 import logging
-import time
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 GRAPH = "https://graph.facebook.com/v19.0"
-
-# Simple TTL cache so we don't hit DB on every single request
-_creds_cache: dict = {}
-_CACHE_TTL = 30  # seconds
 
 
 def _fb_error(res: httpx.Response) -> str:
@@ -32,58 +31,41 @@ def _raise_fb_error(res: httpx.Response):
     raise HTTPException(status_code=400, detail=msg)
 
 
-def _fb_creds() -> tuple[str, str]:
+def _get_fb_creds_for_account(account_id: str) -> tuple[str, str]:
     """
-    Load FB credentials — DB (account_settings) takes priority over .env.
-    No account_id filter: picks the first account that has FB configured.
-    This ensures Settings → Integrations always works, even after restart.
+    Load FB credentials scoped to the authenticated account_id.
+    Raises 400 if not configured for this account.
+    Never picks credentials from another tenant.
     """
-    global _creds_cache
-    now = time.time()
-
-    if _creds_cache.get("ts", 0) + _CACHE_TTL > now:
-        return _creds_cache.get("page_id", ""), _creds_cache.get("token", "")
-
-    # Try DB first — no account_id filter so it works for any saved account
     try:
         supabase = get_supabase()
         res = supabase.table("account_settings") \
             .select("key, value") \
+            .eq("account_id", account_id) \
             .in_("key", ["FACEBOOK_PAGE_ID", "FACEBOOK_PAGE_ACCESS_TOKEN"]) \
             .neq("value", "") \
             .execute()
         db = {row["key"]: row["value"] for row in (res.data or []) if row.get("value", "").strip()}
-        logger.info("FB creds from DB keys found: %s", list(db.keys()))
         if db.get("FACEBOOK_PAGE_ID") and db.get("FACEBOOK_PAGE_ACCESS_TOKEN"):
-            _creds_cache = {
-                "page_id": db["FACEBOOK_PAGE_ID"],
-                "token": db["FACEBOOK_PAGE_ACCESS_TOKEN"],
-                "ts": now,
-            }
-            logger.info("Using FB creds from DB, page_id=%s", _creds_cache["page_id"])
-            return _creds_cache["page_id"], _creds_cache["token"]
-        else:
-            logger.warning("FB creds not found in DB, falling back to .env")
+            return db["FACEBOOK_PAGE_ID"], db["FACEBOOK_PAGE_ACCESS_TOKEN"]
     except Exception as e:
-        logger.warning("Could not load FB creds from DB, falling back to env: %s", e)
+        logger.warning("Could not load FB creds from DB for account %s: %s", account_id, e)
 
-    # Fallback to .env
+    # Fallback to .env only if account has no DB record (single-tenant / dev mode)
     s = get_settings()
-    _creds_cache = {
-        "page_id": s.facebook_page_id,
-        "token": s.facebook_page_access_token,
-        "ts": now,
-    }
-    logger.info("Using FB creds from .env, page_id=%s, token_set=%s", _creds_cache["page_id"], bool(_creds_cache["token"]))
-    return _creds_cache["page_id"], _creds_cache["token"]
+    if s.facebook_page_id and s.facebook_page_access_token:
+        return s.facebook_page_id, s.facebook_page_access_token
+
+    raise HTTPException(
+        status_code=400,
+        detail="Facebook not configured for your account. Go to Settings → Integrations."
+    )
 
 
 # ── Facebook Page Info ────────────────────────────────────────
 @router.get("/meta/page")
-async def get_fb_page():
-    page_id, token = _fb_creds()
-    if not page_id or not token:
-        raise HTTPException(status_code=400, detail="Facebook not configured. Go to Settings → Integrations.")
+async def get_fb_page(user: dict = Depends(get_current_user)):
+    page_id, token = _get_fb_creds_for_account(user["account_id"])
     async with httpx.AsyncClient(timeout=15) as client:
         res = await client.get(
             f"{GRAPH}/{page_id}",
@@ -96,10 +78,8 @@ async def get_fb_page():
 
 # ── Facebook Page Posts ───────────────────────────────────────
 @router.get("/meta/posts")
-async def get_fb_posts(limit: int = 10):
-    page_id, token = _fb_creds()
-    if not page_id or not token:
-        raise HTTPException(status_code=400, detail="Facebook not configured. Go to Settings → Integrations.")
+async def get_fb_posts(limit: int = 10, user: dict = Depends(get_current_user)):
+    page_id, token = _get_fb_creds_for_account(user["account_id"])
     async with httpx.AsyncClient(timeout=15) as client:
         res = await client.get(
             f"{GRAPH}/{page_id}/posts",
@@ -116,10 +96,8 @@ async def get_fb_posts(limit: int = 10):
 
 # ── Facebook Conversations ──────────────────────────────────────
 @router.get("/meta/conversations")
-async def get_fb_conversations():
-    page_id, token = _fb_creds()
-    if not page_id or not token:
-        raise HTTPException(status_code=400, detail="Facebook not configured. Go to Settings → Integrations.")
+async def get_fb_conversations(user: dict = Depends(get_current_user)):
+    page_id, token = _get_fb_creds_for_account(user["account_id"])
     async with httpx.AsyncClient(timeout=15) as client:
         res = await client.get(
             f"{GRAPH}/{page_id}/conversations",
@@ -133,7 +111,8 @@ async def get_fb_conversations():
             participants = c.get("participants", {}).get("data", [])
             other = next((p for p in participants if str(p.get("id")) != str(page_id)), participants[0] if participants else {})
             convs.append({
-                "id": other.get("id", c["id"]),
+                "id": c["id"],  # conversation ID (not participant ID)
+                "participant_id": other.get("id", ""),
                 "name": other.get("name", "Unknown"),
                 "platform": "facebook",
                 "last_message": c.get("snippet", ""),
@@ -144,10 +123,8 @@ async def get_fb_conversations():
 
 
 @router.get("/meta/conversations/{conversation_id}/messages")
-async def get_conversation_messages(conversation_id: str):
-    page_id, token = _fb_creds()
-    if not page_id or not token:
-        raise HTTPException(status_code=400, detail="Facebook not configured.")
+async def get_conversation_messages(conversation_id: str, user: dict = Depends(get_current_user)):
+    page_id, token = _get_fb_creds_for_account(user["account_id"])
     async with httpx.AsyncClient(timeout=15) as client:
         res = await client.get(
             f"{GRAPH}/{conversation_id}/messages",
@@ -168,10 +145,8 @@ async def get_conversation_messages(conversation_id: str):
 
 # ── Facebook Page Stories ───────────────────────────────────────
 @router.get("/meta/stories")
-async def get_fb_stories():
-    page_id, token = _fb_creds()
-    if not page_id or not token:
-        raise HTTPException(status_code=400, detail="Facebook not configured.")
+async def get_fb_stories(user: dict = Depends(get_current_user)):
+    page_id, token = _get_fb_creds_for_account(user["account_id"])
     async with httpx.AsyncClient(timeout=15) as client:
         res = await client.get(
             f"{GRAPH}/{page_id}/feed",
@@ -190,10 +165,8 @@ async def get_fb_stories():
 
 # ── Facebook Post Comments ────────────────────────────────────────
 @router.get("/meta/comments")
-async def get_fb_comments():
-    page_id, token = _fb_creds()
-    if not page_id or not token:
-        raise HTTPException(status_code=400, detail="Facebook not configured.")
+async def get_fb_comments(user: dict = Depends(get_current_user)):
+    page_id, token = _get_fb_creds_for_account(user["account_id"])
     async with httpx.AsyncClient(timeout=15) as client:
         posts_res = await client.get(
             f"{GRAPH}/{page_id}/posts",
@@ -220,21 +193,51 @@ async def get_fb_comments():
 
 # ── Outbound Message Send ─────────────────────────────────────
 @router.post("/meta/send")
-async def send_meta_message(request: Request):
+async def send_meta_message(request: Request, user: dict = Depends(get_current_user)):
     data = await request.json()
     platform: str     = data.get("platform", "")
     recipient_id: str = data.get("recipient_id", "")
     text: str         = data.get("text", "")
-    s = get_settings()
+    account_id: str   = user["account_id"]
 
     if platform == "whatsapp":
-        url   = f"{GRAPH}/{s.whatsapp_phone_number_id}/messages"
-        token = s.whatsapp_access_token
-        body  = {"messaging_product": "whatsapp", "to": recipient_id, "type": "text", "text": {"body": text}}
+        # Load WhatsApp creds scoped to this account
+        try:
+            supabase = get_supabase()
+            res = supabase.table("account_settings") \
+                .select("key, value") \
+                .eq("account_id", account_id) \
+                .in_("key", ["WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_ACCESS_TOKEN"]) \
+                .neq("value", "") \
+                .execute()
+            wa = {row["key"]: row["value"] for row in (res.data or []) if row.get("value", "").strip()}
+        except Exception:
+            wa = {}
+        s = get_settings()
+        phone_id = wa.get("WHATSAPP_PHONE_NUMBER_ID") or s.whatsapp_phone_number_id
+        token    = wa.get("WHATSAPP_ACCESS_TOKEN") or s.whatsapp_access_token
+        if not phone_id or not token:
+            raise HTTPException(status_code=400, detail="WhatsApp not configured for your account.")
+        url  = f"{GRAPH}/{phone_id}/messages"
+        body = {"messaging_product": "whatsapp", "to": recipient_id, "type": "text", "text": {"body": text}}
     elif platform in ("instagram", "facebook"):
-        page_id, token = _fb_creds()
+        page_id, token = _get_fb_creds_for_account(account_id)
         if platform == "instagram":
-            page_id = s.instagram_page_id
+            # Instagram uses the same page token but the IG page ID
+            try:
+                supabase = get_supabase()
+                res = supabase.table("account_settings") \
+                    .select("value") \
+                    .eq("account_id", account_id) \
+                    .eq("key", "INSTAGRAM_PAGE_ID") \
+                    .neq("value", "") \
+                    .limit(1) \
+                    .execute()
+                ig_page = res.data[0]["value"] if res.data else ""
+            except Exception:
+                ig_page = ""
+            s = get_settings()
+            page_id = ig_page or s.instagram_page_id
         url  = f"{GRAPH}/{page_id}/messages"
         body = {"recipient": {"id": recipient_id}, "message": {"text": text}}
     else:

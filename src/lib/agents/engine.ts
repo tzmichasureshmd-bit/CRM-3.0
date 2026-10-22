@@ -9,18 +9,23 @@ import type {
 } from "@/types/crm3";
 
 /* ── Environment & Supabase ────────────────────────────────── */
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://ngvmzkavvkikisprtpgd.supabase.co";
-const SUPABASE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
+/**
+ * Returns a service-role Supabase client.
+ * Throws at startup if the service role key is not configured — never falls
+ * back to the anon key, which would bypass RLS and expose tenant data.
+ */
 export function getSupabaseClient(): SupabaseClient {
-  return createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: false },
-  });
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY is not configured. " +
+      "The agent engine requires a service-role key and must never use the anon key."
+    );
+  }
+  return createClient(url, key, { auth: { persistSession: false } });
 }
 
 /* ── Default Agents Configuration (5 Core Departments) ────── */
@@ -1023,12 +1028,14 @@ Rules:
 export async function approveAgentRun(
   supabase: SupabaseClient,
   runId: string,
+  accountId: string,
   userId: string = "system"
 ): Promise<AgentRun> {
   const { data: run, error } = await supabase
     .from("crm3_ai_agent_runs")
     .select("*, crm3_ai_agents(*)")
     .eq("id", runId)
+    .eq("account_id", accountId)
     .single();
 
   if (error || !run) throw new Error("Run record not found");
@@ -1037,7 +1044,6 @@ export async function approveAgentRun(
   }
 
   const agent = run.crm3_ai_agents;
-  const accountId = run.account_id;
   const pendingActions: AgentRunAction[] = run.actions_taken || [];
   const executedActions: AgentRunAction[] = [];
 
@@ -1088,12 +1094,14 @@ export async function approveAgentRun(
 export async function rejectAgentRun(
   supabase: SupabaseClient,
   runId: string,
+  accountId: string,
   userId: string = "system"
 ): Promise<AgentRun> {
   const { data: run, error } = await supabase
     .from("crm3_ai_agent_runs")
     .select("id, status")
     .eq("id", runId)
+    .eq("account_id", accountId)
     .single();
 
   if (error || !run) throw new Error("Run record not found");

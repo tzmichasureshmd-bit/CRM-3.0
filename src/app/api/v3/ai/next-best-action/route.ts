@@ -1,33 +1,25 @@
 /**
  * CRM 3.0 — Next Best Action API
  * POST /api/v3/ai/next-best-action
- *
- * Returns the next best action for a given CRM object.
- * Reuses lead intelligence scoring — no duplicate AI logic.
+ * Auth: FastAPI JWT via verifyRequest(). account_id always from token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 export async function POST(req: NextRequest) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db: supabase } = auth;
+  const accountId = user.account_id;
+
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { data: profile } = await supabase
-      .from('profiles').select('account_id').eq('user_id', user.id).single();
-    if (!profile?.account_id) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
     const body = await req.json() as { objectType?: string; objectId?: string };
     const { objectType, objectId } = body;
     if (!objectType || !objectId) {
       return NextResponse.json({ error: 'objectType and objectId required' }, { status: 400 });
     }
 
-    const accountId = profile.account_id as string;
-
-    // For leads/contacts — derive NBA from existing lead score
     if (objectType === 'lead' || objectType === 'customer') {
       const { data: contact } = await supabase
         .from('contacts')
@@ -59,7 +51,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // For deals — check staleness
     if (objectType === 'deal') {
       const { data: deal } = await supabase
         .from('deals')

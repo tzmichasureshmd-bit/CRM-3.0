@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-
-async function getAccountId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase.from('profiles').select('account_id').eq('user_id', userId).single();
-  return (data?.account_id as string) ?? null;
-}
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(_req: NextRequest, ctx: RouteContext) {
+export async function GET(req: NextRequest, ctx: RouteContext) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { id } = await ctx.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-    const { data, error } = await supabase.from('crm3_content').select('*').eq('id', id).eq('account_id', accountId).single();
+    const { data, error } = await db.from('crm3_content').select('*').eq('id', id).eq('account_id', user.account_id).single();
     if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return NextResponse.json({ data });
   } catch (err) {
@@ -26,15 +20,14 @@ export async function GET(_req: NextRequest, ctx: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { id } = await ctx.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
 
-    const { data: existing } = await supabase.from('crm3_content').select('id').eq('id', id).eq('account_id', accountId).single();
+    const { data: existing } = await db.from('crm3_content').select('id').eq('id', id).eq('account_id', user.account_id).single();
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
     const body = await req.json() as Record<string, unknown>;
@@ -53,7 +46,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
       updates.published_at = new Date().toISOString();
     }
 
-    const { data, error } = await supabase.from('crm3_content').update(updates).eq('id', id).eq('account_id', accountId).select().single();
+    const { data, error } = await db.from('crm3_content').update(updates).eq('id', id).eq('account_id', user.account_id).select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ data });
   } catch (err) {
@@ -62,15 +55,16 @@ export async function PATCH(req: NextRequest, ctx: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, ctx: RouteContext) {
+export async function DELETE(req: NextRequest, ctx: RouteContext) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { id } = await ctx.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-    const { error } = await supabase.from('crm3_content').delete().eq('id', id).eq('account_id', accountId);
+    const { data: existing } = await db.from('crm3_content').select('id').eq('id', id).eq('account_id', user.account_id).single();
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { error } = await db.from('crm3_content').delete().eq('id', id).eq('account_id', user.account_id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ deleted: true });
   } catch (err) {

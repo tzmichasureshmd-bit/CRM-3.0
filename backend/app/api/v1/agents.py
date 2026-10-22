@@ -15,6 +15,28 @@ AGENT_TYPES = [
     "customer_support", "content", "campaign", "reporting", "knowledge"
 ]
 
+# Tools that require post-write verification
+WRITE_TOOLS = {
+    "create_followup", "update_lead_status", "update_lead_score",
+    "update_contact_field", "add_tag", "remove_tag", "assign_lead",
+    "create_task", "update_deal_stage", "classify_conversation",
+    "send_notification",
+}
+
+# Tools that require approval before execution
+APPROVAL_REQUIRED_TOOLS = {
+    "update_lead_status", "update_contact_field", "assign_lead", "update_deal_stage",
+}
+
+# All known tools in the registry
+KNOWN_TOOLS = WRITE_TOOLS | {
+    "get_contact", "get_conversation", "get_messages", "get_deal",
+    "list_deals", "search_conversations", "get_followups", "search_contacts",
+    "get_overdue_followups", "get_hot_leads", "analyze_lead",
+    "classify_conversation", "recommend_actions", "generate_reply",
+    "summarize_conversation", "prepare_message",
+}
+
 
 class AgentCreate(BaseModel):
     name: str
@@ -78,7 +100,6 @@ async def run_agent(
     agent = agent_res.data
 
     if agent["requires_approval"]:
-        # Create run record in awaiting_approval state
         run_res = db.table("crm3_ai_agent_runs").insert({
             "account_id": user["account_id"],
             "agent_id": agent_id,
@@ -94,7 +115,6 @@ async def run_agent(
             "run_id": run_res.data[0]["id"] if run_res.data else None,
         }
 
-    # Forward to AI service for execution
     async with httpx.AsyncClient() as client:
         try:
             res = await client.post(
@@ -154,3 +174,92 @@ async def delete_agent(
     db=Depends(get_db),
 ):
     db.table("crm3_ai_agents").delete().eq("id", agent_id).eq("account_id", user["account_id"]).execute()
+
+
+# ── Pure helper functions (used by tests and engine) ─────────────────────────
+
+def check_agent_runnable(agent: dict) -> tuple:
+    """Return (ok, error_message). ok=False if agent cannot run."""
+    if not agent.get("enabled", True):
+        return False, "agent is disabled"
+    return True, ""
+
+
+def is_tool_permitted(agent: dict, tool_name: str) -> bool:
+    return tool_name in (agent.get("allowed_tools") or [])
+
+
+def requires_approval_gate(tool_name: str, agent_requires_approval: bool) -> bool:
+    """Return True if this tool call must go through the approval gate."""
+    return agent_requires_approval and tool_name in APPROVAL_REQUIRED_TOOLS
+
+
+def can_execute_approval(approval: dict) -> bool:
+    """Return True only if approval is approved and not expired."""
+    from datetime import datetime, timezone
+    if approval.get("status") != "approved":
+        return False
+    expires_at = approval.get("expires_at")
+    if expires_at:
+        try:
+            exp = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if exp < datetime.now(timezone.utc):
+                return False
+        except (ValueError, AttributeError):
+            return False
+    return True
+
+
+def cap_tool_plan(plan: list, max_actions: int) -> list:
+    return plan[:max_actions]
+
+
+def check_agent_ownership(agent_account_id: str, requesting_account_id: str) -> bool:
+    return agent_account_id == requesting_account_id
+
+
+def validate_tool_name(tool_name: str) -> bool:
+    return tool_name in KNOWN_TOOLS
+
+
+def is_write_tool(tool_name: str) -> bool:
+    return tool_name in WRITE_TOOLS
+
+
+def detect_provider(preferred: "str | None") -> dict:
+    """Detect which AI provider is configured."""
+    import os
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+    def usable(k: str) -> bool:
+        return bool(k) and len(k) >= 20 and not k.startswith("your-")
+
+    if preferred == "anthropic" and usable(anthropic_key):
+        return {"provider": "anthropic", "model": "claude-3-5-sonnet-latest", "configured": True}
+    if preferred == "openai" and usable(openai_key):
+        return {"provider": "openai", "model": "gpt-4o-mini", "configured": True}
+    if usable(openai_key):
+        return {"provider": "openai", "model": "gpt-4o-mini", "configured": True}
+    if usable(anthropic_key):
+        return {"provider": "anthropic", "model": "claude-3-5-sonnet-latest", "configured": True}
+    return {"provider": "rule_based", "model": "rule-based", "configured": False}
+
+
+def sanitize_execution_log(log: dict) -> dict:
+    """Remove API keys and secrets from execution logs."""
+    import re
+    import json
+    raw = json.dumps(log)
+    # Redact OpenAI-style keys
+    raw = re.sub(r'sk-[A-Za-z0-9\-_]{20,}', '[REDACTED]', raw)
+    # Redact anything that looks like a bearer token
+    raw = re.sub(r'Bearer\s+[A-Za-z0-9\-_\.]{20,}', 'Bearer [REDACTED]', raw)
+    return json.loads(raw)
+
+
+def check_idempotency(prior_run: "dict | None") -> dict:
+    """If a prior run exists for this idempotency key, return it."""
+    if prior_run:
+        return {"reused": True, "run_id": prior_run.get("id"), "status": prior_run.get("status")}
+    return {"reused": False}

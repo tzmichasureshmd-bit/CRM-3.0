@@ -2,34 +2,30 @@
  * CRM 3.0 — Agent Approval API
  * POST /api/v3/agents/[id]/approve
  *
- * Approve or reject a pending agent action.
- * Only the account owner can approve.
+ * Auth: FastAPI JWT verified server-side via verifyRequest().
+ * account_id always from verified token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 import { executeTool } from '@/lib/ai/agent-tools';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { id } = await ctx.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
-    if (!profile?.account_id) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
-    const accountId = profile.account_id as string;
 
     // Verify agent ownership
-    const { data: agent } = await supabase
+    const { data: agent } = await db
       .from('crm3_ai_agents')
       .select('id')
       .eq('id', id)
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .single();
     if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
 
@@ -45,29 +41,27 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
     }
 
     // Load approval — verify it belongs to this account
-    const { data: approval } = await supabase
+    const { data: approval } = await db
       .from('crm3_agent_approvals')
       .select('*')
       .eq('id', body.approval_id)
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .eq('agent_id', id)
       .eq('status', 'pending')
       .single();
 
     if (!approval) return NextResponse.json({ error: 'Approval not found or already processed' }, { status: 404 });
 
-    // Check expiry
     if (new Date(approval.expires_at as string) < new Date()) {
-      await supabase.from('crm3_agent_approvals').update({ status: 'rejected', reviewed_by: user.id, reviewed_at: new Date().toISOString(), review_note: 'Expired' }).eq('id', body.approval_id);
+      await db.from('crm3_agent_approvals').update({ status: 'rejected', reviewed_by: user.user_id, reviewed_at: new Date().toISOString(), review_note: 'Expired' }).eq('id', body.approval_id);
       return NextResponse.json({ error: 'Approval has expired' }, { status: 410 });
     }
 
-    // Update approval record
-    await supabase
+    await db
       .from('crm3_agent_approvals')
       .update({
         status: body.decision,
-        reviewed_by: user.id,
+        reviewed_by: user.user_id,
         reviewed_at: new Date().toISOString(),
         review_note: body.note ?? null,
       })
@@ -75,18 +69,16 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
 
     let executionResult = null;
 
-    // If approved, execute the tool now
     if (body.decision === 'approved') {
       executionResult = await executeTool(
         approval.tool_name as string,
         approval.tool_input as Record<string, unknown>,
-        accountId,
-        supabase
+        user.account_id,
+        db
       );
 
-      // Update the step record
       if (approval.step_id) {
-        await supabase
+        await db
           .from('crm3_agent_execution_steps')
           .update({
             status: executionResult.success ? 'completed' : 'failed',
@@ -96,12 +88,11 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       }
     }
 
-    // Audit log
-    await supabase.from('crm3_agent_audit_log').insert({
-      account_id: accountId,
+    await db.from('crm3_agent_audit_log').insert({
+      account_id: user.account_id,
       agent_id: id,
       run_id: approval.run_id,
-      user_id: user.id,
+      user_id: user.user_id,
       event_type: body.decision === 'approved' ? 'approval_approved' : 'approval_rejected',
       event_data: { approval_id: body.approval_id, tool: approval.tool_name, note: body.note },
     });

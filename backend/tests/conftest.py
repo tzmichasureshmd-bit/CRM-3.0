@@ -50,13 +50,33 @@ def hash_otp(code: str) -> str:
 
 def make_mock_db():
     db = MagicMock()
-    chain = db.table.return_value.select.return_value.eq.return_value
-    chain.maybe_single.return_value.execute.return_value.data = None
-    chain.single.return_value.execute.return_value.data = None
+    # Wire both .maybe_single() and .limit().execute() chains used by different
+    # parts of the codebase (middleware uses .limit(1).execute(), some routes
+    # use .maybe_single().execute()).
+    eq_chain = db.table.return_value.select.return_value.eq.return_value
+    eq_chain.maybe_single.return_value.execute.return_value.data = None
+    eq_chain.single.return_value.execute.return_value.data = None
+    eq_chain.limit.return_value.execute.return_value.data = []
     db.table.return_value.insert.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
+    db.table.return_value.insert.return_value.select.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
     db.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [{}]
     db.table.return_value.upsert.return_value.execute.return_value.data = [{}]
     return db
+
+
+def set_db_result(db, row_or_none):
+    """Set a single-row result on all query chain variants used by auth routes.
+
+    Auth routes use .limit(1).execute() — data is a list.
+    Middleware uses .limit(1).execute() — data is a list.
+    Some older tests used .maybe_single() — kept for backward compat.
+    """
+    eq_chain = db.table.return_value.select.return_value.eq.return_value
+    # .limit(1).execute().data — list form
+    list_val = [row_or_none] if row_or_none is not None else []
+    eq_chain.limit.return_value.execute.return_value.data = list_val
+    # .maybe_single().execute().data — single dict or None
+    eq_chain.maybe_single.return_value.execute.return_value.data = row_or_none
 
 
 @pytest.fixture

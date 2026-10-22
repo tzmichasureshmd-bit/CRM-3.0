@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import {
   Shield, Key, Eye, EyeOff, Copy, Plus, Trash2,
   CheckCircle2, AlertCircle, ChevronLeft, Lock,
-  Monitor, Smartphone, Globe, RefreshCw, X,
+  Monitor, Globe, RefreshCw, X,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -43,64 +42,60 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid rgba(130,145,190,0.25)', background: 'white',
   fontSize: 13, color: 'var(--crm-text)', boxSizing: 'border-box', outline: 'none',
 };
-
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 12, fontWeight: 600,
   color: 'var(--crm-text-secondary)', marginBottom: 4,
 };
 
 export default function SecurityPage() {
-  const supabase = createClient();
-
-  // ── Change Password ────────────────────────────────────────
-  const [_currentPass, setCurrentPass] = useState('');
-  const [newPass, setNewPass] = useState('');
+  const [newPass, setNewPass]       = useState('');
   const [confirmPass, setConfirmPass] = useState('');
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
+  const [showNew, setShowNew]       = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [savingPass, setSavingPass] = useState(false);
   const [passBanner, setPassBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // ── API Keys ───────────────────────────────────────────────
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [apiKeys, setApiKeys]       = useState<ApiKey[]>([]);
   const [loadingKeys, setLoadingKeys] = useState(true);
   const [isAddKeyOpen, setIsAddKeyOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyScopes, setNewKeyScopes] = useState<string[]>(['read']);
-  const [savingKey, setSavingKey] = useState(false);
+  const [savingKey, setSavingKey]   = useState(false);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
-  const [copiedKey, setCopiedKey] = useState(false);
-  const [keyBanner, setKeyBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [copiedKey, setCopiedKey]   = useState(false);
+  const [keyBanner, setKeyBanner]   = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // ── Sessions ───────────────────────────────────────────────
-  const [userEmail, setUserEmail] = useState('');
-  const [userId, setUserId] = useState('');
-  const [lastSignIn, setLastSignIn] = useState('');
+  const [userEmail, setUserEmail]   = useState('');
+  const [userId, setUserId]         = useState('');
 
-  const loadUser = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setUserEmail(user.email ?? '');
-      setUserId(user.id);
-      setLastSignIn(user.last_sign_in_at ?? '');
+  const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+
+  useEffect(() => {
+    const stored = localStorage.getItem('crm_user');
+    if (stored) {
+      const u = JSON.parse(stored) as Record<string, string>;
+      setUserEmail(u.email ?? '');
+      setUserId(u.user_id ?? '');
     }
-  }, [supabase]);
+  }, []);
 
   const loadApiKeys = useCallback(async () => {
     setLoadingKeys(true);
-    const { data } = await supabase
-      .from('crm3_api_keys')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(20);
-    setApiKeys((data as ApiKey[]) ?? []);
+    const token = getToken();
+    if (!token) { setLoadingKeys(false); return; }
+    try {
+      const res = await fetch('/api/v3/api-keys', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json() as { keys: ApiKey[] };
+        setApiKeys(data.keys ?? []);
+      }
+    } catch { /* table may not exist yet */ }
     setLoadingKeys(false);
-  }, [supabase]);
+  }, []);
 
-  useEffect(() => {
-    void loadUser();
-    void loadApiKeys();
-  }, [loadUser, loadApiKeys]);
+  useEffect(() => { void loadApiKeys(); }, [loadApiKeys]);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,12 +110,24 @@ export default function SecurityPage() {
     }
     setSavingPass(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPass });
-      if (error) {
-        setPassBanner({ type: 'error', text: error.message });
+      const token = getToken();
+      const res = await fetch('/api/v3/profile/password', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPass }),
+      });
+      const data = await res.json() as Record<string, string>;
+      if (!res.ok) {
+        setPassBanner({ type: 'error', text: data.error ?? 'Failed to update password.' });
       } else {
-        setPassBanner({ type: 'success', text: 'Password updated successfully.' });
-        setCurrentPass(''); setNewPass(''); setConfirmPass('');
+        setPassBanner({ type: 'success', text: 'Password updated. Signing you out...' });
+        setNewPass(''); setConfirmPass('');
+        // Invalidate local session — server incremented token_version
+        setTimeout(() => {
+          localStorage.removeItem('crm_token');
+          localStorage.removeItem('crm_user');
+          window.location.href = '/login';
+        }, 1500);
       }
     } catch (err) {
       setPassBanner({ type: 'error', text: err instanceof Error ? err.message : 'Failed to update password.' });
@@ -134,30 +141,17 @@ export default function SecurityPage() {
     if (!newKeyName.trim()) return;
     setSavingKey(true);
     try {
-      const rawKey = `crm3_${Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('')}`;
-      const prefix = rawKey.slice(0, 12) + '...';
-
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user?.id ?? '').maybeSingle();
-
-      const payload: Record<string, unknown> = {
-        name: newKeyName.trim(),
-        key_prefix: prefix,
-        key_hash: rawKey, // In production: hash this with bcrypt
-        scopes: newKeyScopes,
-      };
-      if (profile?.account_id) payload.account_id = profile.account_id;
-
-      const { error } = await supabase.from('crm3_api_keys').insert(payload);
-      if (error) {
-        // Table may not exist yet — show the key anyway
-        setRevealedKey(rawKey);
-        setCopiedKey(false);
-        setIsAddKeyOpen(false);
-        setNewKeyName('');
-        setKeyBanner({ type: 'success', text: 'API key generated. Copy it now — it won\'t be shown again.' });
+      const token = getToken();
+      const res = await fetch('/api/v3/api-keys', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newKeyName.trim(), scopes: newKeyScopes }),
+      });
+      const data = await res.json() as { key?: string; error?: string };
+      if (!res.ok || !data.key) {
+        setKeyBanner({ type: 'error', text: data.error ?? 'Failed to create API key.' });
       } else {
-        setRevealedKey(rawKey);
+        setRevealedKey(data.key);
         setCopiedKey(false);
         setIsAddKeyOpen(false);
         setNewKeyName('');
@@ -173,14 +167,19 @@ export default function SecurityPage() {
 
   const handleRevokeKey = async (id: string, name: string) => {
     if (!confirm(`Revoke API key "${name}"? This cannot be undone.`)) return;
-    await supabase.from('crm3_api_keys').delete().eq('id', id);
+    const token = getToken();
+    await fetch(`/api/v3/api-keys/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
     setApiKeys(prev => prev.filter(k => k.id !== id));
     setKeyBanner({ type: 'success', text: `API key "${name}" revoked.` });
     setTimeout(() => setKeyBanner(null), 3000);
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
+  const handleSignOut = () => {
+    localStorage.removeItem('crm_token');
+    localStorage.removeItem('crm_user');
     window.location.href = '/login';
   };
 
@@ -193,8 +192,6 @@ export default function SecurityPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 680 }}>
-
-      {/* Back nav */}
       <Link href="/settings" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: 'var(--crm-text-muted)', textDecoration: 'none', fontWeight: 500, width: 'fit-content' }}>
         <ChevronLeft size={16} /> Settings
       </Link>
@@ -206,7 +203,7 @@ export default function SecurityPage() {
         </p>
       </div>
 
-      {/* ── Active Session ─────────────────────────────────── */}
+      {/* Active Session */}
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Active Session</div>
         <div className="crm-glass" style={{ padding: '16px 20px', borderRadius: 14 }}>
@@ -217,7 +214,7 @@ export default function SecurityPage() {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text)' }}>Current Device</div>
               <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>
-                {userEmail || 'Loading...'} · {lastSignIn ? `Last sign in: ${new Date(lastSignIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
+                {userEmail || 'Loading...'}
               </div>
             </div>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#28c99a', background: 'rgba(40,201,154,0.12)', borderRadius: 8, padding: '4px 10px' }}>● Active</span>
@@ -225,7 +222,7 @@ export default function SecurityPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
             {[
               { icon: <Globe size={13} />, label: 'User ID', value: userId ? userId.slice(0, 8) + '...' : '—' },
-              { icon: <Smartphone size={13} />, label: 'Auth Provider', value: 'Supabase Auth' },
+              { icon: <Shield size={13} />, label: 'Auth Provider', value: 'CRM JWT' },
             ].map(item => (
               <div key={item.label} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(130,145,190,0.06)', border: '1px solid rgba(130,145,190,0.10)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--crm-text-muted)', marginBottom: 4 }}>
@@ -236,7 +233,7 @@ export default function SecurityPage() {
             ))}
           </div>
           <button
-            onClick={() => void handleSignOut()}
+            onClick={handleSignOut}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: 'rgba(244,107,114,0.10)', border: '1px solid rgba(244,107,114,0.25)', color: '#f46b72', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
           >
             <Lock size={13} /> Sign Out
@@ -244,7 +241,7 @@ export default function SecurityPage() {
         </div>
       </div>
 
-      {/* ── Change Password ────────────────────────────────── */}
+      {/* Change Password */}
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Change Password</div>
         <div className="crm-glass" style={{ padding: '20px', borderRadius: 14 }}>
@@ -261,7 +258,7 @@ export default function SecurityPage() {
                 </button>
               </div>
               {newPass && (
-                <div style={{ marginTop: 6, display: 'flex', gap: 4 }}>
+                <div style={{ marginTop: 6, display: 'flex', gap: 4, alignItems: 'center' }}>
                   {[1, 2, 3, 4].map(i => (
                     <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: newPass.length >= i * 3 ? (newPass.length >= 12 ? '#28c99a' : newPass.length >= 8 ? '#f4c95d' : '#f46b72') : 'rgba(130,145,190,0.15)' }} />
                   ))}
@@ -274,11 +271,11 @@ export default function SecurityPage() {
             <div>
               <label style={labelStyle}>Confirm New Password</label>
               <div style={{ position: 'relative' }}>
-                <input type={showCurrent ? 'text' : 'password'} value={confirmPass} onChange={e => setConfirmPass(e.target.value)}
+                <input type={showConfirm ? 'text' : 'password'} value={confirmPass} onChange={e => setConfirmPass(e.target.value)}
                   placeholder="Repeat new password" style={{ ...inputStyle, paddingRight: 40, borderColor: confirmPass && confirmPass !== newPass ? '#f46b72' : undefined }} />
-                <button type="button" onClick={() => setShowCurrent(v => !v)}
+                <button type="button" onClick={() => setShowConfirm(v => !v)}
                   style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}>
-                  {showCurrent ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showConfirm ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
               {confirmPass && confirmPass !== newPass && (
@@ -295,28 +292,11 @@ export default function SecurityPage() {
         </div>
       </div>
 
-      {/* ── 2FA ───────────────────────────────────────────── */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Two-Factor Authentication</div>
-        <div className="crm-glass" style={{ padding: '16px 20px', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6', flexShrink: 0 }}>
-            <Smartphone size={20} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text)' }}>Authenticator App</div>
-            <div style={{ fontSize: 12, color: 'var(--crm-text-muted)', marginTop: 2 }}>Add an extra layer of security with TOTP</div>
-          </div>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#8790aa', background: 'rgba(135,144,170,0.12)', borderRadius: 8, padding: '4px 10px' }}>Coming Soon</span>
-        </div>
-      </div>
-
-      {/* ── API Keys ──────────────────────────────────────── */}
+      {/* API Keys */}
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>API Keys</div>
-
         {keyBanner && <div style={{ marginBottom: 10 }}><Banner type={keyBanner.type} text={keyBanner.text} onClose={() => setKeyBanner(null)} /></div>}
 
-        {/* Revealed key */}
         {revealedKey && (
           <div style={{ marginBottom: 10, padding: '14px 16px', borderRadius: 12, background: 'rgba(40,201,154,0.08)', border: '1px solid rgba(40,201,154,0.25)' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#28c99a', marginBottom: 8 }}>
@@ -331,8 +311,7 @@ export default function SecurityPage() {
                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: 'none', background: copiedKey ? 'rgba(40,201,154,0.20)' : 'rgba(79,109,245,0.12)', color: copiedKey ? '#28c99a' : '#4f6df5', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
                 <Copy size={12} /> {copiedKey ? 'Copied!' : 'Copy'}
               </button>
-              <button onClick={() => setRevealedKey(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}>
+              <button onClick={() => setRevealedKey(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)' }}>
                 <X size={14} />
               </button>
             </div>
@@ -387,7 +366,7 @@ export default function SecurityPage() {
         </div>
       </div>
 
-      {/* ── Create Key Modal ──────────────────────────────── */}
+      {/* Create Key Modal */}
       {isAddKeyOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.40)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <div className="crm-glass" style={{ width: '100%', maxWidth: 420, borderRadius: 16, padding: 24, boxShadow: '0 20px 50px rgba(0,0,0,0.20)' }}>
@@ -410,9 +389,6 @@ export default function SecurityPage() {
                       {scope}
                     </button>
                   ))}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--crm-text-muted)', marginTop: 6 }}>
-                  read = GET only · write = GET + POST + PATCH · admin = full access
                 </div>
               </div>
               <div style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(244,201,93,0.10)', border: '1px solid rgba(244,201,93,0.25)', fontSize: 12, color: '#d97706' }}>

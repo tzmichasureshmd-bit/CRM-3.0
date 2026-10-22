@@ -204,9 +204,13 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     if (body.is_won && body.content_id && body.revenue_amount) {
-      void db.from('crm3_content').select('revenue_attributed').eq('id', body.content_id).single().then(({ data: cd }) => {
-        if (cd) void db.from('crm3_content').update({ revenue_attributed: ((cd.revenue_attributed as number) ?? 0) + body.revenue_amount! }).eq('id', body.content_id!);
-      });
+      const { data: cd } = await db.from('crm3_content').select('revenue_attributed').eq('id', body.content_id).eq('account_id', accountId).single();
+      if (cd) {
+        await db.from('crm3_content')
+          .update({ revenue_attributed: ((cd.revenue_attributed as number) ?? 0) + body.revenue_amount })
+          .eq('id', body.content_id)
+          .eq('account_id', accountId);
+      }
     }
 
     return NextResponse.json({ attribution: data }, { status: 201 });

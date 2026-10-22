@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, Target, Users, Clock, BarChart3, Brain } from 'lucide-react';
 import { KPIWidget } from '@/components/dashboard/KPIWidget';
 import { RevenueIntelligence } from '@/components/dashboard/RevenueIntelligence';
@@ -10,7 +10,7 @@ import { AttentionSection } from '@/components/dashboard/AttentionSection';
 import { RecentConversations } from '@/components/dashboard/RecentConversations';
 import { PipelineOverview } from '@/components/dashboard/PipelineOverview';
 import { AICopilot } from '@/components/dashboard/AICopilot';
-import { createClient } from '@/lib/supabase/client';
+import { v3fetch } from '@/lib/auth-client';
 
 interface DashboardKPIs {
   revenue: number;
@@ -31,8 +31,6 @@ function fmt(v: number, currency = 'USD') {
 export default function CommandCenterPage() {
   const [now, setNow]   = useState<Date | null>(null);
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
-  const supabase = createClient();
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     setNow(new Date());
@@ -41,45 +39,39 @@ export default function CommandCenterPage() {
   }, []);
 
   const loadKPIs = useCallback(async () => {
-    const [dealsRes, contactsRes, followupsRes] = await Promise.all([
-      supabase.from('deals').select('status,value,currency').limit(500),
-      supabase.from('contacts').select('lead_score_tier').limit(500),
-      supabase.from('follow_ups').select('status,due_date').limit(200),
-    ]);
+    try {
+      const [dealsRes, contactsRes, followupsRes] = await Promise.all([
+        v3fetch('/api/v3/deals?limit=500'),
+        v3fetch('/api/v3/contacts?limit=500'),
+        v3fetch('/api/v3/follow-ups?status=all&limit=200'),
+      ]);
 
-    const deals     = (dealsRes.data    ?? []) as { status: string; value: number | null; currency?: string }[];
-    const contacts  = (contactsRes.data ?? []) as { lead_score_tier: string | null }[];
-    const followups = (followupsRes.data ?? []) as { status: string; due_date: string }[];
+      const dealsJson     = dealsRes.ok     ? await dealsRes.json()     as { data?: { status: string; value: number | null; currency?: string }[] } : {};
+      const contactsJson  = contactsRes.ok  ? await contactsRes.json()  as { data?: { lead_score_tier: string | null }[]; contacts?: { lead_score_tier: string | null }[] } : {};
+      const followupsJson = followupsRes.ok ? await followupsRes.json() as { follow_ups?: { status: string; due_date: string }[]; data?: { status: string; due_date: string }[] } : {};
 
-    const won      = deals.filter(d => d.status === 'won');
-    const open     = deals.filter(d => d.status === 'open');
-    const revenue  = won.reduce((s, d) => s + (d.value ?? 0), 0);
-    const pipeline = open.reduce((s, d) => s + (d.value ?? 0), 0);
-    const currency = deals[0]?.currency ?? 'USD';
-    const hotLeads = contacts.filter(c => c.lead_score_tier === 'hot').length;
-    const pending  = followups.filter(f =>
-      f.status === 'pending' && new Date(f.due_date) < new Date()
-    ).length;
-    const convRate = (open.length + won.length) > 0
-      ? Math.round((won.length / (open.length + won.length)) * 100)
-      : 0;
+      const deals     = dealsJson.data ?? [];
+      const contacts  = contactsJson.data ?? contactsJson.contacts ?? [];
+      const followups = followupsJson.follow_ups ?? followupsJson.data ?? [];
 
-    setKpis({ revenue, pipeline, hotLeads, pendingFollowups: pending, conversionRate: convRate, currency });
+      const won      = deals.filter(d => d.status === 'won');
+      const open     = deals.filter(d => d.status === 'open');
+      const revenue  = won.reduce((s, d) => s + (d.value ?? 0), 0);
+      const pipeline = open.reduce((s, d) => s + (d.value ?? 0), 0);
+      const currency = (deals[0] as { currency?: string } | undefined)?.currency ?? 'USD';
+      const hotLeads = contacts.filter(c => c.lead_score_tier === 'hot').length;
+      const pending  = followups.filter(f =>
+        f.status === 'pending' && new Date(f.due_date) < new Date()
+      ).length;
+      const convRate = (open.length + won.length) > 0
+        ? Math.round((won.length / (open.length + won.length)) * 100)
+        : 0;
+
+      setKpis({ revenue, pipeline, hotLeads, pendingFollowups: pending, conversionRate: convRate, currency });
+    } catch { /* token expired → layout redirects */ }
   }, []);
 
   useEffect(() => { void loadKPIs(); }, [loadKPIs]);
-
-  // Realtime: re-fetch KPIs when deals / contacts / follow_ups change
-  useEffect(() => {
-    const ch = supabase
-      .channel('dashboard-kpi-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' },        () => { void loadKPIs(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contacts' },     () => { void loadKPIs(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' },   () => { void loadKPIs(); })
-      .subscribe();
-    channelRef.current = ch;
-    return () => { void supabase.removeChannel(ch); };
-  }, [loadKPIs]);
 
   const greeting = now
     ? (now.getHours() < 12 ? 'Good Morning' : now.getHours() < 17 ? 'Good Afternoon' : 'Good Evening')
@@ -111,7 +103,7 @@ export default function CommandCenterPage() {
         </div>
       </div>
 
-      {/* KPI cards — real Supabase data */}
+      {/* KPI cards — authenticated v3 API data */}
       <div className="crm-kpi-grid">
         <KPIWidget title="Revenue" value={k ? fmt(k.revenue, k.currency) : '—'} change="" trend="up" accent="cyan"
           icon={<DollarSign size={20} strokeWidth={2} />} />

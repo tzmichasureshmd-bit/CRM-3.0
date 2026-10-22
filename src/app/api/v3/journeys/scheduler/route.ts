@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getServiceClient } from '@/lib/supabase/service';
 import { executeJourney } from '@/lib/ai/journey-engine';
 
 const CRON_SECRET = process.env.CRON_SECRET ?? 'dev-cron-secret';
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const supabase = await createClient();
+  const supabase = getServiceClient();
 
   try {
     // 2️⃣ Find all waiting contacts that are due and not locked
@@ -134,15 +134,12 @@ export async function POST(req: NextRequest) {
         // 3.3 Resume execution from current node
         const nodeStart = Date.now();
         
-        // Create a system service role client for execution (no user context)
-        const serviceSupabase = await createClient();
-        
         const result = await executeJourney(
           journey_id,
           contact_id,
           account_id,
           'scheduler', // system user
-          serviceSupabase,
+          supabase,
           'scheduler_resume'
         );
 
@@ -249,7 +246,7 @@ export async function POST(req: NextRequest) {
 
 // ── Log scheduler action to audit table ─────────────────────────
 async function logSchedulerAction(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof getServiceClient>,
   accountId: string,
   journeyId: string,
   contactId: string,

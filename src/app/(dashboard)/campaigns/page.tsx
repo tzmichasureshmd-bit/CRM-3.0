@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import {
   Megaphone, Plus, Search, X, CheckCircle2, AlertCircle,
   Smartphone, AtSign, Mail, MessageSquare, Rss,
@@ -133,23 +132,26 @@ function CreateCampaignModal({
   const [status, setStatus] = useState('draft');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { setError('Campaign name is required.'); return; }
     setSaving(true); setError('');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase
-        .from('profiles').select('account_id').eq('user_id', user?.id ?? '').maybeSingle();
-      const payload: CampaignCreate & { account_id?: string } = {
-        name: name.trim(), platform, status,
-      };
-      if (profile?.account_id) payload.account_id = profile.account_id;
-      const { data, error: dbErr } = await supabase.from('campaigns').insert(payload).select('*').single();
-      if (dbErr) { setError(dbErr.message); return; }
-      onCreated(data as Campaign);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const res = await fetch(`${BACKEND}/api/v1/campaigns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: name.trim(), platform, status }),
+      });
+      if (!res.ok) {
+        const d = await res.json() as { detail?: string };
+        setError(d.detail ?? 'Failed to create campaign.');
+        return;
+      }
+      const data = await res.json() as Campaign;
+      onCreated(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create campaign.');
     } finally { setSaving(false); }
@@ -675,7 +677,6 @@ export default function CampaignsPage() {
   const [confirmModal, setConfirmModal] = useState<{ action: 'pause' | 'resume' | 'archive'; campaign: Campaign; loading: boolean } | null>(null);
   const [editModal, setEditModal] = useState<Campaign | null>(null);
 
-  const supabase = createClient();
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showBanner = (type: 'success' | 'error', text: string) => {
@@ -687,11 +688,25 @@ export default function CampaignsPage() {
   const loadCrmCampaigns = useCallback(async () => {
     setLoadingCrm(true);
     try {
-      const { data } = await supabase.from('campaigns').select('*').order('created_at', { ascending: false }).limit(100);
-      setCrmCampaigns((data as Campaign[]) ?? []);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const res = await fetch('/api/v3/broadcasts?type=campaign', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // Fallback: try FastAPI campaigns endpoint
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const r2 = await fetch(`${BACKEND}/api/v1/campaigns?limit=100`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r2.ok) {
+        const json = await r2.json() as { data?: Campaign[] };
+        setCrmCampaigns(json.data ?? []);
+      } else if (res.ok) {
+        const json = await res.json() as { broadcasts?: Campaign[]; data?: Campaign[] };
+        setCrmCampaigns(json.data ?? json.broadcasts ?? []);
+      }
     } catch { setCrmCampaigns([]); }
     finally { setLoadingCrm(false); }
-  }, [supabase]);
+  }, []);
 
   const loadMetaCampaigns = useCallback(async () => {
     setLoadingMeta(true);
@@ -699,10 +714,9 @@ export default function CampaignsPage() {
       const res = await getMetaCampaigns({ limit: '100' });
       if (res?.data) setMetaCampaigns(res.data as Campaign[]);
     } catch {
-      const { data } = await supabase.from('campaigns').select('*').eq('platform', 'facebook').order('created_at', { ascending: false });
-      setMetaCampaigns((data as Campaign[]) ?? []);
+      setMetaCampaigns([]);
     } finally { setLoadingMeta(false); }
-  }, [supabase]);
+  }, []);
 
   const loadMeta = useCallback(async () => {
     try {
@@ -744,7 +758,12 @@ export default function CampaignsPage() {
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete campaign "${name}"?`)) return;
-    await supabase.from('campaigns').delete().eq('id', id);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+    const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+    await fetch(`${BACKEND}/api/v1/campaigns/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
     setCrmCampaigns(prev => prev.filter(c => c.id !== id));
     if (selected?.id === id) setSelected(null);
     showBanner('success', `Campaign "${name}" deleted.`);
@@ -753,7 +772,13 @@ export default function CampaignsPage() {
   const handleStatusChange = async (id: string, status: string) => {
     setCrmCampaigns(prev => prev.map(c => c.id === id ? { ...c, status } : c));
     if (selected?.id === id) setSelected(prev => prev ? { ...prev, status } : null);
-    await supabase.from('campaigns').update({ status }).eq('id', id);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+    const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+    await fetch(`${BACKEND}/api/v1/campaigns/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status }),
+    });
   };
 
   const handleLiveAction = async () => {

@@ -76,7 +76,7 @@ function KpiCard({ label, value, icon, color }: { label: string; value: number; 
 
 // ── New Broadcast Modal ───────────────────────────────────────
 function NewBroadcastModal({ onClose, onCreated }: { onClose: () => void; onCreated: (b: Broadcast) => void }) {
-  const [step, setStep] = useState<1 | 2>(1);
+  const [_step, _setStep] = useState<1 | 2>(1);
   const [name, setName] = useState('');
   const [platform, setPlatform] = useState('whatsapp');
   const [message, setMessage] = useState('');
@@ -195,7 +195,7 @@ function SendAllConfirmModal({ broadcast, onClose, onComplete }: { broadcast: Br
     return () => { active = false; };
   }, [broadcast.id]);
 
-  const toggleContact = (id: string) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleContact = (id: string) => setSelectedIds(prev => { const n = new Set(prev); if (n.has(id)) { n.delete(id); } else { n.add(id); } return n; });
 
   const handleSend = async () => {
     if (selectedIds.size === 0) { setError('Select at least 1 contact.'); return; }

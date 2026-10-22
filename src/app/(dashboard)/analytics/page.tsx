@@ -99,6 +99,8 @@ export default function AnalyticsPage() {
   }, [buildQuery, page, nonce]);
 
   // Realtime: auto-refresh on data changes (debounced).
+  // Uses anon Supabase client for realtime only — no data is read from it.
+  // The actual data fetch goes through the authenticated /api/v3/analytics route.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const supabase = createClient();
@@ -108,9 +110,14 @@ export default function AnalyticsPage() {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => { setNonce(n => n + 1); setLive(false); }, 1200);
     };
-    const channel = supabase.channel('crm-analytics-live');
+    // Only subscribe if we have a valid account context (prevents cross-tenant noise)
+    const accountId = typeof window !== 'undefined'
+      ? (() => { try { return JSON.parse(localStorage.getItem('crm_user') ?? '{}').account_id ?? ''; } catch { return ''; } })()
+      : '';
+    if (!accountId) return;
+    const channel = supabase.channel(`crm-analytics-live-${accountId}`);
     REALTIME_TABLES.forEach(table => {
-      channel.on('postgres_changes', { event: '*', schema: 'public', table }, schedule);
+      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `account_id=eq.${accountId}` }, schedule);
     });
     channel.subscribe();
     return () => {

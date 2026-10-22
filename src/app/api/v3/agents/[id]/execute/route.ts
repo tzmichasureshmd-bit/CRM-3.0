@@ -2,31 +2,23 @@
  * CRM 3.0 — Agent Execute API
  * POST /api/v3/agents/[id]/execute
  *
- * Runs the agent execution engine.
- * account_id always from session — never from body.
+ * Auth: FastAPI JWT verified server-side via verifyRequest().
+ * account_id always from verified token — never from body.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 import { runAgent } from '@/lib/ai/agent-engine';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, ctx: RouteContext) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { id } = await ctx.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_id')
-      .eq('user_id', user.id)
-      .single();
-    if (!profile?.account_id) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
-    const accountId = profile.account_id as string;
 
     const body = await req.json() as {
       input?: string;
@@ -39,20 +31,19 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ error: 'input is required' }, { status: 400 });
     }
 
-    // Optional idempotency header override (useful for retried webhook calls).
     const idempotencyKey = req.headers.get('Idempotency-Key') ?? body.idempotency_key;
 
     const result = await runAgent(
       {
         agentId: id,
-        accountId,
-        userId: user.id,
+        accountId: user.account_id,
+        userId: user.user_id,
         input: body.input.trim(),
         contactId: body.contact_id,
         conversationId: body.conversation_id,
         idempotencyKey: idempotencyKey ?? undefined,
       },
-      supabase
+      db
     );
 
     const httpStatus = result.status === 'failed' && !result.runId ? 400 : 200;

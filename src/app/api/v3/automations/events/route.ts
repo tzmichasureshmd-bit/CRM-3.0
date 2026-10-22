@@ -2,18 +2,16 @@
  * CRM 3.0 — Automation Trigger Event Ingestion
  * POST /api/v3/automations/events
  *
- * Entry point for real-time triggers. Inbound systems (message webhooks, CRM
- * mutations, integrations) post here and matching active automations run.
- *
  * Auth (either):
- *   - Authorization: Bearer <CRON_SECRET>  + body.accountId
- *   - Supabase session (uses the signed-in user's account)
+ *   - Authorization: Bearer <CRON_SECRET>  + body.accountId  (system/webhook calls)
+ *   - FastAPI JWT via verifyRequest()                         (user calls)
  *
  * Idempotent via event_key (crm3_automation_events unique index).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
+import { getServiceClient } from '@/lib/supabase/service';
 import { dispatchAutomationEvent } from '@/lib/ai/automation-engine';
 
 const CRON_SECRET = process.env.CRON_SECRET ?? 'dev-cron-secret';
@@ -35,18 +33,19 @@ export async function POST(req: NextRequest) {
     const token = req.headers.get('authorization')?.replace('Bearer ', '');
     const isSystem = token === CRON_SECRET;
 
-    const supabase = await createClient();
-    let accountId: string | null = null;
+    let accountId: string;
+    let supabase: ReturnType<typeof getServiceClient>;
 
     if (isSystem) {
-      accountId = body.accountId ?? null;
-      if (!accountId) return NextResponse.json({ error: 'accountId is required for system calls' }, { status: 400 });
+      if (!body.accountId) return NextResponse.json({ error: 'accountId is required for system calls' }, { status: 400 });
+      accountId = body.accountId;
+      supabase = getServiceClient();
     } else {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      const { data: profile } = await supabase.from('profiles').select('account_id').eq('user_id', user.id).single();
-      accountId = (profile?.account_id as string) ?? null;
-      if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
+      // User call — verify FastAPI JWT
+      const auth = await verifyRequest(req);
+      if (isAuthError(auth)) return auth;
+      accountId = auth.user.account_id;
+      supabase = auth.db;
     }
 
     const result = await dispatchAutomationEvent(supabase, {

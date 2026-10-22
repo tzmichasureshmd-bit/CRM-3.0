@@ -204,22 +204,11 @@ export default function TelegramPage() {
   const checkBot = useCallback(async () => {
     setLoading(true);
     try {
-      // Call Telegram getMe via backend proxy or directly with token from DB
-      const r = await fetch(`${BACKEND}/api/v1/settings/integrations/telegram`, { headers: getH() });
+      const r = await fetch(`${BACKEND}/api/v1/settings/integrations/telegram/bot-info`, { headers: getH() });
       if (!r.ok) { setConnected(false); setLoading(false); return; }
-      const d = await r.json() as Record<string, string>;
-      const token = d['TELEGRAM_BOT_TOKEN'];
-      if (!token) { setConnected(false); setLoading(false); return; }
-
-      // Call Telegram API directly from browser to get bot info
-      const tgRes = await fetch(`https://api.telegram.org/bot${token}/getMe`);
-      if (tgRes.ok) {
-        const tgData = await tgRes.json() as { ok: boolean; result: TGBot };
-        if (tgData.ok) { setBot(tgData.result); setConnected(true); }
-        else { setConnected(false); }
-      } else {
-        setConnected(false);
-      }
+      const d = await r.json() as { configured: boolean; bot: TGBot | null; error?: string };
+      if (d.configured && d.bot) { setBot(d.bot); setConnected(true); }
+      else { setConnected(false); }
     } catch { setConnected(false); }
     setLoading(false);
   }, []);

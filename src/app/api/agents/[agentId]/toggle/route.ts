@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient, mapTypeToDepartment } from "@/lib/agents/engine";
+import { verifyRequest, isAuthError } from "@/lib/auth/verify-request";
+import { mapTypeToDepartment } from "@/lib/agents/engine";
 
 export const dynamic = "force-dynamic";
 
@@ -7,16 +8,19 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> }
 ) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { agentId } = await params;
-    const supabase = getSupabaseClient();
     const body = await req.json().catch(() => ({}));
 
-    // Fetch current agent to determine new enabled state if not explicitly supplied
-    const { data: current, error: fetchErr } = await supabase
+    const { data: current, error: fetchErr } = await db
       .from("crm3_ai_agents")
       .select("enabled")
       .eq("id", agentId)
+      .eq("account_id", user.account_id)
       .single();
 
     if (fetchErr || !current) {
@@ -25,7 +29,7 @@ export async function PATCH(
 
     const nextEnabled = typeof body.enabled === "boolean" ? body.enabled : !current.enabled;
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("crm3_ai_agents")
       .update({
         enabled: nextEnabled,
@@ -33,11 +37,12 @@ export async function PATCH(
         updated_at: new Date().toISOString(),
       })
       .eq("id", agentId)
+      .eq("account_id", user.account_id)
       .select()
       .single();
 
     if (error || !data) {
-      return NextResponse.json({ error: error?.message || "Failed to toggle agent" }, { status: 400 });
+      return NextResponse.json({ error: "Failed to toggle agent" }, { status: 400 });
     }
 
     return NextResponse.json({
@@ -48,6 +53,6 @@ export async function PATCH(
       },
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed to toggle agent" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to toggle agent" }, { status: 500 });
   }
 }

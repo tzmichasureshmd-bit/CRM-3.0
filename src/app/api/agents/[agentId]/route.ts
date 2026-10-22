@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseClient, mapTypeToDepartment } from "@/lib/agents/engine";
+import { verifyRequest, isAuthError } from "@/lib/auth/verify-request";
+import { mapTypeToDepartment } from "@/lib/agents/engine";
 
 export const dynamic = "force-dynamic";
 
@@ -7,14 +8,18 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> }
 ) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { agentId } = await params;
-    const supabase = getSupabaseClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("crm3_ai_agents")
       .select("*")
       .eq("id", agentId)
+      .eq("account_id", user.account_id)
       .single();
 
     if (error || !data) {
@@ -26,7 +31,7 @@ export async function GET(
       department: data.config?.department || mapTypeToDepartment(data.type),
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed to get agent" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to get agent" }, { status: 500 });
   }
 }
 
@@ -34,36 +39,36 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> }
 ) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { agentId } = await params;
-    const supabase = getSupabaseClient();
     const body = await req.json();
 
-    // Prevent overwriting internal immutable keys
+    // Prevent overwriting immutable keys
     delete body.id;
     delete body.account_id;
     delete body.created_at;
 
     body.updated_at = new Date().toISOString();
 
-    // Preserve or update department in config
     if (body.department) {
-      body.config = {
-        ...(body.config || {}),
-        department: body.department,
-      };
+      body.config = { ...(body.config || {}), department: body.department };
       delete body.department;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from("crm3_ai_agents")
       .update(body)
       .eq("id", agentId)
+      .eq("account_id", user.account_id)
       .select()
       .single();
 
     if (error || !data) {
-      return NextResponse.json({ error: error?.message || "Failed to update agent" }, { status: 400 });
+      return NextResponse.json({ error: error?.message || "Agent not found" }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -71,7 +76,7 @@ export async function PATCH(
       department: data.config?.department || mapTypeToDepartment(data.type),
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed to update agent" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update agent" }, { status: 500 });
   }
 }
 
@@ -79,18 +84,22 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> }
 ) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { agentId } = await params;
-    const supabase = getSupabaseClient();
 
-    const { error } = await supabase
+    const { error } = await db
       .from("crm3_ai_agents")
       .delete()
-      .eq("id", agentId);
+      .eq("id", agentId)
+      .eq("account_id", user.account_id);
 
     if (error) throw error;
     return NextResponse.json({ success: true, message: "Agent deleted" });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed to delete agent" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to delete agent" }, { status: 500 });
   }
 }

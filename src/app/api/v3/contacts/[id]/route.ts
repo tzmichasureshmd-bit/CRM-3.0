@@ -37,6 +37,40 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   }
 }
 
+export async function PATCH(req: NextRequest, ctx: RouteContext) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
+  try {
+    const { id } = await ctx.params;
+    if (!id || !isUuid(id)) return NextResponse.json({ error: 'Invalid contact UUID' }, { status: 400 });
+
+    const body = await req.json() as Record<string, unknown>;
+    const allowed = ['name', 'phone', 'email', 'company', 'lead_status', 'lead_score', 'lead_score_tier', 'lead_score_reason', 'tags', 'source', 'notes', 'opt_out'];
+    const update: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (key in body) update[key] = body[key];
+    }
+    if (Object.keys(update).length === 0) return NextResponse.json({ error: 'No valid fields' }, { status: 400 });
+
+    const { data, error } = await db
+      .from('contacts')
+      .update(update)
+      .eq('id', id)
+      .eq('account_id', user.account_id)
+      .select('*')
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!data) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    return NextResponse.json({ contact: data });
+  } catch (err) {
+    console.error('[contacts PATCH id]', err);
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: NextRequest, ctx: RouteContext) {
   const auth = await verifyRequest(req);
   if (isAuthError(auth)) return auth;

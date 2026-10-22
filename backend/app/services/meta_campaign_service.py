@@ -58,7 +58,12 @@ class MetaCampaignService:
         return token
 
     def _get_ad_account_id(self) -> str:
-        raw_id = self.settings.meta_ad_account_id or "act_2505907436503788"
+        raw_id = self.settings.meta_ad_account_id
+        if not raw_id or not raw_id.strip():
+            raise ValueError(
+                "Meta Ad Account ID is not configured. "
+                "Please set META_AD_ACCOUNT_ID in backend/.env."
+            )
         return normalize_ad_account_id(raw_id)
 
     def _get_api_version(self) -> str:

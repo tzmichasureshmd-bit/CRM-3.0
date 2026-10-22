@@ -168,9 +168,13 @@ export default function RevenueIntelligencePage() {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => { setNonce(n => n + 1); setLive(false); }, 1200);
     };
-    const channel = supabase.channel('crm-revenue-live');
+    const accountId = typeof window !== 'undefined'
+      ? (() => { try { return JSON.parse(localStorage.getItem('crm_user') ?? '{}').account_id ?? ''; } catch { return ''; } })()
+      : '';
+    if (!accountId) return;
+    const channel = supabase.channel(`crm-revenue-live-${accountId}`);
     REALTIME_TABLES.forEach(table => {
-      channel.on('postgres_changes', { event: '*', schema: 'public', table }, schedule);
+      channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `account_id=eq.${accountId}` }, schedule);
     });
     channel.subscribe();
     return () => {

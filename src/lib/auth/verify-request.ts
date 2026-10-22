@@ -113,16 +113,23 @@ export async function verifyRequest(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // 5. Re-derive account_id and role from DB (never trust token claims)
+  // 5. Re-derive account_id, role, and token_version from DB (never trust token claims)
   const db = getServiceClient();
   const { data: profile, error } = await db
     .from('profiles')
-    .select('account_id, role')
+    .select('account_id, role, token_version')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (error || !profile) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // 6. Validate token_version — rejects sessions issued before password reset
+  const tokenVer = (payload.ver as number | undefined) ?? 1;
+  const profileVer = (profile.token_version as number | undefined) ?? 1;
+  if (tokenVer < profileVer) {
+    return NextResponse.json({ error: 'Session invalidated. Please sign in again.' }, { status: 401 });
   }
 
   return {

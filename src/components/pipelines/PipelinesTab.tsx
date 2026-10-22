@@ -14,7 +14,7 @@ import {
   Sparkles,
   Inbox,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { v3fetch } from '@/lib/auth-client';
 import {
   DEFAULT_PIPELINE_STAGES,
   type DealRecord,
@@ -96,7 +96,7 @@ export function PipelinesTab() {
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const supabase = createClient();
+  
 
   const syncContactsList = useCallback((remoteContacts: ContactOption[] = []) => {
     const localContacts: ContactOption[] = readLocalContacts().map(c => ({
@@ -115,11 +115,14 @@ export function PipelinesTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [dealsRes, stagesRes, contactsRes] = await Promise.all([
-        supabase.from('deals').select('*, contacts(name)').order('created_at', { ascending: false }).limit(200),
-        supabase.from('pipeline_stages').select('*').order('position'),
-        supabase.from('contacts').select('id, account_id, name, email, phone, company').order('name').limit(200),
+      const [dealsJson, stagesJson, contactsJson] = await Promise.all([
+        v3fetch('/api/v3/deals?limit=200').then(r => r.ok ? r.json() : { data: [] }),
+        v3fetch('/api/v3/pipeline-stages').then(r => r.ok ? r.json() : { data: [] }),
+        v3fetch('/api/v3/contacts?limit=200').then(r => r.ok ? r.json() : { data: [] }),
       ]);
+      const dealsRes = { data: (dealsJson as { data?: unknown[] }).data ?? [], error: null };
+      const stagesRes = { data: (stagesJson as { data?: unknown[] }).data ?? [], error: null };
+      const contactsRes = { data: (contactsJson as { data?: unknown[]; contacts?: unknown[] }).data ?? (contactsJson as { contacts?: unknown[] }).contacts ?? [], error: null };
 
       if (dealsRes.error) {
         const info = formatSupabaseError(dealsRes.error);
@@ -171,7 +174,7 @@ export function PipelinesTab() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, syncContactsList]);
+  }, [syncContactsList]);
 
   useEffect(() => {
     void load();
@@ -307,10 +310,9 @@ export function PipelinesTab() {
 
     setSaving(true);
     try {
-      const accountId = await resolveTenantAccountId(supabase, [
-        ...deals.map(d => d.account_id),
-        ...contacts.map(c => c.account_id),
-      ]);
+      const accountId = (typeof window !== 'undefined'
+        ? (JSON.parse(localStorage.getItem('crm_user') ?? '{}') as { account_id?: string }).account_id
+        : null) ?? deals.find(d => d.account_id)?.account_id ?? contacts.find(c => c.account_id)?.account_id ?? null;
 
       const dbPayload: Record<string, unknown> = {
         title: trimmedTitle,
@@ -323,11 +325,14 @@ export function PipelinesTab() {
       };
       if (accountId) dbPayload.account_id = accountId;
 
-      const { data, error } = await supabase.from('deals').insert(dbPayload).select('*, contacts(name)').single();
+      let data: Deal | null = null;
+      try {
+        const cr = await v3fetch('/api/v3/deals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dbPayload) });
+        if (cr.ok) data = ((await cr.json() as { deal?: Deal }).deal ?? null);
+      } catch { /* local fallback */ }
 
-      if (error) {
-        const info = formatSupabaseError(error);
-        console.warn(`Failed to create deal in Supabase (${formatErrorSummary(info)}). Persisting locally.`, info);
+      if (!data) {
+        console.warn('Failed to create deal via API. Persisting locally.');
 
         const localDeal: Deal = {
           id: generateLocalId(),
@@ -436,21 +441,14 @@ export function PipelinesTab() {
 
       if (isUuid(editingDeal.id)) {
         const updatePayload: Record<string, unknown> = {
-          title: trimmedTitle,
-          value: parsedValue,
-          currency: editCurrency,
+          title: trimmedTitle, value: parsedValue, currency: editCurrency,
           stage_id: isUuid(selectedStageId) ? selectedStageId : null,
           contact_id: editContactId && isUuid(editContactId) ? editContactId : null,
-          status: dealStatus,
-          notes: encodedNotes,
-          updated_at: new Date().toISOString(),
+          status: dealStatus, notes: encodedNotes, updated_at: new Date().toISOString(),
         };
-
-        const { error } = await supabase.from('deals').update(updatePayload).eq('id', editingDeal.id);
-        if (error) {
-          const info = formatSupabaseError(error);
-          console.warn(`Deal update in Supabase notice (${formatErrorSummary(info)})`, info);
-        }
+        try {
+          await v3fetch(`/api/v3/deals/${editingDeal.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatePayload) });
+        } catch { /* local already updated */ }
       }
 
       setIsEditModalOpen(false);
@@ -486,25 +484,17 @@ export function PipelinesTab() {
 
     try {
       if (isUuid(dealId)) {
-        const { error } = await supabase
-          .from('deals')
-          .update({
-            stage_id: isUuid(newStageId) ? newStageId : null,
-            status: nextStatus,
-            notes: nextNotes,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', dealId);
-
-        if (error) {
-          const info = formatSupabaseError(error);
-          console.warn(`Deal stage update notice (${formatErrorSummary(info)})`, info);
+        try {
+          await v3fetch(`/api/v3/deals/${dealId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stage_id: isUuid(newStageId) ? newStageId : null, status: nextStatus, notes: nextNotes, updated_at: new Date().toISOString() }),
+          });
+        } catch (err) {
+          const info = formatSupabaseError(err);
+          console.warn(`Error moving deal stage (${formatErrorSummary(info)})`, info);
         }
       }
-    } catch (err) {
-      const info = formatSupabaseError(err);
-      console.warn(`Error moving deal stage (${formatErrorSummary(info)})`, info);
-    }
+    } catch { /* local already updated */ }
   };
 
   // ── Automation Execution Callback ─────────────────────────────
@@ -537,10 +527,9 @@ export function PipelinesTab() {
       : null;
 
     try {
-      const accountId = await resolveTenantAccountId(supabase, [
-        ...deals.map(d => d.account_id),
-        ...contacts.map(c => c.account_id),
-      ]);
+      const accountId = (typeof window !== 'undefined'
+        ? (JSON.parse(localStorage.getItem('crm_user') ?? '{}') as { account_id?: string }).account_id
+        : null) ?? deals.find(d => d.account_id)?.account_id ?? contacts.find(c => c.account_id)?.account_id ?? null;
 
       const dealId = generateLocalId();
       const localDeal: Deal = {
@@ -570,9 +559,10 @@ export function PipelinesTab() {
             account_id: accountId,
           };
 
-          const { data, error } = await supabase.from('deals').insert(dbPayload).select('id').single();
-          if (!error && data?.id) {
-            localDeal.id = data.id;
+          const cr = await v3fetch('/api/v3/deals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(dbPayload) });
+          if (cr.ok) {
+            const cd = await cr.json() as { deal?: { id: string } };
+            if (cd.deal?.id) localDeal.id = cd.deal.id;
           }
         } catch {
           // Keep local fallback ID
@@ -599,13 +589,16 @@ export function PipelinesTab() {
 
         if (accountId && isUuid(accountId)) {
           try {
-            await supabase.from('follow_ups').insert({
-              account_id: accountId,
-              contact_id: params.contactId && isUuid(params.contactId) ? params.contactId : null,
-              title: params.followUp.title,
-              due_date: params.followUp.dueDate,
-              status: 'pending',
-              notes: `Automated follow-up for deal "${params.title}"`,
+            await v3fetch('/api/v3/follow-ups', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                account_id: accountId,
+                contact_id: params.contactId && isUuid(params.contactId) ? params.contactId : null,
+                title: params.followUp.title,
+                due_date: params.followUp.dueDate,
+                status: 'pending',
+                notes: `Automated follow-up for deal "${params.title}"`,
+              }),
             });
           } catch {
             // Local fallback already saved

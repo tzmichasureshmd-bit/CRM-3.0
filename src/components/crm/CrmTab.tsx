@@ -20,7 +20,7 @@ import {
   Inbox,
   Sparkles,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { v3fetch } from '@/lib/auth-client';
 import Link from 'next/link';
 import {
   type ContactRecord,
@@ -103,26 +103,18 @@ export function CrmTab() {
   const [formError, setFormError] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const supabase = createClient();
+  const getAccountId = () => typeof window !== 'undefined'
+    ? (JSON.parse(localStorage.getItem('crm_user') ?? '{}') as { account_id?: string }).account_id ?? null
+    : null;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(300);
-
-      if (error) {
-        const info = formatSupabaseError(error);
-        console.warn(`Error loading CRM contacts (${formatErrorSummary(info)})`, info);
-        setContacts(readLocalContacts());
-      } else {
-        const remote = (data as Contact[]) ?? [];
-        const local = readLocalContacts();
-        setContacts(mergeRecordsById(remote, local));
-      }
+      const res = await v3fetch('/api/v3/contacts?limit=300');
+      const json = res.ok ? await res.json() as { data?: Contact[]; contacts?: Contact[] } : {};
+      const remote = json.data ?? json.contacts ?? [];
+      const local = readLocalContacts();
+      setContacts(mergeRecordsById(remote, local));
     } catch (err) {
       const info = formatSupabaseError(err);
       console.warn(`Error loading CRM contacts (${formatErrorSummary(info)})`, info);
@@ -130,7 +122,7 @@ export function CrmTab() {
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -194,12 +186,13 @@ export function CrmTab() {
 
     try {
       if (isUuid(contactId)) {
-        const { error } = await supabase
-          .from('contacts')
-          .update({ lead_status: newStatus, updated_at: new Date().toISOString() })
-          .eq('id', contactId);
-        if (error) {
-          const info = formatSupabaseError(error);
+        try {
+          await v3fetch(`/api/v3/contacts/${contactId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lead_status: newStatus }),
+          });
+        } catch (err) {
+          const info = formatSupabaseError(err);
           console.warn(`Lead status update notice (${formatErrorSummary(info)})`, info);
         }
       }
@@ -238,10 +231,7 @@ export function CrmTab() {
 
     setSaving(true);
     try {
-      const accountId = await resolveTenantAccountId(
-        supabase,
-        contacts.map(c => c.account_id)
-      );
+      const accountId = getAccountId();
 
       const payload: Record<string, unknown> = {
         name: trimmedName || null,
@@ -254,20 +244,15 @@ export function CrmTab() {
         source: 'manual',
         tags: parsedTags,
       };
-      if (accountId) {
-        payload.account_id = accountId;
-      }
+      if (accountId) payload.account_id = accountId;
 
-      const { data, error } = await supabase
-        .from('contacts')
-        .insert(payload)
-        .select('*')
-        .single();
+      let data: Contact | null = null;
+      try {
+        const cr = await v3fetch('/api/v3/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (cr.ok) data = ((await cr.json() as { contact?: Contact }).contact ?? null);
+      } catch { /* local fallback */ }
 
-      if (error) {
-        const info = formatSupabaseError(error);
-        console.warn(`Failed to create contact in Supabase (${formatErrorSummary(info)}). Persisting locally.`, info);
-
+      if (!data) {
         const localContact: Contact = {
           id: generateLocalId(),
           account_id: accountId,
@@ -379,24 +364,14 @@ export function CrmTab() {
       }
 
       if (isUuid(editingContact.id)) {
-        const { error } = await supabase
-          .from('contacts')
-          .update({
-            name: trimmedName || null,
-            phone: trimmedPhone || null,
-            email: trimmedEmail || null,
-            company: trimmedCompany || null,
-            lead_status: editStatus,
-            lead_score_tier: editTier,
-            lead_score: score,
-            tags: parsedTags,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingContact.id);
-
-        if (error) {
-          const info = formatSupabaseError(error);
-          console.warn(`Lead update in Supabase notice (${formatErrorSummary(info)})`, info);
+        try {
+          await v3fetch(`/api/v3/contacts/${editingContact.id}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: trimmedName || null, phone: trimmedPhone || null, email: trimmedEmail || null, company: trimmedCompany || null, lead_status: editStatus, lead_score_tier: editTier, lead_score: score, tags: parsedTags }),
+          });
+        } catch (err) {
+          const info = formatSupabaseError(err);
+          console.warn(`Lead update notice (${formatErrorSummary(info)})`, info);
         }
       }
 
@@ -487,10 +462,7 @@ export function CrmTab() {
     originalPrompt: string;
   }): Promise<{ success: boolean; contactId?: string; error?: string }> => {
     try {
-      const accountId = await resolveTenantAccountId(
-        supabase,
-        contacts.map(c => c.account_id)
-      );
+      const accountId = getAccountId() ?? contacts.find(c => c.account_id)?.account_id ?? null;
 
       const contactId = generateLocalId();
       const localContact: Contact = {
@@ -524,9 +496,10 @@ export function CrmTab() {
             tags: params.tags,
             account_id: accountId,
           };
-          const { data, error } = await supabase.from('contacts').insert(payload).select('id').single();
-          if (!error && data?.id) {
-            localContact.id = data.id;
+          const cr = await v3fetch('/api/v3/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          if (cr.ok) {
+            const cd = await cr.json() as { contact?: { id: string } };
+            if (cd.contact?.id) localContact.id = cd.contact.id;
           }
         } catch {
           // Fallback to local

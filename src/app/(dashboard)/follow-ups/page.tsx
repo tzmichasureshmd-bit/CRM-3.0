@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { CalendarDays, Clock, CheckCircle, AlertCircle, Plus, RefreshCw, X, Search } from 'lucide-react';
 import { getFollowUps, createFollowUp, updateFollowUp } from '@/lib/api-client';
 import type { FollowUp } from '@/lib/api-client';
-import { createClient } from '@/lib/supabase/client'; // only for contact search dropdown
+import { v3fetch } from '@/lib/auth-client';
 
 interface Contact {
   id: string;
@@ -47,8 +47,7 @@ function AddFollowUpModal({ onClose, onCreated }: {
   const [showContactList, setShowContactList] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const supabase = createClient();
-
+  
   // Set default due date to tomorrow
   useEffect(() => {
     const tomorrow = new Date();
@@ -60,12 +59,11 @@ function AddFollowUpModal({ onClose, onCreated }: {
   useEffect(() => {
     if (!contactSearch.trim()) { setContacts([]); return; }
     const timer = setTimeout(async () => {
-      const { data } = await supabase
-        .from('contacts')
-        .select('id, name, phone')
-        .or(`name.ilike.%${contactSearch}%,phone.ilike.%${contactSearch}%`)
-        .limit(8);
-      setContacts((data as Contact[]) ?? []);
+      const res = await v3fetch(`/api/v3/contacts?search=${encodeURIComponent(contactSearch)}&limit=8`);
+      if (res.ok) {
+        const d = await res.json() as { data?: Contact[]; contacts?: Contact[] };
+        setContacts(d.data ?? d.contacts ?? []);
+      }
     }, 300);
     return () => clearTimeout(timer);
   }, [contactSearch]);

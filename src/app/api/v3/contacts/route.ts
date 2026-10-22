@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     const { data, count, error } = await query;
     if (error) throw error;
-    return NextResponse.json({ contacts: data ?? [], total: count ?? 0 });
+    return NextResponse.json({ data: data ?? [], contacts: data ?? [], total: count ?? 0 });
   } catch (err) {
     console.error('[contacts GET]', err);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from tests.conftest import (
-    TEST_USER_ID, TEST_ACCOUNT_ID, make_token, hash_otp
+    TEST_USER_ID, TEST_ACCOUNT_ID, make_token, hash_otp, set_db_result,
 )
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -44,10 +44,25 @@ def _profile_row(token_version=1):
     }
 
 
+def _make_limit_side_effect(db, responses: list):
+    """Make .limit(1).execute().data return successive values from responses."""
+    call_count = [0]
+
+    def limit_side_effect(*args, **kwargs):
+        mock = MagicMock()
+        idx = call_count[0]
+        call_count[0] += 1
+        val = responses[idx] if idx < len(responses) else None
+        mock.execute.return_value.data = [val] if val is not None else []
+        return mock
+
+    db.table.return_value.select.return_value.eq.return_value.limit.side_effect = limit_side_effect
+
+
 class TestOtpSend:
     def test_send_otp_always_returns_generic_message(self, app_client, mock_email_service):
         client, db = app_client
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
+        set_db_result(db, None)
         db.table.return_value.upsert.return_value.execute.return_value.data = [{}]
 
         resp = client.post("/api/v1/auth/otp/send", json={"email": "anyone@example.com"})
@@ -63,16 +78,16 @@ class TestOtpSend:
             "created_at": (datetime.utcnow() - timedelta(seconds=10)).isoformat(),
             "attempt_count": 0,
         }
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = recent_otp
+        set_db_result(db, recent_otp)
 
         resp = client.post("/api/v1/auth/otp/send", json={"email": "reset@example.com"})
         assert resp.status_code == 429
         assert "wait" in resp.json()["detail"].lower()
 
     def test_send_otp_stores_hash_not_plaintext(self, app_client, mock_email_service):
-        """FIX-003: Verify the upsert stores code_hash, not the raw code."""
+        """FIX-003: Verify the upsert stores code_hash and sentinel '[hashed]', not the raw code."""
         client, db = app_client
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
+        set_db_result(db, None)
         upsert_mock = MagicMock()
         upsert_mock.execute.return_value.data = [{}]
         db.table.return_value.upsert.return_value = upsert_mock
@@ -84,6 +99,7 @@ class TestOtpSend:
         assert len(upsert_calls) > 0
         upserted = upsert_calls[0][0][0]
         assert "code_hash" in upserted
+        # code field must be the sentinel, not the actual OTP digits
         assert upserted.get("code") == "[hashed]"
         # code_hash must be a 64-char hex string (SHA-256)
         assert len(upserted["code_hash"]) == 64
@@ -95,17 +111,8 @@ class TestOtpVerify:
         otp_row = _otp_row(code="654321")
         profile  = _profile_row()
 
-        call_count = [0]
-        def side_effect(*args, **kwargs):
-            mock = MagicMock()
-            call_count[0] += 1
-            if call_count[0] == 1:
-                mock.execute.return_value.data = otp_row
-            else:
-                mock.execute.return_value.data = profile
-            return mock
-
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.side_effect = side_effect
+        # otp/verify calls .limit(1).execute() twice: once for OTP row, once for profile
+        _make_limit_side_effect(db, [otp_row, profile])
         db.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [{}]
 
         resp = client.post("/api/v1/auth/otp/verify", json={
@@ -117,7 +124,7 @@ class TestOtpVerify:
     def test_verify_wrong_otp_returns_400(self, app_client):
         client, db = app_client
         otp_row = _otp_row(code="654321")
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = otp_row
+        set_db_result(db, otp_row)
         db.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [{}]
 
         resp = client.post("/api/v1/auth/otp/verify", json={
@@ -129,7 +136,7 @@ class TestOtpVerify:
     def test_verify_expired_otp_returns_400(self, app_client):
         client, db = app_client
         otp_row = _otp_row(code="654321", expired=True)
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = otp_row
+        set_db_result(db, otp_row)
 
         resp = client.post("/api/v1/auth/otp/verify", json={
             "email": "reset@example.com", "code": "654321"
@@ -140,7 +147,7 @@ class TestOtpVerify:
     def test_verify_used_otp_returns_400(self, app_client):
         client, db = app_client
         otp_row = _otp_row(code="654321", used=True)
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = otp_row
+        set_db_result(db, otp_row)
 
         resp = client.post("/api/v1/auth/otp/verify", json={
             "email": "reset@example.com", "code": "654321"
@@ -152,7 +159,7 @@ class TestOtpVerify:
         """FIX-004: After OTP_MAX_ATTEMPTS, return 429."""
         client, db = app_client
         otp_row = _otp_row(code="654321", attempt_count=5)
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = otp_row
+        set_db_result(db, otp_row)
 
         resp = client.post("/api/v1/auth/otp/verify", json={
             "email": "reset@example.com", "code": "654321"
@@ -166,17 +173,7 @@ class TestOtpVerify:
         otp_row = _otp_row(code="654321", has_hash=False)
         profile  = _profile_row()
 
-        call_count = [0]
-        def side_effect(*args, **kwargs):
-            mock = MagicMock()
-            call_count[0] += 1
-            if call_count[0] == 1:
-                mock.execute.return_value.data = otp_row
-            else:
-                mock.execute.return_value.data = profile
-            return mock
-
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.side_effect = side_effect
+        _make_limit_side_effect(db, [otp_row, profile])
         db.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [{}]
 
         resp = client.post("/api/v1/auth/otp/verify", json={
@@ -192,7 +189,7 @@ class TestPasswordReset:
         token = make_token(token_version=1)
 
         profile = _profile_row(token_version=1)
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = profile
+        set_db_result(db, profile)
         db.table.return_value.update.return_value.eq.return_value.execute.return_value.data = [{}]
 
         resp = client.patch(
@@ -218,7 +215,7 @@ class TestPasswordReset:
             "account_id": TEST_ACCOUNT_ID, "role": "owner",
             "token_version": 2, "is_active": True,
         }
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = profile
+        set_db_result(db, profile)
 
         resp2 = client.get("/api/v1/contacts", headers={"Authorization": f"Bearer {old_token}"})
         assert resp2.status_code in (401, 403)
@@ -227,7 +224,7 @@ class TestPasswordReset:
         client, db = app_client
         token = make_token()
         profile = _profile_row()
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = profile
+        set_db_result(db, profile)
 
         resp = client.patch(
             "/api/v1/auth/password",

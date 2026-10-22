@@ -6,35 +6,27 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 type Ctx = { params: Promise<{ id: string }> };
 
-async function getAccountId(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
-  const { data } = await supabase.from('profiles').select('account_id').eq('user_id', userId).single();
-  return (data?.account_id as string) ?? null;
-}
+export async function GET(req: NextRequest, ctx: Ctx) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
 
-export async function GET(_req: NextRequest, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
-    const { data: segment, error } = await supabase
+    const { data: segment, error } = await db
       .from('crm3_segments')
       .select('*')
       .eq('id', id)
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .single();
 
     if (error || !segment) return NextResponse.json({ error: 'Segment not found' }, { status: 404 });
 
-    // Load conditions for rule_based segments
     let conditions: any[] = [];
     if (segment.type === 'rule_based' && segment.rules) {
       try {
@@ -45,10 +37,9 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
       }
     }
 
-    // Load static membership count
     let staticMemberCount = 0;
     if (segment.type === 'manual') {
-      const { count } = await supabase
+      const { count } = await db
         .from('static_segment_memberships')
         .select('*', { count: 'exact', head: true })
         .eq('segment_id', id);
@@ -65,20 +56,18 @@ export async function GET(_req: NextRequest, ctx: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, ctx: Ctx) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { id } = await ctx.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
-
-    const { data: existing } = await supabase
+    const { data: existing } = await db
       .from('crm3_segments')
       .select('id')
       .eq('id', id)
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .single();
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -89,21 +78,18 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       if (key in body) updates[key] = body[key];
     }
 
-    // Validate type
     if (updates.type && !['manual', 'rule_based', 'ai_assisted'].includes(updates.type as string)) {
       return NextResponse.json({ error: 'Invalid segment type' }, { status: 400 });
     }
-
-    // If switching to rule_based, require rules
     if (updates.type === 'rule_based' && !updates.rules) {
       return NextResponse.json({ error: 'Rules are required for rule_based segments' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('crm3_segments')
       .update(updates)
       .eq('id', id)
-      .eq('account_id', accountId)
+      .eq('account_id', user.account_id)
       .select()
       .single();
 
@@ -115,19 +101,24 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 }
 
-export async function DELETE(_req: NextRequest, ctx: Ctx) {
+export async function DELETE(req: NextRequest, ctx: Ctx) {
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { user, db } = auth;
+
   try {
     const { id } = await ctx.params;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const accountId = await getAccountId(supabase, user.id);
-    if (!accountId) return NextResponse.json({ error: 'Account not found' }, { status: 403 });
+    const { data: existing } = await db
+      .from('crm3_segments')
+      .select('id')
+      .eq('id', id)
+      .eq('account_id', user.account_id)
+      .single();
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const { error } = await supabase.from('crm3_segments').delete().eq('id', id).eq('account_id', accountId);
+    const { error } = await db.from('crm3_segments').delete().eq('id', id).eq('account_id', user.account_id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
     return NextResponse.json({ deleted: true });
   } catch (err) {
     console.error('[segments DELETE]', err);

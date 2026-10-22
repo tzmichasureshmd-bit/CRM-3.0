@@ -22,7 +22,7 @@ interface FBPost {
   permalink_url?: string;
 }
 interface FBConv {
-  id: string; name: string; last_message: string; timestamp: string; unread: number;
+  id: string; participant_id: string; name: string; last_message: string; timestamp: string; unread: number;
 }
 interface FBMsg {
   id: string; from: string; message: string; created_time: string; is_mine: boolean;
@@ -32,7 +32,7 @@ interface FBComment {
   post_id: string; post_text: string; from?: { name: string; id: string };
 }
 
-const BACKEND = typeof window !== 'undefined' ? (process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000') : 'http://localhost:8000';
+const API = '/api/v3/facebook';
 const getH = () => ({ Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : ''}` });
 
 function timeAgo(iso: string) {
@@ -180,16 +180,16 @@ export default function FacebookInboxPage() {
     setLoading(true);
     setApiError(null);
     try {
-      const res = await fetch(`${BACKEND}/api/v1/meta/page`, { headers: getH() });
+      const res = await fetch(`${API}/page`, { headers: getH() });
       if (!res.ok) { setConnected(false); return; }
       setPage(await res.json());
       setConnected(true);
 
       const [pr, sr, cr, cvr] = await Promise.all([
-        fetch(`${BACKEND}/api/v1/meta/posts?limit=20`, { headers: getH() }),
-        fetch(`${BACKEND}/api/v1/meta/stories`, { headers: getH() }),
-        fetch(`${BACKEND}/api/v1/meta/comments`, { headers: getH() }),
-        fetch(`${BACKEND}/api/v1/meta/conversations`, { headers: getH() }),
+        fetch(`${API}/posts?limit=20`, { headers: getH() }),
+        fetch(`${API}/stories`, { headers: getH() }),
+        fetch(`${API}/comments`, { headers: getH() }),
+        fetch(`${API}/conversations`, { headers: getH() }),
       ]);
 
       if (pr.ok) { const d = await pr.json(); setPosts(d.data || []); }
@@ -206,7 +206,7 @@ export default function FacebookInboxPage() {
 
   const loadMsgs = useCallback(async (conv: FBConv) => {
     setMsgs([]);
-    const r = await fetch(`${BACKEND}/api/v1/meta/conversations/${conv.id}/messages`, { headers: getH() });
+    const r = await fetch(`${API}/conversations/${conv.id}/messages`, { headers: getH() });
     if (r.ok) { const d = await r.json(); setMsgs(d.data || []); }
   }, []);
 
@@ -214,9 +214,9 @@ export default function FacebookInboxPage() {
     if (!reply.trim() || !selConv || sending) return;
     setSending(true);
     try {
-      await fetch(`${BACKEND}/api/v1/meta/send`, {
+      await fetch(`${API}/send`, {
         method: 'POST', headers: { ...getH(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: 'facebook', recipient_id: selConv.id, text: reply }),
+        body: JSON.stringify({ platform: 'facebook', recipient_id: selConv.participant_id, text: reply }),
       });
       setReply(''); void loadMsgs(selConv);
     } finally { setSending(false); }

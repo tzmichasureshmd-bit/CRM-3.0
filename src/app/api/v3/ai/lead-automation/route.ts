@@ -7,7 +7,6 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import {
   parseNaturalLanguageLead,
   type ParsedLeadIntent,
@@ -16,21 +15,6 @@ import type { ContactRecord } from '@/lib/crm-pipeline-store';
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    let accountId: string | null = null;
-    if (user?.id) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('account_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      accountId = profile?.account_id ?? null;
-    }
-
     const body = await req.json().catch(() => ({}));
     const { prompt, existingContacts = [] } = body as {
       prompt?: string;
@@ -112,7 +96,7 @@ Respond ONLY with a JSON object in this format:
             summary: `Add lead "${content.name || 'New Lead'}"${content.company ? ` (${content.company})` : ''} as ${tier.toUpperCase()} priority.`,
           };
 
-          return NextResponse.json({ success: true, parsed, provider: 'openai', accountId });
+          return NextResponse.json({ success: true, parsed, provider: 'openai' });
         }
       } catch (aiErr) {
         console.warn('[lead-automation] OpenAI parsing fallback triggered:', aiErr);
@@ -125,7 +109,6 @@ Respond ONLY with a JSON object in this format:
       success: true,
       parsed,
       provider: 'rules-engine',
-      accountId,
     });
   } catch (err) {
     console.error('[lead-automation] Execution exception:', err);

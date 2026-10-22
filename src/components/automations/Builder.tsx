@@ -5,7 +5,7 @@ import {
   X, ArrowRight, ArrowLeft, Plus, Trash2, Brain, Check, Loader2, Save, Rocket,
   FlaskConical, AlertCircle, ChevronUp, ChevronDown, Zap, AlertTriangle,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { v3fetch } from '@/lib/auth-client';
 import {
   TRIGGER_GROUPS, TRIGGER_MAP, ACTIONS, ACTION_MAP, CONDITION_FIELDS,
   CONDITION_FIELD_MAP, OPERATORS, OPERATOR_MAP, CHANNELS,
@@ -55,7 +55,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 export function AutomationBuilder({ initial, template, onClose, onSaved }: BuilderProps) {
-  const supabase = useMemo(() => createClient(), []);
+  
 
   const editing = !!initial;
   const seed = !editing ? template ?? null : null;
@@ -122,14 +122,16 @@ export function AutomationBuilder({ initial, template, onClose, onSaved }: Build
 
   useEffect(() => {
     (async () => {
-      const [{ data: c }, { data: p }] = await Promise.all([
-        supabase.from('contacts').select('id,name').order('created_at', { ascending: false }).limit(100),
-        supabase.from('profiles').select('user_id,full_name').limit(50),
+      const [cr, pr] = await Promise.all([
+        v3fetch('/api/v3/contacts?limit=100').then(r => r.ok ? r.json() : {}),
+        v3fetch('/api/v3/profile').then(r => r.ok ? r.json() : {}),
       ]);
-      setContacts((c as { id: string; name: string | null }[]) ?? []);
-      setUsers((p as { user_id: string; full_name: string | null }[]) ?? []);
+      const cData = (cr as { data?: { id: string; name: string | null }[]; contacts?: { id: string; name: string | null }[] }).data ?? (cr as { contacts?: { id: string; name: string | null }[] }).contacts ?? [];
+      setContacts(cData);
+      const pData = (pr as { profile?: { user_id: string; full_name: string | null } }).profile;
+      if (pData) setUsers([pData]);
     })();
-  }, [supabase]);
+  }, []);
 
   const triggerDef = TRIGGER_MAP[triggerType];
   const isSchedule = triggerType === 'schedule';

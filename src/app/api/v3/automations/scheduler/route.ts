@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getServiceClient } from '@/lib/supabase/service';
 import { executeAutomation, processScheduledJob, type AutomationRow } from '@/lib/ai/automation-engine';
 
 const CRON_SECRET = process.env.CRON_SECRET ?? 'dev-cron-secret';
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  const supabase = getServiceClient();
   const nowIso = new Date().toISOString();
   const lockExpiry = new Date(Date.now() - LOCK_SECONDS * 1000).toISOString();
 

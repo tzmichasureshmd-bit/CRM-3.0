@@ -360,7 +360,7 @@ export interface AIAgent {
   model?: string;
   provider?: string;
   temperature?: number;
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
   created_at: string;
   updated_at?: string;
 }
@@ -370,8 +370,8 @@ export type AgentRunStatus = 'awaiting_approval' | 'running' | 'completed' | 'fa
 export interface AgentRunAction {
   tool: string;
   category?: string;
-  input?: Record<string, any>;
-  output?: any;
+  input?: Record<string, unknown>;
+  output?: unknown;
   status: 'success' | 'failed' | 'skipped' | 'pending_approval';
   error?: string;
   timestamp: string;
@@ -393,7 +393,7 @@ export interface AgentRun {
   started_at: string;
   completed_at?: string | null;
   duration_ms?: number | null;
-  input_context?: Record<string, any>;
+  input_context?: Record<string, unknown>;
   contact_id?: string | null;
   conversation_id?: string | null;
 }
@@ -407,7 +407,7 @@ export interface AgentMetrics {
 }
 
 // Legacy alias
-export interface AIAgentRun extends AgentRun {}
+export type AIAgentRun = AgentRun;
 
 export interface AgentAction {
   tool: string;

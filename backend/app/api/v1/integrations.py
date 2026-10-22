@@ -7,6 +7,7 @@ from app.middleware.auth import get_current_user
 from app.db.supabase import get_supabase
 from app.core.config import get_settings
 import logging
+import httpx
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -106,3 +107,26 @@ def _reload_meta_settings(supabase, account_id: str):
         k, v = row["key"].lower(), row["value"]
         if hasattr(settings, k):
             object.__setattr__(settings, k, v)
+
+
+@router.get("/settings/integrations/telegram/bot-info")
+async def get_telegram_bot_info(user=Depends(get_current_user)):
+    """Server-side Telegram getMe — never exposes bot token to browser."""
+    supabase = get_supabase()
+    res = supabase.table("account_settings") \
+        .select("value") \
+        .eq("account_id", user["account_id"]) \
+        .eq("key", "TELEGRAM_BOT_TOKEN") \
+        .limit(1) \
+        .execute()
+    token = res.data[0]["value"] if res.data else ""
+    if not token:
+        return {"configured": False, "bot": None}
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(f"https://api.telegram.org/bot{token}/getMe")
+    if r.status_code != 200:
+        return {"configured": True, "bot": None, "error": "Invalid token"}
+    data = r.json()
+    if not data.get("ok"):
+        return {"configured": True, "bot": None, "error": data.get("description", "Unknown error")}
+    return {"configured": True, "bot": data["result"]}

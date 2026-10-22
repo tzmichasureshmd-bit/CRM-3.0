@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { CalendarDays, Plus, Clock, CheckCircle, XCircle, Video, X, AlertCircle, Search, ExternalLink } from 'lucide-react';
 import { getAppointments, createAppointment, updateAppointment } from '@/lib/api-client';
 import type { Appointment } from '@/lib/api-client';
-import { createClient } from '@/lib/supabase/client'; // only for contact search
 
 interface Contact {
   id: string;
@@ -42,7 +41,6 @@ function ScheduleModal({ onClose, onCreated }: {
   const [showContactList, setShowContactList] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const supabase = createClient();
 
   // Default date = tomorrow
   useEffect(() => {
@@ -51,16 +49,18 @@ function ScheduleModal({ onClose, onCreated }: {
     setDate(tomorrow.toISOString().split('T')[0]);
   }, []);
 
-  // Search contacts
+  // Search contacts via v3fetch (no bare Supabase — RLS gap)
   useEffect(() => {
     if (!contactSearch.trim()) { setContacts([]); return; }
     const timer = setTimeout(async () => {
-      const { data } = await supabase
-        .from('contacts')
-        .select('id, name, phone')
-        .or(`name.ilike.%${contactSearch}%,phone.ilike.%${contactSearch}%`)
-        .limit(8);
-      setContacts((data as Contact[]) ?? []);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
+      const res = await fetch(`/api/v3/contacts?search=${encodeURIComponent(contactSearch)}&limit=8`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json() as { data?: Contact[]; contacts?: Contact[] };
+        setContacts(json.data ?? json.contacts ?? []);
+      }
     }, 300);
     return () => clearTimeout(timer);
   }, [contactSearch]);
@@ -197,7 +197,6 @@ export default function AppointmentsPage() {
   const [loading, setLoading] = useState(true);
   const [showSchedule, setShowSchedule] = useState(false);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'today' | 'completed'>('all');
-  const supabase = createClient();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -206,7 +205,7 @@ export default function AppointmentsPage() {
       setAppointments(res.data as Appointment[]);
     } catch { /* api-client handles 401 */ }
     finally { setLoading(false); }
-  }, [supabase]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 

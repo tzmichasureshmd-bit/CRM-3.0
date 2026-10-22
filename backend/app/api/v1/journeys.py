@@ -6,6 +6,8 @@ from app.middleware.auth import get_current_user
 
 router = APIRouter()
 
+MAX_JOURNEY_NODES = 20
+
 
 class JourneyCreate(BaseModel):
     name: str
@@ -208,3 +210,68 @@ async def get_journey_executions(
         .execute()
     )
     return {"data": res.data or []}
+
+
+# ── Pure helper functions (used by tests and engine) ─────────────────────────
+
+def validate_journey_nodes(nodes: list) -> tuple:
+    """Return (ok, error). ok=False if nodes are invalid."""
+    if not nodes:
+        return False, "Journey has no nodes"
+    return True, None
+
+
+def compute_wait_until(amount: int, unit: str) -> str:
+    """Return ISO timestamp for when a wait node should resume."""
+    from datetime import datetime, timezone, timedelta
+    unit_seconds = {"minutes": 60, "hours": 3600, "days": 86400}
+    seconds = amount * unit_seconds.get(unit, 3600)
+    return (datetime.now(timezone.utc) + timedelta(seconds=seconds)).isoformat()
+
+
+def should_resume_contact(state: dict) -> bool:
+    """Return True if a contact's journey state should be resumed by the scheduler."""
+    if state.get("terminal_error"):
+        return False
+    if state.get("status") not in ("waiting",):
+        return False
+    return True
+
+
+def evaluate_journey_condition(field_value, operator: str, value) -> bool:
+    """Evaluate a journey condition node."""
+    try:
+        if operator == "gt":
+            return float(field_value) > float(value)
+        if operator == "gte":
+            return float(field_value) >= float(value)
+        if operator == "lt":
+            return float(field_value) < float(value)
+        if operator == "lte":
+            return float(field_value) <= float(value)
+        if operator == "eq":
+            return str(field_value) == str(value)
+        if operator == "neq":
+            return str(field_value) != str(value)
+        if operator == "contains":
+            return str(value).lower() in str(field_value).lower()
+        if operator == "is_null":
+            return field_value is None
+        if operator == "is_not_null":
+            return field_value is not None
+    except (TypeError, ValueError):
+        return False
+    return False
+
+
+def check_journey_ownership(journey_account_id: str, requesting_account_id: str) -> bool:
+    return journey_account_id == requesting_account_id
+
+
+def compute_journey_backoff_minutes(attempt: int) -> int:
+    """Exponential backoff starting at 2 minutes: 2, 4, 8 …"""
+    return 2 ** (attempt + 1)
+
+
+def is_dead_letter(attempt_count: int, max_attempts: int) -> bool:
+    return attempt_count >= max_attempts

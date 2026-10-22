@@ -6,11 +6,11 @@
  *          qualify | followup | summarize
  *
  * Uses real conversation messages. Never auto-sends.
- * Employee must explicitly use the generated reply.
+ * Auth: FastAPI JWT via verifyRequest(). account_id always from token.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { verifyRequest, isAuthError } from '@/lib/auth/verify-request';
 
 const TONE_MAP: Record<string, string> = {
   professional: 'Write a professional, formal business reply. Use proper grammar and a respectful tone.',
@@ -35,11 +35,11 @@ const FALLBACKS: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const auth = await verifyRequest(req);
+  if (isAuthError(auth)) return auth;
+  const { db: supabase } = auth;
 
+  try {
     const { conversationId, action } = await req.json();
     if (!conversationId || !action) {
       return NextResponse.json({ error: 'conversationId and action required' }, { status: 400 });
@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Unknown action: ${action}. Valid: ${Object.keys(TONE_MAP).join(', ')}` }, { status: 400 });
     }
 
-    // ── Fetch recent messages ─────────────────────────────────
     const { data: messages } = await supabase
       .from('messages')
       .select('content_text, sender_type, created_at')
@@ -66,7 +65,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ reply: FALLBACKS[action] ?? 'Thank you for your message.' });
     }
 
-    // Build transcript for context
     const transcript = msgs
       .slice(-10)
       .map(m => `${m.sender_type === 'customer' ? 'Customer' : 'Agent'}: ${m.content_text ?? ''}`)

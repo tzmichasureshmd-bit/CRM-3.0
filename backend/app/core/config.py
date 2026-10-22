@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     ai_service_url: str = "http://ai-service:8001"
 
+    # Meta / Facebook Ads
+    meta_ad_account_id: str = ""
+    meta_api_version: str = "v26.0"
+    meta_access_token: str = ""
+    meta_app_id: str = ""
+    meta_app_secret: str = ""  # used for Lead Ads webhook signature verification
+
     # WhatsApp (Meta)
     whatsapp_verify_token: str = ""
     whatsapp_app_secret: str = ""

@@ -9,7 +9,7 @@ from passlib.context import CryptContext
 
 from tests.conftest import (
     TEST_JWT_SECRET, TEST_ALGORITHM, TEST_USER_ID, TEST_ACCOUNT_ID,
-    make_token, hash_otp
+    make_token, hash_otp, set_db_result,
 )
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -30,10 +30,10 @@ def _make_profile(user_id=TEST_USER_ID, account_id=TEST_ACCOUNT_ID,
 class TestRegistration:
     def test_register_success(self, app_client):
         client, db = app_client
-        # No existing profile
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
-        # Account insert returns id
+        # No existing profile with this email
+        set_db_result(db, None)
         db.table.return_value.insert.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
+        db.table.return_value.insert.return_value.select.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
 
         resp = client.post("/api/v1/auth/register", json={
             "email": "new@example.com", "password": "password123",
@@ -47,10 +47,9 @@ class TestRegistration:
 
     def test_register_duplicate_email_returns_409(self, app_client):
         client, db = app_client
-        # Existing profile found
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = {
-            "user_id": TEST_USER_ID
-        }
+        # Existing profile found for this email
+        set_db_result(db, {"user_id": TEST_USER_ID})
+
         resp = client.post("/api/v1/auth/register", json={
             "email": "existing@example.com", "password": "password123",
             "full_name": "Dup User", "account_name": "Dup Co",
@@ -60,8 +59,9 @@ class TestRegistration:
 
     def test_register_normalizes_email_to_lowercase(self, app_client):
         client, db = app_client
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
+        set_db_result(db, None)
         db.table.return_value.insert.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
+        db.table.return_value.insert.return_value.select.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
 
         resp = client.post("/api/v1/auth/register", json={
             "email": "UPPER@EXAMPLE.COM", "password": "password123",
@@ -72,8 +72,9 @@ class TestRegistration:
 
     def test_register_password_is_hashed_not_stored_plaintext(self, app_client):
         client, db = app_client
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
+        set_db_result(db, None)
         db.table.return_value.insert.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
+        db.table.return_value.insert.return_value.select.return_value.execute.return_value.data = [{"id": TEST_ACCOUNT_ID}]
 
         resp = client.post("/api/v1/auth/register", json={
             "email": "hash@example.com", "password": "mypassword",
@@ -98,7 +99,7 @@ class TestLogin:
     def test_login_success(self, app_client):
         client, db = app_client
         profile = _make_profile(password="password123")
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = profile
+        set_db_result(db, profile)
 
         resp = client.post("/api/v1/auth/login", json={
             "email": "test@example.com", "password": "password123"
@@ -111,7 +112,7 @@ class TestLogin:
     def test_login_wrong_password_returns_401(self, app_client):
         client, db = app_client
         profile = _make_profile(password="correct_password")
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = profile
+        set_db_result(db, profile)
 
         resp = client.post("/api/v1/auth/login", json={
             "email": "test@example.com", "password": "wrong_password"
@@ -121,7 +122,7 @@ class TestLogin:
 
     def test_login_nonexistent_email_returns_401(self, app_client):
         client, db = app_client
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
+        set_db_result(db, None)
 
         resp = client.post("/api/v1/auth/login", json={
             "email": "nobody@example.com", "password": "password123"
@@ -131,7 +132,7 @@ class TestLogin:
     def test_login_disabled_account_returns_403(self, app_client):
         client, db = app_client
         profile = _make_profile(password="password123", is_active=False)
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = profile
+        set_db_result(db, profile)
 
         resp = client.post("/api/v1/auth/login", json={
             "email": "test@example.com", "password": "password123"
@@ -144,7 +145,7 @@ class TestLogin:
         profile = _make_profile(password="password123")
         profile["totp_enabled"] = True
         profile["totp_secret"]  = "JBSWY3DPEHPK3PXP"
-        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = profile
+        set_db_result(db, profile)
 
         resp = client.post("/api/v1/auth/login", json={
             "email": "test@example.com", "password": "password123"

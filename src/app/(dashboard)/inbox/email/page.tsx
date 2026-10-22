@@ -67,6 +67,7 @@ function ComposeModal({ onClose, onSent, replyTo, replySubject, convId }: { onCl
       const r = await fetch(`${BASE}/email/send`, { method: 'POST', headers: getH(), body: JSON.stringify({ to, subject, body, conversation_id: convId ?? null, attachments: attachments.length ? attachments : undefined }) });
       if (!r.ok) { const d = await r.json() as { detail?: string }; throw new Error(d.detail ?? 'Failed'); }
       const d = await r.json() as { conversation_id?: string };
+      void d;
       onSent();
       onClose();
     } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Send failed'); setSending(false); }
@@ -231,7 +232,7 @@ function ReadingPane({ conv, onBack, onReply, onDelete, onArchive }: {
           return (
             <div key={msg.id} style={{ border: `1px solid ${isOpen ? G.border : 'transparent'}`, borderRadius: 8, background: G.white, boxShadow: isOpen ? '0 1px 6px rgba(32,33,36,0.1)' : 'none', transition: 'box-shadow 200ms' }}>
               {/* Header row */}
-              <div onClick={() => setExpanded(p => { const s = new Set(p); s.has(msg.id) ? s.delete(msg.id) : s.add(msg.id); return s; })}
+              <div onClick={() => setExpanded(p => { const s = new Set(p); if (s.has(msg.id)) { s.delete(msg.id); } else { s.add(msg.id); } return s; })}
                 style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
                 {/* Avatar — Google colored circle */}
                 <div style={{ width: 40, height: 40, borderRadius: '50%', background: col, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 16, fontWeight: 500, flexShrink: 0 }}>
