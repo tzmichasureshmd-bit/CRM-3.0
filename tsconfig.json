@@ -45,6 +45,13 @@
     "backend",
     "ai-service",
     "android",
-    "crm2"
+    "crm2",
+    "e2e",
+    "playwright.config.ts",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
   ]
 }

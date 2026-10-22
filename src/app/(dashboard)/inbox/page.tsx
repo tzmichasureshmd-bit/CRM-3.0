@@ -7,7 +7,6 @@ import {
   Mail, Phone,
   CheckCheck, Circle, AlertCircle, Sparkles, Copy, Edit3,
 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { useInboxRealtime } from '@/hooks/use-inbox-realtime';
 import { ConvAIIntelligencePanel } from '@/components/inbox/ConvAIIntelligencePanel';
 import { v3fetch } from '@/lib/auth-client';
@@ -429,7 +428,14 @@ function MessageThread({
 
 // ── Main Page ────────────────────────────────────────────────
 export default function InboxPage() {
-  const supabase = createClient();
+  const [accountId, setAccountId] = useState('');
+
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('crm_user') : null;
+    if (stored) {
+      try { setAccountId((JSON.parse(stored) as { account_id?: string }).account_id ?? ''); } catch { /* */ }
+    }
+  }, []);
 
   // ── State ──────────────────────────────────────────────────
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -455,22 +461,15 @@ export default function InboxPage() {
   // ── Load conversations ─────────────────────────────────────
   const loadConversations = useCallback(async () => {
     setLoadingConvs(true);
-    const { data, error } = await supabase
-      .from('conversations')
-      .select(`
-        id, contact_id, platform, status, priority, unread_count,
-        last_message_at, last_message_text, assigned_agent_id,
-        ai_intent, ai_sentiment, ai_summary, ai_lead_score,
-        ai_next_action, ai_analyzed_at, created_at,
-        contact:contacts(id, name, phone, email, lead_score, lead_score_tier, lead_status, source)
-      `)
-      .order('last_message_at', { ascending: false })
-      .limit(100);
-
-    if (!error && data) {
-      setConversations(data as unknown as Conversation[]);
+    try {
+      const res = await v3fetch('/api/v3/conversations?limit=100');
+      if (res.ok) {
+        const d = await res.json() as { data?: Conversation[] };
+        setConversations((d.data ?? []) as Conversation[]);
+      }
+    } finally {
+      setLoadingConvs(false);
     }
-    setLoadingConvs(false);
   }, []);
 
   useEffect(() => { void loadConversations(); }, [loadConversations]);
@@ -478,21 +477,16 @@ export default function InboxPage() {
   // ── Load messages ──────────────────────────────────────────
   const loadMessages = useCallback(async (convId: string) => {
     setLoadingMsgs(true);
-    const { data } = await supabase
-      .from('messages')
-      .select('id, conversation_id, content_text, sender_type, status, created_at')
-      .eq('conversation_id', convId)
-      .order('created_at', { ascending: true })
-      .limit(50);
-    setMessages((data as Message[]) ?? []);
-    setLoadingMsgs(false);
-
-    // Mark as read
-    await supabase
-      .from('conversations')
-      .update({ unread_count: 0 })
-      .eq('id', convId);
-
+    try {
+      const res = await v3fetch(`/api/v3/conversations/${convId}/messages`);
+      if (res.ok) {
+        const d = await res.json() as { data?: Message[] };
+        setMessages(d.data ?? []);
+      }
+    } finally {
+      setLoadingMsgs(false);
+    }
+    await v3fetch(`/api/v3/conversations/${convId}/read`, { method: 'POST' });
     setConversations(prev =>
       prev.map(c => c.id === convId ? { ...c, unread_count: 0 } : c)
     );
@@ -525,30 +519,28 @@ export default function InboxPage() {
     };
     setMessages(prev => [...prev, tempMsg]);
 
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({ conversation_id: activeConv.id, content_text: text, sender_type: 'agent', status: 'sent' })
-      .select()
-      .single();
-
-    if (error) {
-      setSendError('Failed to send message. Please try again.');
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      setReplyText(text);
-    } else {
-      setMessages(prev => prev.map(m => m.id === tempId ? (data as Message) : m));
-      await supabase
-        .from('conversations')
-        .update({ last_message_text: text, last_message_at: new Date().toISOString() })
-        .eq('id', activeConv.id);
+    try {
+      const res = await v3fetch(`/api/v3/conversations/${activeConv.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content_text: text, sender_type: 'agent' }),
+      });
+      if (!res.ok) throw new Error('Send failed');
+      const d = await res.json() as { message?: Message };
+      setMessages(prev => prev.map(m => m.id === tempId ? (d.message ?? { ...tempMsg, status: 'sent' }) : m));
       setConversations(prev =>
         prev.map(c => c.id === activeConv.id
           ? { ...c, last_message_text: text, last_message_at: new Date().toISOString() }
           : c
         )
       );
+    } catch {
+      setSendError('Failed to send message. Please try again.');
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setReplyText(text);
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   }, [activeConv, replyText]);
 
   // ── AI Reply ───────────────────────────────────────────────
@@ -590,7 +582,7 @@ export default function InboxPage() {
   }, [aiAction, handleAIAction]);
 
   // ── Realtime ───────────────────────────────────────────────
-  const { isConnected } = useInboxRealtime({
+  const { isConnected } = useInboxRealtime({ accountId,
     onMessageEvent: useCallback((event) => {
       if (event.eventType === 'INSERT') {
         const msg = event.new as unknown as Message;
