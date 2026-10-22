@@ -5,7 +5,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y curl --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --timeout=120 --retries=5 -r requirements.txt
+RUN pip install --no-cache-dir --timeout=300 --retries=5 \
+    --index-url https://pypi.org/simple/ \
+    --extra-index-url https://pypi.python.org/simple/ \
+    -r requirements.txt
 
 COPY . .
 
