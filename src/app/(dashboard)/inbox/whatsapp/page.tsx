@@ -49,6 +49,10 @@ const getH = () => ({
   Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : ''}`,
 });
 
+// Use Next.js v3 proxy for conversations (avoids direct backend calls)
+const v3 = (path: string, opts?: RequestInit) =>
+  fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : ''}`, ...(opts?.headers ?? {}) } });
+
 function timeAgo(iso: string | null) {
   if (!iso) return '';
   const d = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -283,6 +287,7 @@ export default function WhatsAppPage() {
   const [loading, setLoading]     = useState(true);
   const [showConnect, setShowConnect] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [phoneDisplay, setPhoneDisplay] = useState('');
   const [creds, setCreds]         = useState<Creds>({ WHATSAPP_PHONE_NUMBER_ID: '', WHATSAPP_ACCESS_TOKEN: '', WHATSAPP_VERIFY_TOKEN: '', WHATSAPP_APP_SECRET: '' });
   const [saving, setSaving]       = useState(false);
   const [saveMsg, setSaveMsg]     = useState('');
@@ -290,18 +295,32 @@ export default function WhatsAppPage() {
   // Load existing creds + conversations
   const init = useCallback(async () => {
     try {
-      const [credsRes, convsRes] = await Promise.all([
+      const [credsRes, convsRes, statusRes] = await Promise.all([
         fetch(`${BACKEND}/api/v1/settings/integrations/whatsapp`, { headers: getH() }),
-        fetch(`${BACKEND}/api/v1/conversations?platform=whatsapp&limit=50`, { headers: getH() }),
+        v3('/api/v3/conversations?platform=whatsapp&limit=50'),
+        fetch(`${BACKEND}/api/v1/whatsapp/status`, { headers: getH() }),
       ]);
       if (credsRes.ok) {
         const c = await credsRes.json() as Partial<Creds>;
         setCreds(prev => ({ ...prev, ...c }));
         setConnected(!!(c.WHATSAPP_PHONE_NUMBER_ID && c.WHATSAPP_ACCESS_TOKEN));
       }
+      if (statusRes.ok) {
+        const s = await statusRes.json() as { configured?: boolean; valid?: boolean; phone_number?: string; verified_name?: string };
+        if (s.valid && s.phone_number) setPhoneDisplay(`${s.verified_name ?? ''} · ${s.phone_number}`.trim());
+        if (s.configured) setConnected(true);
+      }
       if (convsRes.ok) {
-        const j = await convsRes.json() as { conversations?: WAConv[]; data?: WAConv[] };
-        setConvs(j.conversations ?? j.data ?? []);
+        const j = await convsRes.json() as { data?: { id: string; contact?: { name?: string; phone?: string } | null; last_message_text?: string; last_message_at?: string; unread_count?: number }[] };
+        const mapped = (j.data ?? []).map(c => ({
+          id: c.id,
+          contact_name: c.contact?.name ?? c.contact?.phone ?? 'Unknown',
+          phone: c.contact?.phone ?? '',
+          last_message: c.last_message_text ?? '',
+          last_message_at: c.last_message_at ?? '',
+          unread_count: c.unread_count ?? 0,
+        }));
+        setConvs(mapped);
       }
     } finally { setLoading(false); }
   }, []);
@@ -345,7 +364,7 @@ export default function WhatsAppPage() {
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: WA.text }}>WhatsApp Business</div>
           <div style={{ fontSize: 11, color: connected ? WA.green : WA.muted }}>
-            {connected ? '● Connected via Meta API' : '○ Not connected'}
+            {connected ? `● Connected via Meta API${phoneDisplay ? ` — ${phoneDisplay}` : ''}` : '○ Not connected'}
           </div>
         </div>
         {/* Stats chips */}

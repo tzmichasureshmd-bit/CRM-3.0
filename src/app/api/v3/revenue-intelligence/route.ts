@@ -56,14 +56,18 @@ function rel(v: unknown): Record<string, unknown> | null {
 interface Ctx { accountId: string; role: string; currency: string; accountName: string }
 
 async function getCtx(supabase: SB, accountId: string, role: string): Promise<Ctx> {
-  const { data: account } = await supabase
-    .from('accounts').select('name, currency').eq('id', accountId).single();
-  return {
-    accountId,
-    role,
-    currency: (account?.currency as string) ?? 'USD',
-    accountName: (account?.name as string) ?? '',
-  };
+  // accounts table may not exist — fall back gracefully
+  let currency = 'USD';
+  let accountName = '';
+  try {
+    const { data: account } = await supabase
+      .from('accounts').select('name, currency').eq('id', accountId).single();
+    if (account) {
+      currency = (account.currency as string) ?? 'USD';
+      accountName = (account.name as string) ?? '';
+    }
+  } catch { /* table may not exist — use defaults */ }
+  return { accountId, role, currency, accountName };
 }
 
 interface Range { from: Date; to: Date; preset: string; days: number }
