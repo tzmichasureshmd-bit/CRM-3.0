@@ -1,32 +1,74 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CRMSidebar } from '@/components/layout/CRMSidebar';
 import { CRMTopbar } from '@/components/layout/CRMTopbar';
 import { FloatingCopilot } from '@/components/chat/FloatingCopilot';
+import { SessionRenewalModal } from '@/components/ui/SessionRenewalModal';
+
+function getTokenExpiry(token: string): number | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' ? payload.exp : null;
+  } catch { return null; }
+}
+
+function isTokenExpired(token: string): boolean {
+  const exp = getTokenExpiry(token);
+  return exp !== null && Math.floor(Date.now() / 1000) > exp;
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [ready, setReady] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showRenewal, setShowRenewal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     const token = localStorage.getItem('crm_token');
-    if (!token) {
-      window.location.replace('/login');
-    } else {
-      // Restore persisted theme
-      const saved = localStorage.getItem('crm_theme') as 'light' | 'dark' | null;
-      if (saved === 'dark') setTheme('dark');
-      setReady(true);
+    if (!token) { window.location.replace('/login'); return; }
+
+    // If already expired on mount — show renewal modal, keep the page
+    if (isTokenExpired(token)) {
+      setShowRenewal(true);
     }
+
+    const saved = localStorage.getItem('crm_theme') as 'light' | 'dark' | null;
+    if (saved === 'dark') setTheme('dark');
+    setReady(true);
+  }, []);
+
+  // Check every 60s — show modal the moment token expires mid-session
+  useEffect(() => {
+    if (!ready) return;
+    const id = setInterval(() => {
+      const token = localStorage.getItem('crm_token');
+      if (!token) { window.location.replace('/login'); return; }
+      if (isTokenExpired(token)) setShowRenewal(true);
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [ready]);
+
+  // Listen for 401 events fired by v3fetch
+  useEffect(() => {
+    const handler = () => setShowRenewal(true);
+    window.addEventListener('crm:session-expired', handler);
+    return () => window.removeEventListener('crm:session-expired', handler);
   }, []);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('crm_theme', theme);
   }, [theme]);
+
+  const handleRenewed = useCallback(() => {
+    setShowRenewal(false);
+    // Silently reload data by dispatching a custom event pages can listen to
+    window.dispatchEvent(new CustomEvent('crm:session-renewed'));
+  }, []);
 
   if (!mounted || !ready) return (
     <div style={{ minHeight: '100vh', overflow: 'hidden', position: 'relative', background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)' }}>
@@ -72,17 +114,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const toggle = () => setTheme(t => t === 'light' ? 'dark' : 'light');
 
   return (
-    <div className="crm-app">
-      <div className="crm-shell">
-        <div className="crm-sidebar-wrap">
-          <CRMSidebar theme={theme} onToggleTheme={toggle} />
+    <>
+      <div className="crm-app">
+        <div className="crm-shell">
+          <div className="crm-sidebar-wrap">
+            <CRMSidebar theme={theme} onToggleTheme={toggle} />
+          </div>
+          <div className="crm-main">
+            <CRMTopbar theme={theme} onToggleTheme={toggle} />
+            <div className="crm-content">{children}</div>
+          </div>
         </div>
-        <div className="crm-main">
-          <CRMTopbar theme={theme} onToggleTheme={toggle} />
-          <div className="crm-content">{children}</div>
-        </div>
+        <FloatingCopilot />
       </div>
-      <FloatingCopilot />
-    </div>
+
+      {/* Session renewal modal — shown on top of everything when token expires */}
+      {showRenewal && <SessionRenewalModal onRenewed={handleRenewed} />}
+    </>
   );
 }

@@ -60,13 +60,19 @@ function authHeaders(extra?: HeadersInit): HeadersInit {
 
 /**
  * Drop-in replacement for bare fetch('/api/v3/...') calls.
- * Automatically attaches the CRM JWT. Returns the raw Response.
+ * Automatically attaches the CRM JWT.
+ * On 401, fires crm:session-expired event — shows renewal modal, never redirects.
  */
 export function v3fetch(input: string, init?: RequestInit): Promise<Response> {
   return fetch(input, {
     cache: 'no-store',
     ...init,
     headers: authHeaders(init?.headers),
+  }).then(res => {
+    if (res.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('crm:session-expired'));
+    }
+    return res;
   });
 }
 
