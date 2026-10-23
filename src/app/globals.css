@@ -663,7 +663,7 @@ html[data-theme="dark"] .crm-attention-card {
   width: 10px; height: 10px; border-radius: 50%;
   background: linear-gradient(135deg, #4f6df5, #8b5cf6);
   box-shadow: 0 0 12px rgba(79,109,245,0.70);
-  pointer-events: none; z-index: 99999; will-change: transform;
+  pointer-events: none; z-index: 2147483647; will-change: transform;
   transition: width 180ms ease, height 180ms ease, background 180ms ease;
 }
 .crm-cursor-ring {
@@ -671,7 +671,7 @@ html[data-theme="dark"] .crm-attention-card {
   width: 36px; height: 36px; border-radius: 50%;
   border: 1.5px solid rgba(79,109,245,0.45);
   background: rgba(79,109,245,0.06);
-  pointer-events: none; z-index: 99998; will-change: transform;
+  pointer-events: none; z-index: 2147483646; will-change: transform;
   transition: width 180ms ease, height 180ms ease, border-color 180ms ease;
 }
 .crm-cursor-dot.cursor-hover {

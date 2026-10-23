@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Lock, Eye, EyeOff, X } from 'lucide-react';
+import { Loader2, Lock, Eye, EyeOff } from 'lucide-react';
+import { signInWithGoogle } from '@/lib/firebase';
 
 interface SessionRenewalModalProps {
   onRenewed: () => void;
@@ -13,17 +14,45 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [email, setEmail]       = useState('');
-  const [countdown, setCountdown] = useState(0);
+  const [isGoogle, setIsGoogle] = useState(false);
 
   useEffect(() => {
-    // Get email from stored user
     try {
-      const u = JSON.parse(localStorage.getItem('crm_user') ?? '{}') as { email?: string };
+      const u = JSON.parse(localStorage.getItem('crm_user') ?? '{}') as { email?: string; avatar_url?: string };
       setEmail(u.email ?? '');
+      // Google users have avatar_url set from Google profile
+      setIsGoogle(!!u.avatar_url);
     } catch { /* */ }
   }, []);
 
-  const handleRenew = useCallback(async (e: React.FormEvent) => {
+  const handleGoogle = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const idToken = await signInWithGoogle();
+      const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
+      const res = await fetch(`${BACKEND}/api/v1/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_token: idToken }),
+      });
+      const data = await res.json() as Record<string, string>;
+      if (!res.ok || !data.access_token) {
+        setError(data.detail ?? 'Google sign-in failed. Try again.');
+        setLoading(false);
+        return;
+      }
+      localStorage.setItem('crm_token', data.access_token);
+      onRenewed();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('popup-closed')) { setLoading(false); return; }
+      setError('Google sign-in failed. Check your connection.');
+      setLoading(false);
+    }
+  }, [onRenewed]);
+
+  const handlePassword = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password.trim()) return;
     setLoading(true);
@@ -41,24 +70,18 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
         setLoading(false);
         return;
       }
-      // Save new token
       localStorage.setItem('crm_token', data.access_token);
-      // Update stored user if new data returned
-      if (data.user_id) {
-        const existing = JSON.parse(localStorage.getItem('crm_user') ?? '{}') as Record<string, string>;
-        localStorage.setItem('crm_user', JSON.stringify({ ...existing, ...data }));
-      }
       setPassword('');
       onRenewed();
     } catch {
-      setError('Cannot connect to server. Check your connection.');
+      setError('Cannot connect to server.');
       setLoading(false);
     }
   }, [email, password, onRenewed]);
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 99999,
+      position: 'fixed', inset: 0, zIndex: 9999,
       background: 'rgba(10,14,30,0.75)', backdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
     }}>
@@ -80,11 +103,9 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
             <Lock size={20} color="white" />
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 750, color: '#0f1117', marginBottom: 4 }}>
-              Session Expired
-            </div>
+            <div style={{ fontSize: 16, fontWeight: 750, color: '#0f1117', marginBottom: 4 }}>Session Expired</div>
             <div style={{ fontSize: 13, color: '#8790aa', lineHeight: 1.5 }}>
-              Your session timed out. Re-enter your password to continue — your work is safe.
+              Your session timed out. Sign in again to continue — your work is safe.
             </div>
           </div>
         </div>
@@ -111,62 +132,75 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
           </div>
         )}
 
-        {/* Password form */}
-        <form onSubmit={e => void handleRenew(e)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 5 }}>
-              Password
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPw ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                autoFocus
-                required
-                style={{
-                  width: '100%', padding: '11px 42px 11px 14px', borderRadius: 12,
-                  border: '1.5px solid rgba(130,145,190,0.28)', background: 'white',
-                  fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box',
-                }}
-              />
-              <button type="button" onClick={() => setShowPw(p => !p)}
-                style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8790aa', display: 'flex' }}>
-                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-
+        {/* Google button for Google users */}
+        {isGoogle ? (
           <button
-            type="submit"
-            disabled={loading || !password.trim()}
+            onClick={() => void handleGoogle()}
+            disabled={loading}
             style={{
-              width: '100%', padding: '12px', borderRadius: 12, border: 'none',
-              background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)',
-              color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              opacity: (loading || !password.trim()) ? 0.7 : 1,
-              boxShadow: '0 8px 20px rgba(79,109,245,0.30)',
+              width: '100%', padding: '13px', borderRadius: 12,
+              border: '1.5px solid rgba(130,145,190,0.30)', background: 'white',
+              fontSize: 14, fontWeight: 600, color: '#1a1a2e',
+              cursor: loading ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              opacity: loading ? 0.75 : 1,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
             }}
           >
-            {loading
-              ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Renewing session…</>
-              : '🔓 Continue Working'}
+            {loading ? (
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 18 18">
+                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/>
+                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z"/>
+              </svg>
+            )}
+            {loading ? 'Signing in…' : 'Continue with Google'}
           </button>
-        </form>
+        ) : (
+          /* Password form for email/password users */
+          <form onSubmit={e => void handlePassword(e)} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334e68', marginBottom: 5 }}>Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  autoFocus required
+                  style={{
+                    width: '100%', padding: '11px 42px 11px 14px', borderRadius: 12,
+                    border: '1.5px solid rgba(130,145,190,0.28)', background: 'white',
+                    fontSize: 14, color: '#0f1117', outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+                <button type="button" onClick={() => setShowPw(p => !p)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#8790aa', display: 'flex' }}>
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <button type="submit" disabled={loading || !password.trim()}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 12, border: 'none',
+                background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)',
+                color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: (loading || !password.trim()) ? 0.7 : 1,
+              }}>
+              {loading ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Renewing…</> : '🔓 Continue Working'}
+            </button>
+          </form>
+        )}
 
-        {/* Sign out option */}
         <div style={{ textAlign: 'center', fontSize: 12, color: '#8790aa' }}>
           Not you?{' '}
           <button
-            onClick={() => {
-              localStorage.removeItem('crm_token');
-              localStorage.removeItem('crm_user');
-              window.location.replace('/login');
-            }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f46b72', fontSize: 12, fontWeight: 600, padding: 0 }}
-          >
+            onClick={() => { localStorage.removeItem('crm_token'); localStorage.removeItem('crm_user'); window.location.replace('/login'); }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f46b72', fontSize: 12, fontWeight: 600, padding: 0 }}>
             Sign out
           </button>
         </div>
