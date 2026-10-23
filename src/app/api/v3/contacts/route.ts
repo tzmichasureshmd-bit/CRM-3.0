@@ -30,7 +30,10 @@ export async function GET(req: NextRequest) {
     if (search) query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`);
 
     const { data, count, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('[contacts GET] DB error:', error.message);
+      return NextResponse.json({ data: [], contacts: [], total: 0 });
+    }
     return NextResponse.json({ data: data ?? [], contacts: data ?? [], total: count ?? 0 });
   } catch (err) {
     console.error('[contacts GET]', err);

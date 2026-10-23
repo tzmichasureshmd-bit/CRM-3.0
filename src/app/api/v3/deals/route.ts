@@ -28,7 +28,10 @@ export async function GET(req: NextRequest) {
     if (status) query = query.eq('status', status);
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('[deals GET] DB error:', error.message);
+      return NextResponse.json({ data: [] });
+    }
     return NextResponse.json({ data: data ?? [] });
   } catch (err) {
     console.error('[deals GET]', err);
