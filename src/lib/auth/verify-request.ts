@@ -74,8 +74,8 @@ export async function verifyRequest(
   const token = authHeader.slice(7);
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    console.error('[auth] JWT_SECRET not configured');
-    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 });
+    console.error('[auth] JWT_SECRET not configured — returning 401');
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   // 1. Verify HMAC-SHA256 signature
