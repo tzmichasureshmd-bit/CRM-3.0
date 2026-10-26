@@ -58,6 +58,10 @@ services:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://crm3.tzmicha.com}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://crm3.tzmicha.com}
+        JWT_SECRET: ${JWT_SECRET}
+        SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+        OPENAI_API_KEY: ${OPENAI_API_KEY}
+        CRON_SECRET: ${CRON_SECRET:-prod-cron-secret}
     environment:
       - PORT=3000
       - HOSTNAME=0.0.0.0
