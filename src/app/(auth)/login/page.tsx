@@ -43,16 +43,17 @@ export default function LoginPage() {
   }, []);
 
   // ── shared: save session + redirect ──────────────────────────
-  const saveAndRedirect = (data: Record<string, string>) => {
+  const saveAndRedirect = (data: Record<string, string>, provider: 'email' | 'google' = 'email') => {
     localStorage.removeItem('crm_partial_token'); // FIX-009: clear partial token on successful login
     localStorage.setItem('crm_token', data.access_token);
     localStorage.setItem('crm_user', JSON.stringify({
-      user_id:    data.user_id    ?? '',
-      account_id: data.account_id ?? '',
-      role:       data.role       ?? 'owner',
-      email:      data.email      ?? email.trim(),
-      full_name:  data.full_name  ?? email.trim().split('@')[0],
-      avatar_url: data.avatar_url ?? '',
+      user_id:       data.user_id    ?? '',
+      account_id:    data.account_id ?? '',
+      role:          data.role       ?? 'owner',
+      email:         data.email      ?? email.trim(),
+      full_name:     data.full_name  ?? email.trim().split('@')[0],
+      avatar_url:    data.avatar_url ?? '',
+      auth_provider: provider,
     }));
     window.location.replace('/dashboard');
   };
@@ -80,7 +81,7 @@ export default function LoginPage() {
         window.location.replace('/login/totp');
         return;
       }
-      saveAndRedirect(data);
+      saveAndRedirect(data, 'email');
     } catch {
       setError('Cannot connect to server.');
       setLoading(false);
@@ -104,7 +105,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      saveAndRedirect(data);
+      saveAndRedirect(data, 'google');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('popup-closed')) { setLoading(false); return; }

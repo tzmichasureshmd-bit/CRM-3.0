@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret: str
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 10080  # 7 days
+    jwt_expire_minutes: int = 525600  # 1 year (effectively no expiry)
 
     # AI
     openai_api_key: str = ""

@@ -18,10 +18,9 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
 
   useEffect(() => {
     try {
-      const u = JSON.parse(localStorage.getItem('crm_user') ?? '{}') as { email?: string; avatar_url?: string };
+      const u = JSON.parse(localStorage.getItem('crm_user') ?? '{}') as { email?: string; auth_provider?: string };
       setEmail(u.email ?? '');
-      // Google users have avatar_url set from Google profile
-      setIsGoogle(!!u.avatar_url);
+      setIsGoogle(u.auth_provider === 'google');
     } catch { /* */ }
   }, []);
 

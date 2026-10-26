@@ -13,6 +13,7 @@ os.environ.setdefault("SUPABASE_URL",              "https://test.supabase.co")
 os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key")
 os.environ.setdefault("SUPABASE_ANON_KEY",         "test-anon-key")
 os.environ.setdefault("JWT_SECRET",                "test-secret-do-not-use-in-production")
+os.environ["JWT_EXPIRE_MINUTES"] = "525600"  # 1 year — regression guard against short expiry
 os.environ.setdefault("ENCRYPTION_KEY",            "test-encryption-key-32-chars-long!")
 os.environ.setdefault("DEBUG_MODE",                "false")
 os.environ.setdefault("ALLOWED_ORIGINS",           "http://localhost:3000,https://crm3.tzmicha.com")
