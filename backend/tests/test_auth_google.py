@@ -4,7 +4,7 @@ Covers H.4, H.5, H.6 from the test plan.
 """
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
-from tests.conftest import TEST_USER_ID, TEST_ACCOUNT_ID, set_db_result
+from conftest import TEST_USER_ID, TEST_ACCOUNT_ID, set_db_result
 
 
 VALID_FIREBASE_PAYLOAD = {

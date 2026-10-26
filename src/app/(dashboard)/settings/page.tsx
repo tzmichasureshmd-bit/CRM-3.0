@@ -1,38 +1,45 @@
 'use client';
 
-import { User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight, Brain, FileText, Lock, Users } from 'lucide-react';
+import { User, Bell, Shield, Key, CreditCard, Server, Mail, ChevronRight, Brain, FileText, Lock, Users, Building2, GitMerge, ClipboardList } from 'lucide-react';
 import Link from 'next/link';
 
 const SECTIONS = [
   {
-    title: 'Account',
+    title: 'General',
     items: [
       { icon: <User size={16} />, label: 'Profile', desc: 'Name, avatar, timezone', color: '#4d7cff', href: '/settings/profile' },
       { icon: <Bell size={16} />, label: 'Notifications', desc: 'Email, push, in-app alerts', color: '#8b5cf6', href: '/settings/notifications' },
-      { icon: <Users size={16} />, label: 'Team & RBAC', desc: 'Employees, roles, permissions', color: '#28c99a', href: '/settings/company' },
+    ],
+  },
+  {
+    title: 'Tenant / Company',
+    items: [
+      { icon: <Building2 size={16} />, label: 'Company Profile', desc: 'Name, logo, contact info, workspace', color: '#4f6df5', href: '/settings/company' },
+      { icon: <Users size={16} />, label: 'Team Members', desc: 'Employees, roles, channel access', color: '#28c99a', href: '/settings/team' },
+      { icon: <Mail size={16} />, label: 'Invitations & Requests', desc: 'Sent invitations, join requests', color: '#f4c95d', href: '/settings/team-requests' },
+      { icon: <Shield size={16} />, label: 'Roles & Permissions', desc: 'RBAC permission matrix', color: '#8b5cf6', href: '/settings/roles' },
     ],
   },
   {
     title: 'Integrations',
     items: [
-      { icon: <Smartphone size={16} />, label: 'WhatsApp Business', desc: 'Connect WhatsApp API', color: '#25D366', href: '/settings/integrations' },
-      { icon: <AtSign size={16} />, label: 'Instagram', desc: 'Connect Instagram DMs', color: '#E1306C', href: '/settings/integrations' },
-      { icon: <MessageSquare size={16} />, label: 'Facebook', desc: 'Connect Facebook Messenger', color: '#1877F2', href: '/settings/integrations' },
+      { icon: <GitMerge size={16} />, label: 'Channel Integrations', desc: 'WhatsApp, Instagram, Facebook, Telegram', color: '#25D366', href: '/settings/integrations' },
       { icon: <Mail size={16} />, label: 'Email', desc: 'SMTP / Gmail / Outlook', color: '#8b5cf6', href: '/settings/email' },
     ],
   },
   {
-    title: 'Security',
+    title: 'Security & Compliance',
     items: [
       { icon: <Shield size={16} />, label: 'Security', desc: 'Password, 2FA, sessions', color: '#28c99a', href: '/settings/security' },
       { icon: <Key size={16} />, label: 'API Keys', desc: 'Manage API access keys', color: '#f4c95d', href: '/settings/security' },
       { icon: <Brain size={16} />, label: 'AI API Keys', desc: 'OpenAI, Anthropic, Groq, Gemini', color: '#8b5cf6', href: '/settings/ai-keys' },
+      { icon: <ClipboardList size={16} />, label: 'Audit Logs', desc: 'Track all actions and changes', color: '#4f6df5', href: '/settings/audit' },
     ],
   },
   {
     title: 'Billing & System',
     items: [
-      { icon: <CreditCard size={16} />, label: 'Billing', desc: 'Plan, usage, invoices', color: '#f46b72', href: '/settings/billing' },
+      { icon: <CreditCard size={16} />, label: 'Billing & Subscription', desc: 'Plan, usage, invoices', color: '#f46b72', href: '/settings/billing' },
       { icon: <Server size={16} />, label: 'Platform Health', desc: 'System status, diagnostics', color: '#4f6df5', href: '/settings/health' },
     ],
   },
@@ -57,31 +64,19 @@ export default function SettingsPage() {
         <div key={section.title}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--crm-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{section.title}</div>
           <div className="crm-glass" style={{ overflow: 'hidden' }}>
-            {section.items.map((item, i) => {
-              const inner = (
-                <>
-                  <div style={{ width: 38, height: 38, borderRadius: 11, background: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
-                    {item.icon}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text)' }}>{item.label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{item.desc}</div>
-                  </div>
-                  <ChevronRight size={16} color="var(--crm-text-muted)" />
-                </>
-              );
-              const sharedStyle = {
-                width: '100%', display: 'flex', alignItems: 'center', gap: 14,
-                padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer',
-                textAlign: 'left' as const, textDecoration: 'none',
-                borderBottom: i < section.items.length - 1 ? '1px solid rgba(130,145,190,0.10)' : 'none',
-              };
-              return item.href ? (
-                <Link key={item.label} href={item.href} style={sharedStyle}>{inner}</Link>
-              ) : (
-                <button key={item.label} style={sharedStyle}>{inner}</button>
-              );
-            })}
+            {section.items.map((item, i) => (
+              <Link key={item.label} href={item.href}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'none', borderBottom: i < section.items.length - 1 ? '1px solid rgba(130,145,190,0.10)' : 'none' }}>
+                <div style={{ width: 38, height: 38, borderRadius: 11, background: `${item.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.color, flexShrink: 0 }}>
+                  {item.icon}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--crm-text)' }}>{item.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--crm-text-muted)' }}>{item.desc}</div>
+                </div>
+                <ChevronRight size={16} color="var(--crm-text-muted)" />
+              </Link>
+            ))}
           </div>
         </div>
       ))}

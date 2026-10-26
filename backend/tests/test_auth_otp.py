@@ -7,7 +7,7 @@ import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
-from tests.conftest import (
+from conftest import (
     TEST_USER_ID, TEST_ACCOUNT_ID, make_token, hash_otp, set_db_result,
 )
 

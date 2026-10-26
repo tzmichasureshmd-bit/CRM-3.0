@@ -3,8 +3,23 @@ from pydantic import BaseModel
 from typing import Optional
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 
 class ContactCreate(BaseModel):
@@ -77,7 +92,11 @@ async def create_contact(
     data["account_id"] = user["account_id"]
     data["user_id"] = user["user_id"]
     res = db.table("contacts").insert(data).execute()
-    return res.data[0] if res.data else {}
+    contact = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "contact.created",
+           "contact", contact.get("id"),
+           metadata={"phone": body.phone, "lead_status": body.lead_status})
+    return contact
 
 
 @router.patch("/contacts/{contact_id}")
@@ -97,6 +116,8 @@ async def update_contact(
         .eq("account_id", user["account_id"])
         .execute()
     )
+    _audit(db, user["account_id"], user["user_id"], "contact.updated",
+           "contact", contact_id, metadata=data)
     return res.data[0] if res.data else {}
 
 
@@ -107,3 +128,5 @@ async def delete_contact(
     db=Depends(get_db),
 ):
     db.table("contacts").delete().eq("id", contact_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "contact.deleted",
+           "contact", contact_id)

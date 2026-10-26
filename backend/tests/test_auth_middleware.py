@@ -4,7 +4,7 @@ Covers H.12, H.13, H.14 from the test plan.
 """
 import pytest
 from unittest.mock import MagicMock
-from tests.conftest import (
+from conftest import (
     TEST_USER_ID, TEST_ACCOUNT_ID, TEST_USER_ID_2, TEST_ACCOUNT_ID_2,
     make_token, set_db_result,
 )

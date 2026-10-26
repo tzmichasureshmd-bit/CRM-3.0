@@ -3,8 +3,23 @@ from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
 from datetime import datetime
 import httpx
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 
 @router.get("/leads")
@@ -117,6 +132,10 @@ async def analyze_lead(
         "lead_score_reason": factors[0]["reason"] if factors else None,
         "lead_score_updated_at": datetime.utcnow().isoformat(),
     }).eq("id", contact_id).eq("account_id", user["account_id"]).execute()
+
+    _audit(db, user["account_id"], user["user_id"], "lead.score_updated",
+           "contact", contact_id,
+           metadata={"score": score, "tier": tier, "intent": intent})
 
     nba = "Contact immediately — high buying intent" if score >= 80 else \
           "Send a personalized follow-up message" if score >= 50 else \

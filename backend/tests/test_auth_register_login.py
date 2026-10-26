@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch, call
 from fastapi.testclient import TestClient
 from passlib.context import CryptContext
 
-from tests.conftest import (
+from conftest import (
     TEST_JWT_SECRET, TEST_ALGORITHM, TEST_USER_ID, TEST_ACCOUNT_ID,
     make_token, hash_otp, set_db_result,
 )

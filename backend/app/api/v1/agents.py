@@ -6,9 +6,24 @@ from app.middleware.auth import get_current_user
 from app.core.config import get_settings
 from datetime import datetime
 import httpx
+import logging
 
 router = APIRouter()
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 AGENT_TYPES = [
     "lead_qualification", "sales_assistant", "followup",
@@ -75,7 +90,11 @@ async def create_agent(
     data["status"] = "idle"
     data["execution_count"] = 0
     res = db.table("crm3_ai_agents").insert(data).execute()
-    return res.data[0] if res.data else {}
+    agent = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "agent.created",
+           "agent", agent.get("id"),
+           metadata={"name": body.name, "type": body.type})
+    return agent
 
 
 @router.post("/agents/{agent_id}/run")
@@ -109,10 +128,13 @@ async def run_agent(
             "tokens_used": 0,
             "started_at": datetime.utcnow().isoformat(),
         }).execute()
+        run_id = run_res.data[0]["id"] if run_res.data else None
+        _audit(db, user["account_id"], user["user_id"], "agent.run_requested",
+               "agent", agent_id, metadata={"run_id": run_id, "requires_approval": True})
         return {
             "status": "awaiting_approval",
             "message": "Agent run requires human approval before execution.",
-            "run_id": run_res.data[0]["id"] if run_res.data else None,
+            "run_id": run_id,
         }
 
     async with httpx.AsyncClient() as client:
@@ -174,6 +196,8 @@ async def delete_agent(
     db=Depends(get_db),
 ):
     db.table("crm3_ai_agents").delete().eq("id", agent_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "agent.deleted",
+           "agent", agent_id)
 
 
 # ── Pure helper functions (used by tests and engine) ─────────────────────────

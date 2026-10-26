@@ -3,8 +3,23 @@ from pydantic import BaseModel
 from typing import Optional
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 
 class AppointmentCreate(BaseModel):
@@ -85,7 +100,11 @@ async def create_appointment(
         "user_id": user["user_id"],
     }
     res = db.table("follow_ups").insert({k: v for k, v in data.items() if v is not None}).execute()
-    return res.data[0] if res.data else {}
+    appt = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "appointment.created",
+           "appointment", appt.get("id"),
+           metadata={"title": body.title, "scheduled_at": body.scheduled_at})
+    return appt
 
 
 @router.patch("/appointments/{appointment_id}")
@@ -113,6 +132,8 @@ async def update_appointment(
     )
     if not res.data:
         raise HTTPException(status_code=404, detail="Appointment not found")
+    _audit(db, user["account_id"], user["user_id"], "appointment.updated",
+           "appointment", appointment_id, metadata=data)
     return res.data[0]
 
 
@@ -123,3 +144,5 @@ async def delete_appointment(
     db=Depends(get_db),
 ):
     db.table("follow_ups").delete().eq("id", appointment_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "appointment.deleted",
+           "appointment", appointment_id)

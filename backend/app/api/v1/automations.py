@@ -1,8 +1,23 @@
 from fastapi import APIRouter, Depends, Query
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 
 @router.get("/automations")
@@ -56,6 +71,8 @@ async def toggle_automation(
         .eq("account_id", user["account_id"])
         .execute()
     )
+    _audit(db, user["account_id"], user["user_id"], "automation.toggled",
+           "automation", automation_id, metadata={"is_active": is_active})
     return res.data[0] if res.data else {}
 
 
@@ -69,7 +86,10 @@ async def create_automation(
     body.setdefault("status", "draft")
     body.setdefault("is_active", False)
     res = db.table("automations").insert(body).execute()
-    return res.data[0] if res.data else {}
+    automation = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "automation.created",
+           "automation", automation.get("id"), metadata={"name": body.get("name")})
+    return automation
 
 
 @router.delete("/automations/{automation_id}", status_code=204)
@@ -79,6 +99,8 @@ async def delete_automation(
     db=Depends(get_db),
 ):
     db.table("automations").delete().eq("id", automation_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "automation.deleted",
+           "automation", automation_id)
 
 
 # ── Pure helper functions (used by tests and engine) ─────────────────────────

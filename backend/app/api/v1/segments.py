@@ -3,8 +3,23 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 
 class SegmentCreate(BaseModel):
@@ -106,7 +121,10 @@ async def create_segment(
     data = body.model_dump(exclude_none=True)
     data["account_id"] = user["account_id"]
     res = db.table("crm3_segments").insert(data).execute()
-    return res.data[0] if res.data else {}
+    segment = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "segment.created",
+           "segment", segment.get("id"), metadata={"name": body.name})
+    return segment
 
 
 @router.patch("/segments/{segment_id}")
@@ -138,3 +156,5 @@ async def delete_segment(
     db=Depends(get_db),
 ):
     db.table("crm3_segments").delete().eq("id", segment_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "segment.deleted",
+           "segment", segment_id)

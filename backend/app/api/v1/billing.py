@@ -1,9 +1,25 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
 from datetime import datetime, timezone
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+VALID_PLANS = {"free", "starter", "growth", "scale", "enterprise"}
+
+
+def _audit(db, account_id, actor_id, action, entity_id=None, metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": "account", "entity_id": entity_id,
+            "result": "success", "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 PLANS = {
     "starter": {
@@ -94,3 +110,59 @@ async def get_billing(
             "message": "Hello, I need assistance with TZMICHA CRM billing.",
         },
     }
+
+
+@router.patch("/billing/plan")
+async def update_plan(
+    body: dict,
+    user: dict = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """
+    Update the plan for a company.
+    Super admins can update any company by passing target_account_id.
+    Company owners can only update their own account (manual/consultant flow).
+    No payment is processed here — plan changes are consultant-confirmed.
+    """
+    from app.db.supabase import get_supabase
+    from app.middleware.auth import require_role
+
+    new_plan = body.get("plan", "").lower().strip()
+    if new_plan not in VALID_PLANS:
+        raise HTTPException(status_code=400, detail=f"Invalid plan. Must be one of: {sorted(VALID_PLANS)}")
+
+    # Super admin can update any company; others can only update their own
+    target_account_id = body.get("target_account_id") or user["account_id"]
+
+    if target_account_id != user["account_id"]:
+        # Verify caller is super admin (DB check, never trust token)
+        sa_check = db.table("profiles").select("is_super_admin").eq("user_id", user["user_id"]).limit(1).execute()
+        if not sa_check.data or not sa_check.data[0].get("is_super_admin"):
+            raise HTTPException(status_code=403, detail="Super admin required to update another company's plan")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Update accounts table
+    db.table("accounts").update({
+        "plan": new_plan,
+        "plan_started_at": now_iso,
+    }).eq("id", target_account_id).execute()
+
+    # Upsert account_settings for plan key
+    db.table("account_settings").upsert({
+        "account_id": target_account_id,
+        "key": "plan",
+        "value": new_plan,
+    }, on_conflict="account_id,key").execute()
+
+    db.table("account_settings").upsert({
+        "account_id": target_account_id,
+        "key": "plan_started_at",
+        "value": now_iso,
+    }, on_conflict="account_id,key").execute()
+
+    _audit(db, target_account_id, user["user_id"], "billing.plan_updated",
+           entity_id=target_account_id,
+           metadata={"plan": new_plan, "updated_by": user["user_id"]})
+
+    return {"status": "updated", "plan": new_plan, "plan_started_at": now_iso}

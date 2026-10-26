@@ -4,8 +4,23 @@ from typing import Optional, List, Dict, Any
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
 from app.services.broadcast_service import get_broadcast_service
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 
 class BroadcastCreate(BaseModel):
@@ -124,11 +139,14 @@ async def create_broadcast(
     
     try:
         res = db.table("broadcasts").insert(data).execute()
-        return res.data[0] if res.data else {}
+        broadcast = res.data[0] if res.data else {}
     except Exception:
-        # Fallback to campaigns if table write fails
         res = db.table("campaigns").insert(data).execute()
-        return res.data[0] if res.data else {}
+        broadcast = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "broadcast.created",
+           "broadcast", broadcast.get("id"),
+           metadata={"name": body.name, "platform": body.platform})
+    return broadcast
 
 
 @router.patch("/broadcasts/{broadcast_id}")
@@ -170,6 +188,8 @@ async def delete_broadcast(
 ):
     db.table("broadcasts").delete().eq("id", broadcast_id).eq("account_id", user["account_id"]).execute()
     db.table("campaigns").delete().eq("id", broadcast_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "broadcast.deleted",
+           "broadcast", broadcast_id)
 
 
 # ─────────────────────────────────────────────────────────────

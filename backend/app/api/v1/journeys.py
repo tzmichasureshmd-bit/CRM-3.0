@@ -3,8 +3,23 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 MAX_JOURNEY_NODES = 20
 
@@ -75,7 +90,10 @@ async def create_journey(
     data["entry_count"] = 0
     data["completed_count"] = 0
     res = db.table("crm3_journeys").insert(data).execute()
-    return res.data[0] if res.data else {}
+    journey = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "journey.created",
+           "journey", journey.get("id"), metadata={"name": body.name})
+    return journey
 
 
 @router.patch("/journeys/{journey_id}")
@@ -107,6 +125,8 @@ async def delete_journey(
     db=Depends(get_db),
 ):
     db.table("crm3_journeys").delete().eq("id", journey_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "journey.deleted",
+           "journey", journey_id)
 
 
 @router.post("/journeys/{journey_id}/publish")
@@ -141,6 +161,8 @@ async def publish_journey(
         .eq("account_id", user["account_id"])
         .execute()
     )
+    _audit(db, user["account_id"], user["user_id"], "journey.published",
+           "journey", journey_id)
     return res.data[0] if res.data else {}
 
 

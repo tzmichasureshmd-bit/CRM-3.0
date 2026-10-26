@@ -2,8 +2,23 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 
 @router.get("/conversations")
@@ -93,14 +108,24 @@ async def assign_conversation(
     user: dict = Depends(get_current_user),
     db=Depends(get_db),
 ):
-    agent_id = body.get("agent_id")
+    agent_id    = body.get("agent_id")
+    employee_id = body.get("employee_id")
+    update: dict = {}
+    if agent_id is not None:
+        update["assigned_agent_id"] = agent_id
+    if employee_id is not None:
+        update["assigned_employee_id"] = employee_id
+    if not update:
+        raise HTTPException(status_code=400, detail="agent_id or employee_id required")
     res = (
         db.table("conversations")
-        .update({"assigned_agent_id": agent_id})
+        .update(update)
         .eq("id", conversation_id)
         .eq("account_id", user["account_id"])
         .execute()
     )
+    _audit(db, user["account_id"], user["user_id"], "conversation.assigned",
+           "conversation", conversation_id, metadata=update)
     return res.data[0] if res.data else {}
 
 
@@ -121,4 +146,6 @@ async def update_status(
         .eq("account_id", user["account_id"])
         .execute()
     )
+    _audit(db, user["account_id"], user["user_id"], "conversation.status_changed",
+           "conversation", conversation_id, metadata={"status": status})
     return res.data[0] if res.data else {}

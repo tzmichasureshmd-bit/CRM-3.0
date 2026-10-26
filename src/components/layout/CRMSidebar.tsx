@@ -83,7 +83,10 @@ const NAV = [
     id: 'admin', label: 'ADMIN',
     items: [
       { href: '/settings', icon: Settings, label: 'Settings' },
-      { href: '/settings/company', icon: Users, label: 'Team & RBAC' },
+      { href: '/settings/company', icon: Users, label: 'Company Profile' },
+      { href: '/settings/team', icon: Users, label: 'Team Members' },
+      { href: '/settings/team-requests', icon: Mail, label: 'Invitations & Requests' },
+      { href: '/settings/roles', icon: Shield, label: 'Roles & Permissions' },
       { href: '/settings/audit', icon: Shield, label: 'Audit Logs' },
       { href: '/settings/integrations', icon: Key, label: 'Integrations' },
       { href: '/settings/security', icon: Shield, label: 'Security' },

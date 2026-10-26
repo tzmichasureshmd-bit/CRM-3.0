@@ -3,9 +3,24 @@ from typing import Optional
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
 from app.services.meta_campaign_service import MetaCampaignService
+import logging
 
 router = APIRouter()
 meta_service = MetaCampaignService()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 
 @router.get("/campaigns")
@@ -36,7 +51,10 @@ async def create_campaign(
     body["account_id"] = user["account_id"]
     body.setdefault("status", "draft")
     res = db.table("campaigns").insert(body).execute()
-    return res.data[0] if res.data else {}
+    campaign = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "campaign.created",
+           "campaign", campaign.get("id"), metadata={"name": body.get("name")})
+    return campaign
 
 
 @router.patch("/campaigns/{campaign_id}")
@@ -56,6 +74,8 @@ async def update_campaign(
         .eq("account_id", user["account_id"])
         .execute()
     )
+    _audit(db, user["account_id"], user["user_id"], "campaign.updated",
+           "campaign", campaign_id, metadata={k: v for k, v in body.items() if k != "content"})
     return res.data[0] if res.data else {}
 
 
@@ -66,6 +86,8 @@ async def delete_campaign(
     db=Depends(get_db),
 ):
     db.table("campaigns").delete().eq("id", campaign_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "campaign.deleted",
+           "campaign", campaign_id)
 
 
 @router.get("/campaigns/{campaign_id}/intelligence")

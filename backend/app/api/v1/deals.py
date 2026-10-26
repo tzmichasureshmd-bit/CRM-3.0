@@ -3,8 +3,23 @@ from pydantic import BaseModel
 from typing import Optional
 from app.db.supabase import get_db
 from app.middleware.auth import get_current_user
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def _audit(db, account_id, actor_id, action, entity_type=None, entity_id=None,
+           result="success", metadata=None):
+    try:
+        db.table("audit_logs").insert({
+            "account_id": account_id, "actor_id": actor_id,
+            "actor_type": "user", "action": action,
+            "entity_type": entity_type, "entity_id": entity_id,
+            "result": result, "metadata": metadata or {},
+        }).execute()
+    except Exception as e:
+        logger.warning("audit_log failed: %s", e)
 
 
 # ── Pydantic Models ───────────────────────────────────────────
@@ -68,7 +83,10 @@ async def create_pipeline_stage(
     data = body.model_dump()
     data["account_id"] = user["account_id"]
     res = db.table("pipeline_stages").insert(data).execute()
-    return res.data[0] if res.data else {}
+    stage = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "pipeline_stage.created",
+           "pipeline_stage", stage.get("id"), metadata={"name": body.name})
+    return stage
 
 
 @router.patch("/pipeline-stages/{stage_id}")
@@ -88,6 +106,8 @@ async def update_pipeline_stage(
         .eq("account_id", user["account_id"])
         .execute()
     )
+    _audit(db, user["account_id"], user["user_id"], "pipeline_stage.updated",
+           "pipeline_stage", stage_id, metadata=data)
     return res.data[0] if res.data else {}
 
 
@@ -97,9 +117,10 @@ async def delete_pipeline_stage(
     user: dict = Depends(get_current_user),
     db=Depends(get_db),
 ):
-    # Move deals in this stage to null before deleting
     db.table("deals").update({"stage_id": None}).eq("stage_id", stage_id).eq("account_id", user["account_id"]).execute()
     db.table("pipeline_stages").delete().eq("id", stage_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "pipeline_stage.deleted",
+           "pipeline_stage", stage_id)
 
 
 # ── Deals ─────────────────────────────────────────────────────
@@ -150,7 +171,6 @@ async def get_pipeline_stats(
     total_won_value = sum(d["value"] or 0 for d in won_deals)
     win_rate = round(len(won_deals) / (len(won_deals) + len(lost_deals)) * 100, 1) if (won_deals or lost_deals) else 0
 
-    # Group by stage
     stage_breakdown: dict = {}
     for d in open_deals:
         stage_name = (d.get("pipeline_stages") or {}).get("name", "Unknown")
@@ -199,7 +219,6 @@ async def create_deal(
     data = body.model_dump(exclude_none=True)
     data["account_id"] = user["account_id"]
 
-    # Determine status from stage name if stage_id provided
     if data.get("stage_id"):
         stage_res = db.table("pipeline_stages").select("name").eq("id", data["stage_id"]).limit(1).execute()
         if stage_res.data:
@@ -214,7 +233,11 @@ async def create_deal(
         data["status"] = "open"
 
     res = db.table("deals").insert(data).execute()
-    return res.data[0] if res.data else {}
+    deal = res.data[0] if res.data else {}
+    _audit(db, user["account_id"], user["user_id"], "deal.created",
+           "deal", deal.get("id"),
+           metadata={"title": body.title, "value": body.value, "currency": body.currency})
+    return deal
 
 
 @router.patch("/deals/{deal_id}")
@@ -228,7 +251,6 @@ async def update_deal(
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
 
-    # Auto-set status when stage changes to won/lost
     if data.get("stage_id"):
         stage_res = db.table("pipeline_stages").select("name").eq("id", data["stage_id"]).limit(1).execute()
         if stage_res.data:
@@ -249,6 +271,8 @@ async def update_deal(
     )
     if not res.data:
         raise HTTPException(status_code=404, detail="Deal not found")
+    _audit(db, user["account_id"], user["user_id"], "deal.updated",
+           "deal", deal_id, metadata={k: v for k, v in data.items() if k != "notes"})
     return res.data[0]
 
 
@@ -259,6 +283,8 @@ async def delete_deal(
     db=Depends(get_db),
 ):
     db.table("deals").delete().eq("id", deal_id).eq("account_id", user["account_id"]).execute()
+    _audit(db, user["account_id"], user["user_id"], "deal.deleted",
+           "deal", deal_id)
 
 
 @router.patch("/deals/{deal_id}/move")
@@ -268,7 +294,6 @@ async def move_deal_stage(
     user: dict = Depends(get_current_user),
     db=Depends(get_db),
 ):
-    """Quick endpoint to move a deal to a new stage."""
     new_stage_id = body.get("stage_id")
     if not new_stage_id:
         raise HTTPException(status_code=400, detail="stage_id is required")
@@ -289,4 +314,7 @@ async def move_deal_stage(
     )
     if not res.data:
         raise HTTPException(status_code=404, detail="Deal not found")
+    _audit(db, user["account_id"], user["user_id"], "deal.stage_moved",
+           "deal", deal_id,
+           metadata={"stage_id": new_stage_id, "status": new_status})
     return res.data[0]

@@ -2,6 +2,10 @@
 Automated Test Suite for Meta Ads Campaigns Integration
 Tests status mapping, pagination, error handling, token redaction, deduplication, and tenant isolation.
 """
+import pathlib, sys
+ROOT = pathlib.Path(__file__).parent.parent.parent
+sys.path.insert(0, str(ROOT / "backend"))
+
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock
