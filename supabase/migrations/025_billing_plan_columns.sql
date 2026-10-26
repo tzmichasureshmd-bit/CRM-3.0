@@ -24,7 +24,7 @@ ALTER TABLE accounts ADD COLUMN IF NOT EXISTS currency      text NOT NULL DEFAUL
 -- Seed default plan row in account_settings for existing accounts
 -- (only inserts if no plan row exists yet)
 INSERT INTO account_settings (account_id, key, value)
-SELECT id, 'plan', 'growth'
+SELECT id, 'plan', to_jsonb('growth'::text)
 FROM accounts
 WHERE NOT EXISTS (
   SELECT 1 FROM account_settings
