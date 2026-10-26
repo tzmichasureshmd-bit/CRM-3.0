@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { CRMSidebar } from '@/components/layout/CRMSidebar';
 import { CRMTopbar } from '@/components/layout/CRMTopbar';
 import { FloatingCopilot } from '@/components/chat/FloatingCopilot';
 import { SessionRenewalModal } from '@/components/ui/SessionRenewalModal';
+import { checkSessionExpiry } from '@/lib/auth-client';
 
 
 
@@ -13,21 +14,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [ready, setReady] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showRenewal, setShowRenewal] = useState(false);
+  const renewalInProgressRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
     const token = localStorage.getItem('crm_token');
     if (!token) { window.location.replace('/login'); return; }
+
+    // FIX-006: Proactively check token expiry on mount.
+    // If the token is expired/malformed, this fires crm:session-expired immediately
+    // so the renewal modal appears before the first API call fails.
+    checkSessionExpiry();
+
     const saved = localStorage.getItem('crm_theme') as 'light' | 'dark' | null;
     if (saved === 'dark') setTheme('dark');
     setReady(true);
   }, []);
 
-  // Listen for 401 events fired by v3fetch
+  // Listen for 401 events fired by v3fetch / api-client / fetch helpers.
+  // Guard: prevent duplicate modals with ref + debounce.
   useEffect(() => {
-    const handler = () => setShowRenewal(true);
+    let debounceTimer: NodeJS.Timeout | null = null;
+    
+    const handler = () => {
+      // If renewal already in progress, ignore additional events
+      if (renewalInProgressRef.current) return;
+      
+      // Debounce: if multiple 401s fire within 500ms, only show modal once
+      if (debounceTimer) clearTimeout(debounceTimer);
+      
+      debounceTimer = setTimeout(() => {
+        renewalInProgressRef.current = true;
+        setShowRenewal(true);
+      }, 500);
+    };
+    
     window.addEventListener('crm:session-expired', handler);
-    return () => window.removeEventListener('crm:session-expired', handler);
+    return () => {
+      window.removeEventListener('crm:session-expired', handler);
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -37,6 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleRenewed = useCallback(() => {
     setShowRenewal(false);
+    renewalInProgressRef.current = false;
     // Silently reload data by dispatching a custom event pages can listen to
     window.dispatchEvent(new CustomEvent('crm:session-renewed'));
   }, []);

@@ -1,17 +1,16 @@
 /**
  * Shared fetch helper for all dashboard pages.
  * Automatically prepends BACKEND_URL and adds JWT auth header.
+ *
+ * @deprecated Use apiFetch from api-client.ts or fetchApi from auth-client.ts instead.
+ * This file is kept for backward compatibility only.
  */
+
+import { getCrmToken } from './auth-client';
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
 
-function getToken(): string {
-  if (typeof window === 'undefined') return '';
-  return localStorage.getItem('crm_token') ?? '';
-}
-
 export function apiUrl(path: string): string {
-  // path should start with /api/v1/...
   return `${BACKEND}${path}`;
 }
 
@@ -19,7 +18,7 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getToken();
+  const token = getCrmToken() ?? '';
   const res = await fetch(apiUrl(path), {
     ...options,
     headers: {
@@ -28,6 +27,14 @@ export async function apiFetch<T = unknown>(
       ...(options.headers ?? {}),
     },
   });
+  if (res.status === 401) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('crm:session-expired', {
+        detail: { reason: '401_response', url: path, timestamp: new Date().toISOString() }
+      }));
+    }
+    throw new Error('Session expired');
+  }
   if (!res.ok) {
     const body = await res.text();
     let msg = `HTTP ${res.status}`;

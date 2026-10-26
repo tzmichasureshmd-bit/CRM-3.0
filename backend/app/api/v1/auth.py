@@ -596,7 +596,13 @@ async def update_password(request: Request, db=Depends(get_db)):
 
 
 @router.post("/auth/logout")
-async def logout():
-    # FIX-009: Partial token cleanup is handled client-side on logout.
-    # Server-side: stateless JWT — no server action needed beyond client clearing storage.
+async def logout(user: dict = Depends(get_current_user), db=Depends(get_db)):
+    """
+    Server-side logout: increment token_version to immediately invalidate
+    the current JWT. Client must also clear localStorage.
+    """
+    profile = get_profile(db, user["user_id"])
+    current_version = profile.get("token_version", 1) or 1
+    db.table("profiles").update({"token_version": current_version + 1})\
+        .eq("user_id", user["user_id"]).execute()
     return {"message": "Logged out"}

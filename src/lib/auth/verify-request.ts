@@ -113,16 +113,21 @@ export async function verifyRequest(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // 5. Re-derive account_id, role, and token_version from DB (never trust token claims)
+  // 5. Re-derive account_id, role, is_active, and token_version from DB (never trust token claims)
   const db = getServiceClient();
   const { data: profile, error } = await db
     .from('profiles')
-    .select('account_id, role, token_version')
+    .select('account_id, role, token_version, is_active')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (error || !profile) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // Reject suspended accounts on every request
+  if (profile.is_active === false) {
+    return NextResponse.json({ error: 'Account is suspended.' }, { status: 403 });
   }
 
   // 6. Validate token_version — rejects sessions issued before password reset

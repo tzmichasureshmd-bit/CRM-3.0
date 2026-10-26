@@ -322,9 +322,17 @@ class TestRevocationAndLogout:
         assert resp.status_code not in (401, 403)
 
     def test_logout_endpoint_returns_200(self, app_client):
-        """Logout is stateless — server returns 200, client clears storage."""
+        """Logout now requires authentication and increments token_version."""
         client, db = app_client
-        resp = client.post("/api/v1/auth/logout")
+        token = make_token(token_version=1)
+        _set_profile(db, {**_profile(token_version=1), "user_id": TEST_USER_ID,
+                          "totp_secret": None, "totp_enabled": False})
+        db.table.return_value.update.return_value.eq.return_value \
+            .execute.return_value.data = [{}]
+        resp = client.post(
+            "/api/v1/auth/logout",
+            headers={"Authorization": f"Bearer {token}"}
+        )
         assert resp.status_code == 200
 
     def test_403_does_not_indicate_expired_session(self, app_client):

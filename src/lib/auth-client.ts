@@ -31,17 +31,103 @@ export class ApiError extends Error {
   }
 }
 
-/** Clear the CRM session and redirect to login. */
-export function clearSession(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem('crm_token');
-  window.location.href = '/login';
+// ── TOKEN MANAGEMENT ──────────────────────────────────────────
+
+/** Parse JWT payload without verification (client-side only). */
+function parseJWT(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = payload + '='.repeat((4 - (payload.length % 4)) % 4);
+    const json = atob(padded);
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
-/** Read the CRM JWT from localStorage (browser only). */
-function getCrmToken(): string | null {
+/** Check if JWT is expired (with 5-minute buffer). */
+export function isTokenExpired(token: string): boolean {
+  const payload = parseJWT(token);
+  if (!payload || typeof payload.exp !== 'number') return true;
+  const bufferSeconds = 5 * 60; // Show renewal modal 5 minutes before expiry
+  return Math.floor(Date.now() / 1000) >= (payload.exp - bufferSeconds);
+}
+
+/** Get seconds until token expires (returns 0 if expired/invalid). */
+export function getTokenExpirySeconds(token: string): number {
+  const payload = parseJWT(token);
+  if (!payload || typeof payload.exp !== 'number') return 0;
+  const seconds = payload.exp - Math.floor(Date.now() / 1000);
+  return Math.max(0, seconds);
+}
+
+/**
+ * CONSOLIDATED TOKEN ACCESSOR (use this everywhere).
+ * Validates token structure and returns null if invalid/expired.
+ */
+export function getCrmToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('crm_token');
+  const token = localStorage.getItem('crm_token');
+  if (!token) return null;
+  
+  // Validate structure
+  const payload = parseJWT(token);
+  if (!payload) {
+    console.warn('[auth] Invalid JWT structure, clearing token');
+    clearAllTokens();
+    // Fire session-expired so the renewal modal appears instead of silently failing
+    window.dispatchEvent(new CustomEvent('crm:session-expired', {
+      detail: { reason: 'malformed_token', timestamp: new Date().toISOString() }
+    }));
+    return null;
+  }
+  
+  return token;
+}
+
+/**
+ * Clear ALL auth-related tokens and user data.
+ * Use this for all logout/sign-out paths.
+ */
+export function clearAllTokens(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('crm_token');
+  localStorage.removeItem('crm_user');
+  localStorage.removeItem('crm_partial_token');
+}
+
+/** 
+ * Clear the CRM session and redirect to login.
+ * @deprecated Use clearAllTokens() + redirect separately for more control.
+ */
+export function clearSession(): void {
+  clearAllTokens();
+  if (typeof window !== 'undefined') {
+    window.location.href = '/login';
+  }
+}
+
+/**
+ * Check if current session is expired and fire event if so.
+ * Call this on page load / route changes.
+ * Returns true if session is valid, false if expired.
+ */
+export function checkSessionExpiry(): boolean {
+  if (typeof window === 'undefined') return true;
+  
+  const token = getCrmToken();
+  if (!token) return false;
+  
+  if (isTokenExpired(token)) {
+    window.dispatchEvent(new CustomEvent('crm:session-expired', {
+      detail: { reason: 'expiry', checked_at: new Date().toISOString() }
+    }));
+    return false;
+  }
+  
+  return true;
 }
 
 /** Build headers with Authorization: Bearer <token> attached. */
@@ -70,7 +156,13 @@ export function v3fetch(input: string, init?: RequestInit): Promise<Response> {
     headers: authHeaders(init?.headers),
   }).then(res => {
     if (res.status === 401 && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('crm:session-expired'));
+      window.dispatchEvent(new CustomEvent('crm:session-expired', {
+        detail: { 
+          reason: '401_response', 
+          url: input,
+          timestamp: new Date().toISOString() 
+        }
+      }));
     }
     return res;
   });

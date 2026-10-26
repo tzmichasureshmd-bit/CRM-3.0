@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/firebase';
+import { clearAllTokens } from '@/lib/auth-client';
 
 interface SessionRenewalModalProps {
   onRenewed: () => void;
@@ -15,6 +16,8 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
   const [error, setError]       = useState('');
   const [email, setEmail]       = useState('');
   const [isGoogle, setIsGoogle] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isNetworkError, setIsNetworkError] = useState(false);
 
   useEffect(() => {
     try {
@@ -27,6 +30,7 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
   const handleGoogle = useCallback(async () => {
     setLoading(true);
     setError('');
+    setIsNetworkError(false);
     try {
       const idToken = await signInWithGoogle();
       const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
@@ -39,15 +43,30 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
       if (!res.ok || !data.access_token) {
         setError(data.detail ?? 'Google sign-in failed. Try again.');
         setLoading(false);
+        setRetryCount(prev => prev + 1);
         return;
       }
       localStorage.setItem('crm_token', data.access_token);
+      // Update crm_user so next expiry shows correct email/provider
+      try {
+        const prev = JSON.parse(localStorage.getItem('crm_user') ?? '{}') as Record<string, string>;
+        localStorage.setItem('crm_user', JSON.stringify({
+          ...prev,
+          email:         data.email      ?? prev.email ?? '',
+          full_name:     data.full_name  ?? prev.full_name ?? '',
+          avatar_url:    data.avatar_url ?? prev.avatar_url ?? '',
+          auth_provider: 'google',
+        }));
+      } catch { /* */ }
+      setRetryCount(0);
       onRenewed();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
       if (msg.includes('popup-closed')) { setLoading(false); return; }
-      setError('Google sign-in failed. Check your connection.');
+      setError('Network error. Check your connection and try again.');
+      setIsNetworkError(true);
       setLoading(false);
+      setRetryCount(prev => prev + 1);
     }
   }, [onRenewed]);
 
@@ -56,6 +75,7 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
     if (!password.trim()) return;
     setLoading(true);
     setError('');
+    setIsNetworkError(false);
     try {
       const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
       const res = await fetch(`${BACKEND}/api/v1/auth/login`, {
@@ -65,16 +85,32 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
       });
       const data = await res.json() as Record<string, string>;
       if (!res.ok || !data.access_token) {
-        setError(data.detail ?? 'Incorrect password. Try again.');
+        const detail = data.detail ?? 'Incorrect password';
+        setError(detail);
         setLoading(false);
+        setRetryCount(prev => prev + 1);
         return;
       }
       localStorage.setItem('crm_token', data.access_token);
+      // Update crm_user so next expiry shows correct email/provider
+      try {
+        const prev = JSON.parse(localStorage.getItem('crm_user') ?? '{}') as Record<string, string>;
+        localStorage.setItem('crm_user', JSON.stringify({
+          ...prev,
+          email:         data.email      ?? prev.email ?? email,
+          full_name:     data.full_name  ?? prev.full_name ?? '',
+          avatar_url:    data.avatar_url ?? prev.avatar_url ?? '',
+          auth_provider: 'email',
+        }));
+      } catch { /* */ }
       setPassword('');
+      setRetryCount(0);
       onRenewed();
     } catch {
-      setError('Cannot connect to server.');
+      setError('Network error. Check your connection and try again.');
+      setIsNetworkError(true);
       setLoading(false);
+      setRetryCount(prev => prev + 1);
     }
   }, [email, password, onRenewed]);
 
@@ -122,17 +158,64 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
 
         {/* Error */}
         {error && (
-          <div style={{
-            padding: '9px 13px', borderRadius: 10,
-            background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.25)',
-            fontSize: 13, color: '#f46b72',
-          }}>
-            ⚠️ {error}
+          <div>
+            <div style={{
+              padding: '9px 13px', borderRadius: 10,
+              background: 'rgba(244,107,114,0.08)', border: '1px solid rgba(244,107,114,0.25)',
+              fontSize: 13, color: '#f46b72', marginBottom: 8,
+            }}>
+              ⚠️ {error}
+            </div>
+            {isNetworkError && (
+              <button
+                onClick={() => isGoogle ? void handleGoogle() : void handlePassword(new Event('submit') as unknown as React.FormEvent)}
+                disabled={loading}
+                style={{
+                  width: '100%', padding: '8px', borderRadius: 8,
+                  border: '1px solid rgba(244,107,114,0.25)', background: 'white',
+                  fontSize: 12, fontWeight: 600, color: '#f46b72',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  marginBottom: 12,
+                }}
+              >
+                🔄 Retry Connection
+              </button>
+            )}
+            {!isNetworkError && retryCount >= 2 && !isGoogle && (
+              <a
+                href="/forgot-password"
+                style={{
+                  display: 'block', textAlign: 'center',
+                  fontSize: 12, color: '#4f6df5', fontWeight: 600,
+                  textDecoration: 'none', marginBottom: 12,
+                }}
+              >
+                Forgot your password?
+              </a>
+            )}
           </div>
         )}
 
-        {/* Google button for Google users */}
-        {isGoogle ? (
+        {/* FIX-007: If crm_user is missing/corrupted (no email), show safe fallback instead of
+            a broken password form (Google users have no password and would be stuck). */}
+        {!email ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 13, color: '#8790aa', textAlign: 'center', lineHeight: 1.6 }}>
+              Unable to detect your sign-in method. Please sign out and sign in again.
+            </div>
+            <button
+              onClick={() => { clearAllTokens(); window.location.replace('/login'); }}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 12, border: 'none',
+                background: 'linear-gradient(135deg,#4f6df5,#8b5cf6)',
+                color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              Sign In Again
+            </button>
+          </div>
+        ) : isGoogle ? (
+          /* Google button for Google users */
           <button
             onClick={() => void handleGoogle()}
             disabled={loading}
@@ -198,7 +281,7 @@ export function SessionRenewalModal({ onRenewed }: SessionRenewalModalProps) {
         <div style={{ textAlign: 'center', fontSize: 12, color: '#8790aa' }}>
           Not you?{' '}
           <button
-            onClick={() => { localStorage.removeItem('crm_token'); localStorage.removeItem('crm_user'); window.location.replace('/login'); }}
+            onClick={() => { clearAllTokens(); window.location.replace('/login'); }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f46b72', fontSize: 12, fontWeight: 600, padding: 0 }}>
             Sign out
           </button>
