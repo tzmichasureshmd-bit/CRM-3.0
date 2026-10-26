@@ -649,11 +649,20 @@ export default function InboxPage() {
       >
         {/* Header */}
         <div style={{ padding: '14px 14px 8px', borderBottom: '1px solid rgba(130,145,190,0.10)', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 750, color: 'var(--crm-text)' }}>Inbox</h2>
             <button onClick={() => void loadConversations()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--crm-text-muted)', padding: 4 }}>
               <RefreshCw size={13} />
             </button>
+          </div>
+          {/* Tabs: All / Assigned to Me / Unread */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['all','assigned','unread'] as const).map(tab => (
+              <button key={tab} onClick={() => { if(tab==='unread') { setUnreadOnly(true); } else { setUnreadOnly(false); } if(tab==='assigned') { setStatus('open'); } else if(tab==='all') { setStatus('all'); } }}
+                style={{ flex:1, padding:'5px 0', borderRadius:8, border:'none', cursor:'pointer', fontSize:11, fontWeight:700, background: (tab==='unread'&&unreadOnly)||(tab==='assigned'&&status==='open'&&!unreadOnly)||(tab==='all'&&status==='all'&&!unreadOnly) ? 'linear-gradient(135deg,#4f6df5,#8b5cf6)' : 'rgba(130,145,190,0.10)', color: (tab==='unread'&&unreadOnly)||(tab==='assigned'&&status==='open'&&!unreadOnly)||(tab==='all'&&status==='all'&&!unreadOnly) ? 'white' : 'var(--crm-text-muted)' }}>
+                {tab==='all'?'All':tab==='assigned'?'Assigned':'Unread'}
+              </button>
+            ))}
           </div>
         </div>
         <ConvListPanel

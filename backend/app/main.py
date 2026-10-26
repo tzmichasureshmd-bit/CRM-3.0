@@ -13,7 +13,7 @@ from app.api.v1 import (
     follow_ups, broadcasts, appointments, segments, journeys,
     revenue_intelligence, attribution, copilot, ai_routes, email_routes, meta, instagram_routes,
     ai_settings, integrations, notifications, analytics,
-    knowledge, media, experiments, billing,
+    knowledge, media, experiments, billing, employees,
 )
 
 settings = get_settings()
@@ -102,6 +102,8 @@ app.include_router(knowledge.router,             prefix=PREFIX_V3, tags=["Knowle
 app.include_router(media.router,                 prefix=PREFIX_V3, tags=["Media v3"])
 app.include_router(experiments.router,           prefix=PREFIX_V3, tags=["A/B Testing v3"])
 app.include_router(billing.router,               prefix=PREFIX_V3, tags=["Billing v3"])
+app.include_router(employees.router,             prefix=PREFIX,    tags=["Employees"])
+app.include_router(employees.router,             prefix=PREFIX_V3, tags=["Employees v3"])
 
 
 @app.get("/")

@@ -1,6 +1,6 @@
 'use client';
 
-import { User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight, Brain, FileText, Lock } from 'lucide-react';
+import { User, Bell, Shield, Key, CreditCard, Server, Smartphone, AtSign, Mail, MessageSquare, ChevronRight, Brain, FileText, Lock, Users } from 'lucide-react';
 import Link from 'next/link';
 
 const SECTIONS = [
@@ -9,6 +9,7 @@ const SECTIONS = [
     items: [
       { icon: <User size={16} />, label: 'Profile', desc: 'Name, avatar, timezone', color: '#4d7cff', href: '/settings/profile' },
       { icon: <Bell size={16} />, label: 'Notifications', desc: 'Email, push, in-app alerts', color: '#8b5cf6', href: '/settings/notifications' },
+      { icon: <Users size={16} />, label: 'Team & RBAC', desc: 'Employees, roles, permissions', color: '#28c99a', href: '/settings/company' },
     ],
   },
   {
