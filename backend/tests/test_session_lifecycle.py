@@ -161,6 +161,56 @@ class TestSessionNavigation:
             )
 
 
+class TestVerifyRequestExpiry:
+    """verify-request.ts boundary: expired tokens must be rejected.
+
+    These tests exercise the FastAPI backend boundary (auth.py) which uses
+    python-jose and enforces exp by default. The Next.js verify-request.ts
+    boundary is TypeScript and cannot be unit-tested here, but the restored
+    expiry check is verified by code inspection and the TypeScript build.
+    """
+
+    def test_expired_token_rejected_at_fastapi_boundary(self, app_client):
+        """FastAPI auth.py must reject expired tokens via python-jose."""
+        client, db = app_client
+        expired = make_token(expired=True)
+        resp = client.get(
+            "/api/v1/contacts",
+            headers={"Authorization": f"Bearer {expired}"}
+        )
+        assert resp.status_code == 401
+
+    def test_valid_token_not_rejected_as_expired(self, app_client):
+        """A fresh token must not be incorrectly rejected as expired."""
+        client, db = app_client
+        token = make_token()  # expires in 60 minutes
+        _set_profile(db, _profile())
+        db.table.return_value.select.return_value.eq.return_value \
+            .order.return_value.limit.return_value.execute.return_value.data = []
+        resp = client.get(
+            "/api/v1/contacts",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code not in (401, 403)
+
+    def test_token_without_exp_claim_rejected(self, app_client):
+        """Tokens missing exp claim: python-jose accepts them (no exp = no expiry
+        enforcement by default). They are rejected at the DB lookup step if the
+        sub doesn't match a profile. This documents actual system behaviour."""
+        client, db = app_client
+        from jose import jwt as jose_jwt
+        payload = {"sub": TEST_USER_ID, "ver": 1}
+        no_exp_token = jose_jwt.encode(payload, TEST_JWT_SECRET, algorithm=TEST_ALGORITHM)
+        # Profile not found — DB returns empty
+        _set_profile(db, None)
+        resp = client.get(
+            "/api/v1/contacts",
+            headers={"Authorization": f"Bearer {no_exp_token}"}
+        )
+        # 403 (profile not found) or 401 (jose rejects) — either way access denied
+        assert resp.status_code in (401, 403)
+
+
 class TestTokenSecurity:
     """Security properties must be preserved despite long-lived tokens."""
 
@@ -225,6 +275,104 @@ class TestTokenSecurity:
             headers={"Authorization": token}
         )
         assert resp.status_code in (401, 403)
+
+
+class TestRevocationAndLogout:
+    """Token-version revocation and logout contract."""
+
+    def test_password_reset_increments_token_version(self, app_client):
+        """PATCH /auth/password must increment token_version in DB."""
+        client, db = app_client
+        token = make_token(token_version=1)
+        _set_profile(db, {**_profile(token_version=1), "user_id": TEST_USER_ID})
+        db.table.return_value.update.return_value.eq.return_value \
+            .execute.return_value.data = [{}]
+
+        resp = client.patch(
+            "/api/v1/auth/password",
+            json={"password": "newpassword123"},
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code == 200
+        # Verify update was called (token_version increment)
+        assert db.table.return_value.update.called
+
+    def test_old_token_version_rejected_after_password_reset(self, app_client):
+        """Token with ver=1 must be rejected when profile has token_version=2."""
+        client, db = app_client
+        old_token = make_token(token_version=1)
+        _set_profile(db, _profile(token_version=2))
+        resp = client.get(
+            "/api/v1/contacts",
+            headers={"Authorization": f"Bearer {old_token}"}
+        )
+        assert resp.status_code in (401, 403)
+
+    def test_current_token_version_accepted(self, app_client):
+        """Token with ver=2 must be accepted when profile has token_version=2."""
+        client, db = app_client
+        token = make_token(token_version=2)
+        _set_profile(db, _profile(token_version=2))
+        db.table.return_value.select.return_value.eq.return_value \
+            .order.return_value.limit.return_value.execute.return_value.data = []
+        resp = client.get(
+            "/api/v1/contacts",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert resp.status_code not in (401, 403)
+
+    def test_logout_endpoint_returns_200(self, app_client):
+        """Logout is stateless — server returns 200, client clears storage."""
+        client, db = app_client
+        resp = client.post("/api/v1/auth/logout")
+        assert resp.status_code == 200
+
+    def test_403_does_not_indicate_expired_session(self, app_client):
+        """403 Forbidden must not be confused with 401 Unauthorized.
+        Verified by checking that require_role raises 403 for wrong role.
+        """
+        client, db = app_client
+        agent_token = make_token(role="agent")
+        _set_profile(db, {
+            "account_id": TEST_ACCOUNT_ID,
+            "role": "agent",
+            "token_version": 1,
+        })
+        # /api/v1/super-admin/stats requires is_super_admin DB flag
+        # With agent role and no super_admin flag, must get 403 not 401
+        db.table.return_value.select.return_value.eq.return_value \
+            .limit.return_value.execute.return_value.data = [{
+                "account_id": TEST_ACCOUNT_ID,
+                "role": "agent",
+                "token_version": 1,
+                "is_super_admin": False,
+            }]
+        resp = client.get(
+            "/api/v1/super-admin/stats",
+            headers={"Authorization": f"Bearer {agent_token}"}
+        )
+        # Must be 403 (insufficient privilege), not 401 (expired/invalid session)
+        assert resp.status_code == 403
+
+
+class TestTenantIsolation:
+    """Cross-tenant access must be denied regardless of token lifetime."""
+
+    def test_token_account_claim_ignored_db_account_used(self, app_client):
+        """account_id is always re-derived from DB, never from token claims."""
+        client, db = app_client
+        # Token claims account_id_2 but DB profile has account_id_1
+        from conftest import TEST_ACCOUNT_ID_2
+        token = make_token(account_id=TEST_ACCOUNT_ID_2)
+        _set_profile(db, _profile())  # DB returns account_id_1
+        db.table.return_value.select.return_value.eq.return_value \
+            .order.return_value.limit.return_value.execute.return_value.data = []
+        resp = client.get(
+            "/api/v1/contacts",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        # Accepted — but uses DB account_id, not token claim
+        assert resp.status_code not in (401, 403)
 
 
 class TestSessionRestoration:

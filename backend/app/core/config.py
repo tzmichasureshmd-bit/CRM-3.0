@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret: str
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 525600  # 1 year (effectively no expiry)
+    jwt_expire_minutes: int = 525600  # 1 year — long-lived by design (no refresh tokens).
+                                       # Revocation is via token_version increment on password reset.
+                                       # Reduce to 43200 (30d) if refresh tokens are added later.
 
     # AI
     openai_api_key: str = ""

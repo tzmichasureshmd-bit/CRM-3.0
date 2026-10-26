@@ -97,7 +97,11 @@ export async function verifyRequest(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // 3. Expiry check intentionally skipped — tokens are long-lived (1 year)
+  // 3. Check expiry — signature must be verified first (done above)
+  const exp = payload.exp as number | undefined;
+  if (exp !== undefined && Math.floor(Date.now() / 1000) > exp) {
+    return NextResponse.json({ error: 'Token expired' }, { status: 401 });
+  }
 
   // 4. Reject partial TOTP tokens — must not access protected routes
   if (payload.partial === true) {
