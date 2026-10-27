@@ -12,12 +12,13 @@ CREATE TABLE IF NOT EXISTS crm3_experiments (
   description TEXT,
   metric TEXT NOT NULL DEFAULT 'conversion_rate',
   variants JSONB NOT NULL DEFAULT '[]'::jsonb,
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'running', 'paused', 'completed')),
+  status TEXT NOT NULL DEFAULT 'draft',
   started_at TIMESTAMPTZ,
   ended_at TIMESTAMPTZ,
   winner_variant TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT crm3_experiments_status_check CHECK (status IN ('draft', 'running', 'paused', 'completed'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_crm3_experiments_account ON crm3_experiments(account_id);
@@ -30,9 +31,10 @@ CREATE TABLE IF NOT EXISTS crm3_experiment_events (
   account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   contact_id UUID,
   variant TEXT NOT NULL,
-  event_type TEXT NOT NULL CHECK (event_type IN ('exposure', 'conversion')),
+  event_type TEXT NOT NULL,
   metadata JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT crm3_experiment_events_type_check CHECK (event_type IN ('exposure', 'conversion'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_crm3_experiment_events_experiment ON crm3_experiment_events(experiment_id);
@@ -48,7 +50,7 @@ CREATE TABLE IF NOT EXISTS media_assets (
   account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   created_by UUID NOT NULL,
   name TEXT NOT NULL,
-  file_type TEXT NOT NULL DEFAULT 'other' CHECK (file_type IN ('image', 'video', 'document', 'audio', 'other')),
+  file_type TEXT NOT NULL DEFAULT 'other',
   mime_type TEXT,
   size_bytes BIGINT,
   storage_url TEXT NOT NULL,
@@ -56,7 +58,8 @@ CREATE TABLE IF NOT EXISTS media_assets (
   alt_text TEXT,
   tags TEXT[] DEFAULT ARRAY[]::TEXT[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT media_assets_type_check CHECK (file_type IN ('image', 'video', 'document', 'audio', 'other'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_assets_account ON media_assets(account_id);
@@ -70,11 +73,13 @@ CREATE TABLE IF NOT EXISTS knowledge_documents (
   created_by UUID NOT NULL,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
-  category TEXT NOT NULL DEFAULT 'general' CHECK (category IN ('faq', 'guide', 'policy', 'product', 'support', 'general')),
-  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+  category TEXT NOT NULL DEFAULT 'general',
+  status TEXT NOT NULL DEFAULT 'draft',
   tags TEXT[] DEFAULT ARRAY[]::TEXT[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT knowledge_documents_category_check CHECK (category IN ('faq', 'guide', 'policy', 'product', 'support', 'general')),
+  CONSTRAINT knowledge_documents_status_check CHECK (status IN ('draft', 'published', 'archived'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_knowledge_documents_account ON knowledge_documents(account_id);
@@ -105,15 +110,17 @@ CREATE TABLE IF NOT EXISTS company_profiles (
 CREATE TABLE IF NOT EXISTS billing_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id UUID NOT NULL UNIQUE REFERENCES accounts(id) ON DELETE CASCADE,
-  plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'enterprise')),
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'past_due', 'canceled', 'trialing')),
+  plan TEXT NOT NULL DEFAULT 'free',
+  status TEXT NOT NULL DEFAULT 'active',
   current_period_start TIMESTAMPTZ,
   current_period_end TIMESTAMPTZ,
   cancel_at_period_end BOOLEAN DEFAULT FALSE,
   stripe_customer_id TEXT,
   stripe_subscription_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT billing_subscriptions_plan_check CHECK (plan IN ('free', 'pro', 'enterprise')),
+  CONSTRAINT billing_subscriptions_status_check CHECK (status IN ('active', 'past_due', 'canceled', 'trialing'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_account ON billing_subscriptions(account_id);
