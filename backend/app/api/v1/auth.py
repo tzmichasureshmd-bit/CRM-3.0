@@ -69,15 +69,15 @@ class TokenResponse(BaseModel):
 
 def create_token(user_id: str, account_id: str, role: str,
                  partial: bool = False, token_version: int = 1) -> str:
-    expire = datetime.utcnow() + timedelta(
-        minutes=5 if partial else settings.jwt_expire_minutes
-    )
+    now    = datetime.utcnow()
+    expire = now + timedelta(minutes=5 if partial else settings.jwt_expire_minutes)
     payload = {
         "sub": user_id,
         "account_id": account_id,
         "role": role,
+        "iat": now,       # issued-at — fixes epoch 0 bug
         "exp": expire,
-        "ver": token_version,   # FIX-005: token version for revocation
+        "ver": token_version,
     }
     if partial:
         payload["partial"] = True

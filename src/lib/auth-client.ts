@@ -47,11 +47,11 @@ function parseJWT(token: string): Record<string, unknown> | null {
   }
 }
 
-/** Check if JWT is expired (with 5-minute buffer). */
+/** Check if JWT is expired (with 2-minute buffer). */
 export function isTokenExpired(token: string): boolean {
   const payload = parseJWT(token);
   if (!payload || typeof payload.exp !== 'number') return true;
-  const bufferSeconds = 5 * 60; // Show renewal modal 5 minutes before expiry
+  const bufferSeconds = 2 * 60; // 2-minute buffer — was 5min which triggered too early
   return Math.floor(Date.now() / 1000) >= (payload.exp - bufferSeconds);
 }
 
@@ -144,10 +144,13 @@ function authHeaders(extra?: HeadersInit): HeadersInit {
   return base;
 }
 
+// Global flag — prevents multiple simultaneous 401s from firing crm:session-expired more than once
+let _sessionExpiredFired = false;
+
 /**
  * Drop-in replacement for bare fetch('/api/v3/...') calls.
  * Automatically attaches the CRM JWT.
- * On 401, fires crm:session-expired event — shows renewal modal, never redirects.
+ * On 401, fires crm:session-expired event ONCE — shows renewal modal, never redirects.
  */
 export function v3fetch(input: string, init?: RequestInit): Promise<Response> {
   return fetch(input, {
@@ -155,7 +158,10 @@ export function v3fetch(input: string, init?: RequestInit): Promise<Response> {
     ...init,
     headers: authHeaders(init?.headers),
   }).then(res => {
-    if (res.status === 401 && typeof window !== 'undefined') {
+    if (res.status === 401 && typeof window !== 'undefined' && !_sessionExpiredFired) {
+      _sessionExpiredFired = true;
+      // Reset after 3 seconds so future real expirations still work
+      setTimeout(() => { _sessionExpiredFired = false; }, 3000);
       window.dispatchEvent(new CustomEvent('crm:session-expired', {
         detail: { 
           reason: '401_response', 

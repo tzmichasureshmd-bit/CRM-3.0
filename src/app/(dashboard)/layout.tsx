@@ -15,16 +15,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mounted, setMounted] = useState(false);
   const [showRenewal, setShowRenewal] = useState(false);
   const renewalInProgressRef = useRef(false);
+  const sessionCheckedRef    = useRef(false);
 
   useEffect(() => {
     setMounted(true);
     const token = localStorage.getItem('crm_token');
     if (!token) { window.location.replace('/login'); return; }
 
-    // FIX-006: Proactively check token expiry on mount.
-    // If the token is expired/malformed, this fires crm:session-expired immediately
-    // so the renewal modal appears before the first API call fails.
-    checkSessionExpiry();
+    // Only check expiry ONCE on first mount — not on every page navigation.
+    // checkSessionExpiry fires crm:session-expired if token is expired/malformed.
+    if (!sessionCheckedRef.current) {
+      sessionCheckedRef.current = true;
+      checkSessionExpiry();
+    }
 
     const saved = localStorage.getItem('crm_theme') as 'light' | 'dark' | null;
     if (saved === 'dark') setTheme('dark');
@@ -64,7 +67,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleRenewed = useCallback(() => {
     setShowRenewal(false);
     renewalInProgressRef.current = false;
-    // Silently reload data by dispatching a custom event pages can listen to
     window.dispatchEvent(new CustomEvent('crm:session-renewed'));
   }, []);
 

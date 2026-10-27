@@ -3,6 +3,7 @@ import { Search, Bell, Settings, LayoutGrid, MessageSquare, Sun, Moon, User, Log
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getStoredUser, getContacts, getDeals, getConversations } from '@/lib/api-client';
+import { clearAllTokens } from '@/lib/auth-client';
 
 interface NotifItem {
   id: string;
@@ -62,12 +63,16 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Load notifications from backend
+  // Load notifications — silent, never fires session-expired
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') ?? '' : '';
     if (!token) return;
     fetch('/api/v3/notifications', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => {
+        // Silently ignore 401 here — topbar should never trigger session modal
+        if (!r.ok) return null;
+        return r.json();
+      })
       .then((d: { data?: NotifItem[] } | null) => { if (d?.data) setNotifs(d.data.slice(0, 20)); })
       .catch(() => {});
   }, []);
@@ -113,8 +118,7 @@ export function CRMTopbar({ theme, onToggleTheme }: CRMTopbarProps) {
   }, []);
 
   const handleSignOut = () => {
-    localStorage.removeItem('crm_token');
-    localStorage.removeItem('crm_user');
+    clearAllTokens();
     window.location.replace('/login');
   };
 

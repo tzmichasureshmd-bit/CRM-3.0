@@ -46,9 +46,13 @@ export default function CommandCenterPage() {
         v3fetch('/api/v3/follow-ups?status=all&limit=200'),
       ]);
 
-      const dealsJson     = dealsRes.ok     ? await dealsRes.json()     as { data?: { status: string; value: number | null; currency?: string }[] } : {};
-      const contactsJson  = contactsRes.ok  ? await contactsRes.json()  as { data?: { lead_score_tier: string | null }[]; contacts?: { lead_score_tier: string | null }[] } : {};
-      const followupsJson = followupsRes.ok ? await followupsRes.json() as { follow_ups?: { status: string; due_date: string }[]; data?: { status: string; due_date: string }[] } : {};
+      // If any returned 401, session-expired already fired via v3fetch.
+      // Don't process further — just bail silently.
+      if (!dealsRes.ok || !contactsRes.ok || !followupsRes.ok) return;
+
+      const dealsJson     = await dealsRes.json()     as { data?: { status: string; value: number | null; currency?: string }[] };
+      const contactsJson  = await contactsRes.json()  as { data?: { lead_score_tier: string | null }[]; contacts?: { lead_score_tier: string | null }[] };
+      const followupsJson = await followupsRes.json() as { follow_ups?: { status: string; due_date: string }[]; data?: { status: string; due_date: string }[] };
 
       const deals     = dealsJson.data ?? [];
       const contacts  = contactsJson.data ?? contactsJson.contacts ?? [];
