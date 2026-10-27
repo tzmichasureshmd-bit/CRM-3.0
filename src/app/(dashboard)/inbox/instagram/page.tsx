@@ -584,6 +584,13 @@ export default function InstagramPage() {
 
   useEffect(() => { void loadCreds(); void loadAll(); }, [loadAll, loadCreds]);
 
+  // Re-fetch after session renewal so page recovers without manual refresh
+  useEffect(() => {
+    const handler = () => void loadAll();
+    window.addEventListener('crm:session-renewed', handler);
+    return () => window.removeEventListener('crm:session-renewed', handler);
+  }, [loadAll]);
+
   // silent poll every 10s
   useEffect(() => {
     const id = setInterval(() => void loadAll(true), 10000);

@@ -5,23 +5,28 @@
  * account_id is always from the JWT — never from the frontend.
  */
 
+import { getCrmToken, clearAllTokens } from './auth-client';
+
 const BASE = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:8000';
 const API  = `${BASE}/api/v1`;
 
 // ── Token helpers ─────────────────────────────────────────────
+/**
+ * @deprecated Use getCrmToken() from auth-client.ts instead.
+ */
 export function getToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('crm_token');
+  return getCrmToken();
 }
 
 export function setToken(token: string): void {
   localStorage.setItem('crm_token', token);
 }
 
+/**
+ * @deprecated Use clearAllTokens() from auth-client.ts instead.
+ */
 export function clearToken(): void {
-  localStorage.removeItem('crm_token');
-  localStorage.removeItem('crm_user');
-  localStorage.removeItem('crm_partial_token'); // FIX-009: clear partial token on logout
+  clearAllTokens();
 }
 
 export function getStoredUser(): { user_id: string; account_id: string; role: string } | null {
@@ -35,7 +40,7 @@ export function getStoredUser(): { user_id: string; account_id: string; role: st
 // Returns the stored CRM JWT. No Supabase fallback — a missing token means
 // the user is not logged in and must go through the CRM login flow.
 async function getValidToken(): Promise<string | null> {
-  return getToken();
+  return getCrmToken();
 }
 
 // ── Core fetch wrapper ────────────────────────────────────────
@@ -59,7 +64,19 @@ async function req<T = unknown>(
     const body = await res.text();
     let msg = 'Invalid credentials';
     try { msg = (JSON.parse(body) as { detail?: string }).detail ?? msg; } catch { /* */ }
-    if (!authOnly) clearToken(); // clear stale token but do NOT redirect — layout handles it
+    if (!authOnly && typeof window !== 'undefined') {
+      // Fire the renewal modal — do NOT clear the token here.
+      // Clearing the token on a transient 401 causes a cascade: every subsequent
+      // request fires crm:session-expired again because the token is now missing.
+      // The token is only cleared on explicit logout or after the user cancels renewal.
+      window.dispatchEvent(new CustomEvent('crm:session-expired', {
+        detail: { 
+          reason: '401_response', 
+          url: path,
+          timestamp: new Date().toISOString() 
+        }
+      }));
+    }
     throw new Error(msg);
   }
 

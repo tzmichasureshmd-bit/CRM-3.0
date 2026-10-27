@@ -327,6 +327,13 @@ export default function WhatsAppPage() {
 
   useEffect(() => { void init(); }, [init]);
 
+  // Re-fetch after session renewal so page recovers without manual refresh
+  useEffect(() => {
+    const handler = () => void init();
+    window.addEventListener('crm:session-renewed', handler);
+    return () => window.removeEventListener('crm:session-renewed', handler);
+  }, [init]);
+
   // silent sidebar poll every 8s — refreshes conv list without any visual disruption
   useEffect(() => {
     const id = setInterval(() => void init(), 8000);

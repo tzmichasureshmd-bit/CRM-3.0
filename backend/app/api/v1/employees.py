@@ -104,6 +104,19 @@ async def update_employee(employee_id: str, body: dict, user=Depends(get_current
         .eq("id", employee_id).eq("account_id", user["account_id"]).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Employee not found")
+
+    # If deactivating, increment token_version on the linked profile so the
+    # employee's JWT is immediately rejected on the next request.
+    if update.get("is_active") is False:
+        emp = res.data[0]
+        linked_user_id = emp.get("user_id")
+        if linked_user_id:
+            prof = db.table("profiles").select("token_version").eq("user_id", linked_user_id).limit(1).execute()
+            if prof.data:
+                new_ver = (prof.data[0].get("token_version") or 1) + 1
+                db.table("profiles").update({"token_version": new_ver, "is_active": False})\
+                    .eq("user_id", linked_user_id).execute()
+
     _audit(db, user["account_id"], user["user_id"], "", "employee.updated",
            "employee", employee_id, metadata=update)
     return res.data[0]
@@ -111,8 +124,23 @@ async def update_employee(employee_id: str, body: dict, user=Depends(get_current
 
 @router.delete("/employees/{employee_id}")
 async def delete_employee(employee_id: str, user=Depends(get_current_user), db=Depends(get_supabase)):
+    # Fetch before delete to get linked user_id
+    emp_res = db.table("employees").select("user_id").eq("id", employee_id)\
+        .eq("account_id", user["account_id"]).limit(1).execute()
+    linked_user_id = emp_res.data[0].get("user_id") if emp_res.data else None
+
     db.table("employees").delete()\
         .eq("id", employee_id).eq("account_id", user["account_id"]).execute()
+
+    # Increment token_version on the linked profile so the removed employee's
+    # JWT is immediately rejected. Scoped to this account's employee only.
+    if linked_user_id:
+        prof = db.table("profiles").select("token_version").eq("user_id", linked_user_id).limit(1).execute()
+        if prof.data:
+            new_ver = (prof.data[0].get("token_version") or 1) + 1
+            db.table("profiles").update({"token_version": new_ver})\
+                .eq("user_id", linked_user_id).execute()
+
     _audit(db, user["account_id"], user["user_id"], "", "employee.deleted",
            "employee", employee_id)
     return {"status": "deleted"}
