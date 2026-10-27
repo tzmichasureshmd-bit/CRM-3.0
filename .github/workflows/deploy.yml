@@ -20,15 +20,17 @@ jobs:
           ${{ secrets.BACKEND_ENV }}
           EOF
           
-          # Frontend .env.local
+          # Frontend .env.local - inject OPENAI_API_KEY from secret
           cat > .env.local << 'EOF'
           ${{ secrets.FRONTEND_ENV }}
           EOF
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env.local
           
-          # AI Service .env
+          # AI Service .env - inject OPENAI_API_KEY from secret
           cat > ai-service/.env << 'EOF'
           ${{ secrets.AI_SERVICE_ENV }}
           EOF
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> ai-service/.env
 
       - name: Stop existing containers
         run: docker compose down --remove-orphans || true
