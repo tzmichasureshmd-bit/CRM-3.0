@@ -68,6 +68,7 @@ services:
       - NEXT_PUBLIC_BACKEND_URL=https://crm3.tzmicha.com
       - NEXT_PUBLIC_AI_URL=http://ai-service:8001
       # Server-side secrets — required by verifyRequest() in /api/v3/* routes
+      - BACKEND_URL=http://backend:8000
       - JWT_SECRET=${JWT_SECRET}
       - SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
