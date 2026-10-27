@@ -48,6 +48,8 @@ ENV NODE_ENV=production
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+# Copy .env.local so JWT_SECRET and server-side secrets are available at runtime
+COPY --from=builder /app/.env.local ./.env.local
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
