@@ -23,7 +23,11 @@ jobs:
         run: docker compose down --remove-orphans || true
 
       - name: Build images
-        run: docker compose build --no-cache
+        run: |
+          # Build images one at a time to avoid memory exhaustion
+          docker compose build --no-cache --memory 1g backend
+          docker compose build --no-cache --memory 1g ai-service
+          docker compose build --no-cache --memory 2g frontend
         env:
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
