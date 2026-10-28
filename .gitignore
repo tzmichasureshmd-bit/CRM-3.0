@@ -72,3 +72,14 @@ backend/backend_restart.log
 
 # AI service cache
 ai-service/.pytest_cache/
+
+# Documentation & SQL files (generated/temporary)
+*_MIGRATION_*.sql
+CREATE_MISSING_TABLES.sql
+APPLY_MIGRATION_*.sql
+APPLY_ALL_MIGRATIONS_*.sql
+HOW_TO_*.md
+TEST_*.md
+QUICK_START_*.md
+JWT_SESSION_*.md
+test_*.py
