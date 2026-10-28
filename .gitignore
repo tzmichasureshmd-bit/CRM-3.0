@@ -13,14 +13,18 @@ dist/
 Tzmicha_CRM-main/
 
 
-# env files
-.env
+# env files - secrets
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 backend/.env
 frontend/.env.local
+ai-service/.env
+
+# Note: .env is tracked (contains dummy values to silence docker-compose warnings)
+# On VPS, .env is a symlink to .env.local (created by GitHub Actions workflow)
+# Real secrets are ONLY in .env.local (not tracked)
 
 # debug
 npm-debug.log*

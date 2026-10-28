@@ -50,6 +50,10 @@ jobs:
             echo "✅ ai-service/.env exists - PRESERVING (no changes)"
           fi
           
+          # Create symlink .env -> .env.local for Docker Compose variable substitution
+          echo "🔗 Creating .env symlink to .env.local for Docker Compose..."
+          ln -sf .env.local .env
+          
           echo ""
           echo "📝 Summary: .env files preserved to maintain JWT sessions"
 
