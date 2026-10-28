@@ -13,24 +13,45 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Create .env files from secrets
+      - name: Preserve .env files (prevent JWT session loss)
         run: |
+          # NEVER overwrite .env files if they exist
+          # This preserves JWT_SECRET and prevents session invalidation
+          
           # Backend .env
-          cat > backend/.env << 'EOF'
+          if [ ! -f backend/.env ]; then
+            echo "⚙️  Creating NEW backend/.env from secrets..."
+            cat > backend/.env << 'EOF'
           ${{ secrets.BACKEND_ENV }}
           EOF
+          else
+            echo "✅ backend/.env exists - PRESERVING (no changes)"
+          fi
           
-          # Frontend .env.local - inject OPENAI_API_KEY from secret
-          cat > .env.local << 'EOF'
+          # Frontend .env.local
+          if [ ! -f .env.local ]; then
+            echo "⚙️  Creating NEW .env.local from secrets..."
+            cat > .env.local << 'EOF'
           ${{ secrets.FRONTEND_ENV }}
           EOF
-          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env.local
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env.local
+          else
+            echo "✅ .env.local exists - PRESERVING (no changes)"
+          fi
           
-          # AI Service .env - inject OPENAI_API_KEY from secret
-          cat > ai-service/.env << 'EOF'
+          # AI Service .env
+          if [ ! -f ai-service/.env ]; then
+            echo "⚙️  Creating NEW ai-service/.env from secrets..."
+            cat > ai-service/.env << 'EOF'
           ${{ secrets.AI_SERVICE_ENV }}
           EOF
-          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> ai-service/.env
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> ai-service/.env
+          else
+            echo "✅ ai-service/.env exists - PRESERVING (no changes)"
+          fi
+          
+          echo ""
+          echo "📝 Summary: .env files preserved to maintain JWT sessions"
 
       - name: Stop existing containers
         run: docker compose down --remove-orphans || true
