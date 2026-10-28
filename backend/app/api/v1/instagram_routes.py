@@ -168,10 +168,29 @@ async def reply_ig_dm(conversation_id: str, body: dict, user: dict = Depends(get
     ig_id, _ = _get_ig_credentials(user["account_id"])
     text: str = body.get("text", "")
     recipient_id: str = body.get("recipient_id", "")
+    
     if not text:
         raise HTTPException(status_code=400, detail="text required")
+    
+    # If no recipient_id, fetch from messages in conversation
     if not recipient_id:
-        raise HTTPException(status_code=400, detail="recipient_id required")
+        try:
+            msgs = await _get(f"/{conversation_id}/messages", user["account_id"], {
+                "fields": "id,from",
+                "limit": 10,
+            })
+            # Find first message not from us
+            for m in msgs.get("data", []):
+                from_id = m.get("from", {}).get("id", "")
+                if from_id and str(from_id) != str(ig_id):
+                    recipient_id = from_id
+                    break
+        except:
+            pass
+        
+        if not recipient_id:
+            raise HTTPException(status_code=400, detail="recipient_id required and could not be determined")
+    
     return await _post(f"/{ig_id}/messages", user["account_id"], {
         "recipient": {"id": recipient_id},
         "message": {"text": text},
